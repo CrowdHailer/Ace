@@ -7,6 +7,28 @@
 2. Keep reasonable notes of progress so others can learn about how to build a web server in elixir.
 3. See what progress I have made in a year as an elixir developer.
 
+## Ace 0.1 (TCP echo)
+
+The simplest TCP echo server.
+All code exists in a single source file `server.ex`.
+Documentation is added to the [source code](https://github.com/CrowdHailer/Ace/blob/master/server.ex).
+
+#### startup
+
+```
+elixir server.ex
+```
+
+#### Connect
+Use telnet to communicate with the echo server.
+
+```
+telnet localhost 8080
+
+hi
+ECHO: hi
+```
+
 ## Using Vagrant
 
 Vagrant manages virtual machine provisioning.
