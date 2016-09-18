@@ -1,6 +1,13 @@
 # Ace
 ### An educational Webserver for Elixir.
 
+# HI
+
+> If you are hear send me a message twitter/gh-issue, they're all good.
+> I want to take a deep dive into TCP/HTTP and network protocols in general, so if your curious or on a similar voyage of discovery say hi.
+
+> Cheers
+
 ## The plan.
 
 1. To take this obviously deficient TCP echo server that I wrote as a beginner elixir developer and create a fully fledged HTTP server.
