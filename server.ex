@@ -52,6 +52,10 @@ defmodule TCPEcho do
       {:ok, message} ->
         TCP.send(socket, "ECHO: #{String.strip(message)}\r\n")
         loop(socket)
+
+      # Shutdown gracefully if the client unexpectedly closed the connection
+      {:error, :closed } ->
+        IO.puts("Socket connection closed")
     end
   end
 end
