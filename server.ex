@@ -17,7 +17,7 @@ defmodule TCPEcho do
     {:packet, :line},
 
     # Set the socket to execute in passive mode.
-    # The process must explicity recieve incoming data by calling `TCP.recv/2`
+    # The process must explicity receive incoming data by calling `TCP.recv/2`
     {:active, false},
 
     # FIXME, seams necessary when restarting the server.
