@@ -1,3 +1,23 @@
+
+defmodule Ace.TCP.Acceptor.Supervisor do
+  use Supervisor
+
+  def start_link(options, sup_opts \\ []) do
+    Supervisor.start_link(__MODULE__, options, sup_opts)
+  end
+
+  # MODULE CALLBACKS
+
+  def init(options) do
+    port = options[:port]
+    {:ok, listen_socket} = :gen_tcp.listen(port, [{:active, false}, :binary])
+    children = [
+      worker(Ace.TCP.Acceptor, [listen_socket])
+    ]
+
+    supervise(children, strategy: :one_for_one)
+  end
+end
 defmodule Ace.TCP.Supervisor do
   use Supervisor
 
