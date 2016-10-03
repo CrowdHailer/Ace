@@ -1,4 +1,4 @@
-defmodule TCPEcho do
+defmodule Ace.TCP do
   # Alias erlang libraries so the following code is more readable.
 
   # Interface to TCP/IP sockets.
@@ -61,6 +61,3 @@ defmodule TCPEcho do
     end
   end
 end
-
-# Start the echo server on port 8080.
-TCPEcho.start(8080)

@@ -1,0 +1,2 @@
+%{"earmark": {:hex, :earmark, "1.0.1", "2c2cd903bfdc3de3f189bd9a8d4569a075b88a8981ded9a0d95672f6e2b63141", [:mix], []},
+  "ex_doc": {:hex, :ex_doc, "0.14.1", "bfed8d4e93c755e2b150be925ad2cfa6af7c3bfcacc3b609f45f6048c9d623d6", [:mix], [{:earmark, "~> 1.0", [hex: :earmark, optional: false]}]}}
