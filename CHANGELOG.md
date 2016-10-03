@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased](https://github.com/CrowdHailer/Ace)
+
+### Changed
+- Restructured to a mix project. Follow new start up instructions in README.
+
 ## [0.1.1](https://github.com/CrowdHailer/Ace/tree/0.1.1) - 2016-10-03
 
 ### Fixed

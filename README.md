@@ -1,29 +1,38 @@
 # Ace
 ### An educational Webserver for Elixir.
 
-# HI
+# Hi
 
 > If you are hear send me a message twitter/gh-issue, they're all good.
 > I want to take a deep dive into TCP/HTTP and network protocols in general, so if your curious or on a similar voyage of discovery say hi.
 
 > Cheers
 
-## The plan.
+## Installation
 
-1. To take this obviously deficient TCP echo server that I wrote as a beginner elixir developer and create a fully fledged HTTP server.
-2. Keep reasonable notes of progress so others can learn about how to build a web server in elixir.
-3. See what progress I have made in a year as an elixir developer.
+[Available on Hex](https://hex.pm/packages/ace), the package can be installed as:
 
-## Ace 0.1 (TCP echo)
+  1. Add `ace` to your list of dependencies in `mix.exs`:
 
-The simplest TCP echo server.
-All code exists in a single source file `server.ex`.
-Documentation is added to the [source code](https://github.com/CrowdHailer/Ace/blob/master/server.ex).
+    ```elixir
+    def deps do
+      [{:ace, "~> 0.2.0"}]
+    end
+    ```
+
+## Usage
 
 #### startup
 
+From the console, start mix.
+
+```shell
+iex -S mix
 ```
-elixir server.ex
+
+In the `iex` console, start a TCP server.
+```elixir
+Ace.TCP.start(8080)
 ```
 
 #### Connect
@@ -35,6 +44,19 @@ telnet localhost 8080
 hi
 ECHO: hi
 ```
+
+## The plan
+
+1. To take this obviously deficient TCP echo server that I wrote as a beginner elixir developer and create a fully fledged HTTP server.
+2. Keep reasonable notes of progress so others can learn about how to build a web server in elixir.
+3. See what progress I have made in a year as an elixir developer.
+
+### Ace 0.1 (TCP echo)
+
+The simplest TCP echo server that works.
+Checkout the source of [version 0.1.0](https://github.com/CrowdHailer/Ace/blob/0.1.0/server.ex).
+The [change log](https://github.com/CrowdHailer/Ace/blob/master/CHANGELOG.md) documents all enhancements to this prototype server.
+
 
 ## Using Vagrant
 
