@@ -20,8 +20,10 @@ defmodule TCPEcho do
     # The process must explicity recieve incoming data by calling `TCP.recv/2`
     {:active, false},
 
-    # FIXME, seams necessary when restarting the server.
-    # Problem: the port is not always released when shutting down the server?
+    # it is possible for the process to complete before the kernel has released the associated network resource, and this port cannot be bound to another process until the kernel has decided that it is done.
+    # A detailed explaination is given at http://hea-www.harvard.edu/~fine/Tech/addrinuse.html
+    # This setting is a security vulnerability only on multi-user machines.
+    # It is NOT a vulnerability from outside the machine.
     {:reuseaddr, true}
   ]
 
