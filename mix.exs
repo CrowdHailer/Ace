@@ -21,6 +21,7 @@ defmodule Ace.Mixfile do
 
   defp deps do
     [
+      {:dialyxir, "~> 0.3.5", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
