@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/CrowdHailer/Ace)
+## [0.2.0](https://github.com/CrowdHailer/Ace)
+
+## Added
+- ExUnit test suit and single test case.
+- ExDoc for first hex published version.
 
 ### Changed
 - Restructured to a mix project. Follow new start up instructions in README.
@@ -13,7 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
-- Handle socket closed by client
+- Handle socket closed by client.
 
 ## [0.1.0](https://github.com/CrowdHailer/Ace/tree/0.1.0) - 2016-09-18
 
