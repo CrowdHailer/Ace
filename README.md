@@ -84,8 +84,10 @@ Once we've decided how to move forward with a pull request:
     $ cd Ace
     $ mix deps.get
     $ mix test
+    $ mix dialyzer.plt
+    $ mix dialyzer
 
-Once you've made your additions and `mix test` passes, go ahead and open a PR!
+Once you've made your additions, `mix test` passes and `mix dialyzer` reports no warnings, go ahead and open a PR!
 
 ## Resources I used to get this far
 

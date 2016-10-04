@@ -61,7 +61,7 @@ defmodule Ace.TCP do
 
       # Reply with the message and re-enter loop handler.
       {:ok, message} ->
-        TCP.send(socket, "ECHO: #{String.strip(message)}\r\n")
+        :ok = TCP.send(socket, "ECHO: #{String.strip(message)}\r\n")
         loop(socket)
 
       # Shutdown gracefully if the client unexpectedly closed the connection
