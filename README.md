@@ -1,12 +1,10 @@
-# Ace
-### An educational Webserver for Elixir.
+# Ace - Educational Webserver
 
-# Hi
+> Say hi, send me a message via twitter/gh-issue etc, they're all good.
+> I want to take a deep dive into TCP/HTTP and network protocols in general, so if your curious or on a similar voyage of discovery would be great to chat.
+> Cheers.
 
-> If you are hear send me a message twitter/gh-issue, they're all good.
-> I want to take a deep dive into TCP/HTTP and network protocols in general, so if your curious or on a similar voyage of discovery say hi.
-
-> Cheers
+[Documentation for Ace is available on hexdoc](https://hexdocs.pm/ace)
 
 ## Installation
 
@@ -21,6 +19,7 @@
     ```
 
 ## Usage
+
 
 #### startup
 
