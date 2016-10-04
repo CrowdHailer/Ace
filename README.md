@@ -89,7 +89,6 @@ Once you've made your additions and `mix test` passes, go ahead and open a PR!
 
 ## Resources I used to get this far
 
-- https://github.com/adamgamble/elixir_http_server
 - https://github.com/tominated/elixir_http_server
-- https://github.com/parroty/http_server
 - http://www.neo.com/2014/01/14/elixir-and-the-internet-of-things-handling-a-stampede
+- https://erlangcentral.org/wiki/index.php/Building_a_Non-blocking_TCP_server_using_OTP_principles
