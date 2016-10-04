@@ -74,6 +74,19 @@ cd /vagrant
 
 From this directory instructions will be that same as users running Elixir on their machine.
 
+## Contributing
+
+Before opening a pull request, please open an issue first.
+
+Once we've decided how to move forward with a pull request:
+
+    $ git clone git@github.com:CrowdHailer/Ace.git
+    $ cd Ace
+    $ mix deps.get
+    $ mix test
+
+Once you've made your additions and `mix test` passes, go ahead and open a PR!
+
 ## Resources I used to get this far
 
 - https://github.com/adamgamble/elixir_http_server
