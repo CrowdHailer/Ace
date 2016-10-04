@@ -1,4 +1,10 @@
 defmodule Ace.TCP do
+  @moduledoc """
+  TCP connections are handled by the `Ace.TCP` server.
+
+  To start the server run `Ace.TCP.start(port)`.
+  """
+
   # Alias erlang libraries so the following code is more readable.
 
   # Interface to TCP/IP sockets.
@@ -27,6 +33,9 @@ defmodule Ace.TCP do
     {:reuseaddr, true}
   ]
 
+  @doc """
+  Starts the server listening on the given port.
+  """
   def start(port) do
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)
@@ -43,7 +52,7 @@ defmodule Ace.TCP do
   end
 
   # Define a loop handler that gets executed on each incoming message.
-  def loop(socket) do
+  defp loop(socket) do
     case TCP.recv(socket, 0) do
 
       # Close the socket if the incoming message is "CLOSE".
