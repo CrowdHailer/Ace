@@ -13,7 +13,20 @@ defmodule Ace.TCPTest do
     :timer.sleep(100)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    {:ok, _welcome_message} = :gen_tcp.recv(client, 0)
     :ok = :gen_tcp.send(client, "blob\r\n")
-    {:ok, "ECHO: blob\r\n"} = :gen_tcp.recv(client, 0)
+    assert {:ok, "ECHO: blob\r\n"} = :gen_tcp.recv(client, 0)
+  end
+
+  test "says welcome for new connection" do
+    port = 10002
+
+    task = Task.async(fn () ->
+      {:ok, server} = Ace.TCP.start(port)
+    end)
+    :timer.sleep(100)
+
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
   end
 end
