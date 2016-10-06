@@ -29,4 +29,22 @@ defmodule Ace.TCPTest do
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
   end
+
+  test "socket broadcasts server message" do
+    port = 10_003
+    test_pid = self
+    task = Task.async(fn () ->
+      send(test_pid, {:server_pid, self})
+      {:ok, server} = Ace.TCP.start(port)
+    end)
+    :timer.sleep(100)
+
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    receive do
+      {:server_pid, pid} ->
+        send(pid, {:data, "HELLO"})
+    end
+    {:ok, _welcome_message} = :gen_tcp.recv(client, 0, 2000)
+    assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
+  end
 end

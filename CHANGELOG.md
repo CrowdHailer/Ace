@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased](https://github.com/CrowdHailer/Ace) - xxxx-xx-xx
 
 ## Added
-- System sends welcome message
+- System sends welcome message.
+- System sends data messages over the socket.
 
 ### Changed
 

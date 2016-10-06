@@ -56,20 +56,16 @@ defmodule Ace.TCP do
 
   # Define a loop handler that gets executed on each incoming message.
   defp loop(socket) do
-    case TCP.recv(socket, 0) do
-
-      # Close the socket if the incoming message is "CLOSE".
-      {:ok, "CLOSE" <> _} ->
-        TCP.close(socket)
-
-      # Reply with the message and re-enter loop handler.
-      {:ok, message} ->
+    :inet.setopts(socket, active: :once)
+    receive do
+      {:tcp, ^socket, message} ->
         :ok = TCP.send(socket, "ECHO: #{String.strip(message)}\r\n")
         loop(socket)
-
-      # Shutdown gracefully if the client unexpectedly closed the connection
-      {:error, :closed } ->
-        IO.puts("Socket connection closed")
+      {:data, message} ->
+        :ok = TCP.send(socket, "#{message}\r\n")
+        IO.inspect(message)
+        loop(socket)
     end
+    # FIXME handle client closing of socket
   end
 end
