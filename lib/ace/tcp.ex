@@ -47,6 +47,9 @@ defmodule Ace.TCP do
     # Accept and incoming connection request on the listening socket.
     {:ok, socket} = TCP.accept(listen_socket)
 
+    # Send a welcome message
+    :ok = TCP.send(socket, "WELCOME\r\n")
+
     # Enter the message handling loop
     loop(socket)
   end
