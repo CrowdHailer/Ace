@@ -65,7 +65,7 @@ defmodule Ace.TCP do
 
   # Define a loop handler that gets executed on each incoming message.
   defp loop(socket) do
-    # Set the socket to send a single recieved package as a message to this process.
+    # Set the socket to send a single recieved packet as a message to this process.
     # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
     :ok = :inet.setopts(socket, active: :once)
     receive do
