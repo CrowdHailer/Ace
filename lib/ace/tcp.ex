@@ -77,7 +77,10 @@ defmodule Ace.TCP do
       {:data, message} ->
         :ok = TCP.send(socket, "#{message}\r\n")
         loop(socket)
+      # If the socket is closed print a debug message.
+      # Do not reenter handling loop.
+      {:tcp_closed, ^socket} ->
+        IO.puts("Socket connection closed")
     end
-    # FIXME handle client closing of socket
   end
 end
