@@ -44,6 +44,15 @@ defmodule Ace.TCP do
     {:ok, port} = Inet.port(listen_socket)
     IO.puts("Listening on port: #{port}")
 
+    # Start a new process that will listen for a connection.
+    pid = spawn_link(__MODULE__, :open, [listen_socket])
+
+    # Return the server process
+    {:ok, pid}
+  end
+
+  def open(listen_socket) do
+
     # Accept and incoming connection request on the listening socket.
     {:ok, socket} = TCP.accept(listen_socket)
 
@@ -56,14 +65,17 @@ defmodule Ace.TCP do
 
   # Define a loop handler that gets executed on each incoming message.
   defp loop(socket) do
+    # Set the socket to send a single recieved package as a message to this process.
+    # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
     :inet.setopts(socket, active: :once)
     receive do
+      # For any incoming tcp packet respond by echoing the incomming message.
       {:tcp, ^socket, message} ->
         :ok = TCP.send(socket, "ECHO: #{String.strip(message)}\r\n")
         loop(socket)
+      # Send any erlang message that matches this pattern to the connected client.
       {:data, message} ->
         :ok = TCP.send(socket, "#{message}\r\n")
-        IO.inspect(message)
         loop(socket)
     end
     # FIXME handle client closing of socket

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - System sends data messages over the socket.
 
 ### Changed
+- Starting a server no longer blocks until the connection has been closed.
 
 ## [0.3.0](https://github.com/CrowdHailer/Ace) - 2016-10-04
 
