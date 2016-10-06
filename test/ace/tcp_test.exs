@@ -3,14 +3,7 @@ defmodule Ace.TCPTest do
 
   test "echos each message" do
     port = 10001
-
-    # Starting a server does not return until a connection has been dealt with.
-    # For this reason the call needs to be in a separate process.
-    # FIXME have the `start` call complete when the server is ready to accept a connection.
-    task = Task.async(fn () ->
-      {:ok, server} = Ace.TCP.start(port)
-    end)
-    :timer.sleep(100)
+    {:ok, server} = Ace.TCP.start(port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, _welcome_message} = :gen_tcp.recv(client, 0)
@@ -20,31 +13,19 @@ defmodule Ace.TCPTest do
 
   test "says welcome for new connection" do
     port = 10002
-
-    task = Task.async(fn () ->
-      {:ok, server} = Ace.TCP.start(port)
-    end)
-    :timer.sleep(100)
+    {:ok, server} = Ace.TCP.start(port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
   end
 
   test "socket broadcasts server message" do
-    port = 10_003
-    test_pid = self
-    task = Task.async(fn () ->
-      send(test_pid, {:server_pid, self})
-      {:ok, server} = Ace.TCP.start(port)
-    end)
-    :timer.sleep(100)
+    port = 10_004
+    {:ok, server} = Ace.TCP.start(port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    receive do
-      {:server_pid, pid} ->
-        send(pid, {:data, "HELLO"})
-    end
     {:ok, _welcome_message} = :gen_tcp.recv(client, 0, 2000)
+    send(server, {:data, "HELLO"})
     assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
   end
 end
