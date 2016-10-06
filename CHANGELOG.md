@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/CrowdHailer/Ace) - xxxx-xx-xx
+## [0.4.0](https://github.com/CrowdHailer/Ace/tree/0.4.0) - 2016-10-06
 
 ## Added
 - System sends welcome message.
@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Starting a server no longer blocks until the connection has been closed.
 
-## [0.3.0](https://github.com/CrowdHailer/Ace) - 2016-10-04
+## [0.3.0](https://github.com/CrowdHailer/Ace/tree/0.3.0) - 2016-10-04
 
 ## Added
 - Dialyzer for static analysis, with updated contributing instructions.
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Nothing, only bumped version due to incorrect publishing on hex.
 
-## [0.2.0](https://github.com/CrowdHailer/Ace) - 2016-10-04
+## [0.2.0](https://github.com/CrowdHailer/Ace/tree/0.2.0) - 2016-10-04
 
 ## Added
 - ExUnit test suit and single test case.

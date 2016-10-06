@@ -20,7 +20,6 @@
 
 ## Usage
 
-
 #### startup
 
 From the console, start mix.
@@ -31,7 +30,7 @@ iex -S mix
 
 In the `iex` console, start a TCP server.
 ```elixir
-Ace.TCP.start(8080)
+{:ok, server} = Ace.TCP.start(8080)
 ```
 
 #### Connect
@@ -39,9 +38,27 @@ Use telnet to communicate with the echo server.
 
 ```
 telnet localhost 8080
+```
 
+Wihin the telnet terminal
+
+```
+# once connected
+WELCOME
 hi
 ECHO: hi
+```
+
+In the iex session
+
+```
+send(server, {:data, "BOO!"})
+```
+
+back in telnet terminal
+
+```
+BOO!
 ```
 
 ## The plan
