@@ -20,12 +20,23 @@ defmodule Ace.TCPTest do
   end
 
   test "socket broadcasts server message" do
-    port = 10_004
+    port = 10_003
     {:ok, server} = Ace.TCP.start(port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, _welcome_message} = :gen_tcp.recv(client, 0, 2000)
     send(server, {:data, "HELLO"})
     assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
+  end
+
+  test "process for closed socket has died" do
+    port = 10_004
+    {:ok, server} = Ace.TCP.start(port)
+
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
+    :ok = :gen_tcp.close(client)
+    :timer.sleep(50)
+    assert false == Process.alive?(server)
   end
 end
