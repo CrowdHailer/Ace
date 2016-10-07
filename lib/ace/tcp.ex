@@ -1,4 +1,21 @@
 defmodule Ace.TCP do
+  defmodule DefaultServer do
+    def init(_connection, state = {:greeting, greeting}) do
+      {:send, greeting, state}
+    end
+
+    def handle_packet(inbound, state) do
+      {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
+    end
+
+    def handle_info(notification, state) do
+      {:send, "#{notification}\r\n", state}
+    end
+
+    def terminate(_reason, _state) do
+      IO.puts("Socket connection closed")
+    end
+  end
   @moduledoc """
   TCP connections are handled by the `Ace.TCP` server.
 
@@ -36,7 +53,7 @@ defmodule Ace.TCP do
   @doc """
   Starts the server listening on the given port.
   """
-  def start(port) do
+  def start(port, app \\ {DefaultServer, {:greeting, "WELCOME\r\n"}}) do
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)
 
@@ -45,42 +62,57 @@ defmodule Ace.TCP do
     IO.puts("Listening on port: #{port}")
 
     # Start a new process that will listen for a connection.
-    pid = spawn_link(__MODULE__, :open, [listen_socket])
+    pid = spawn_link(__MODULE__, :accept, [listen_socket, app])
 
     # Return the server process
     {:ok, pid}
   end
 
-  def open(listen_socket) do
+  def accept(listen_socket, {mod, state}) do
 
     # Accept and incoming connection request on the listening socket.
     {:ok, socket} = TCP.accept(listen_socket)
 
-    # Send a welcome message
-    :ok = TCP.send(socket, "WELCOME\r\n")
+    # Initialise the server with the app secification.
+    # Enter the message handling loop after sending a message if required.
+    case mod.init(:inet.peername(socket), state) do
+      {:send, message, new_state} ->
+        :ok = TCP.send(socket, message)
+        loop(socket, {mod, new_state})
+      {:nosend, new_state} ->
+        loop(socket, {mod, new_state})
+    end
 
-    # Enter the message handling loop
-    loop(socket)
   end
 
-  # Define a loop handler that gets executed on each incoming message.
-  defp loop(socket) do
+  # Define a loop handler that gets executed for every server action.
+  defp loop(socket, app = {mod, state}) do
     # Set the socket to send a single recieved packet as a message to this process.
     # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
     :ok = :inet.setopts(socket, active: :once)
     receive do
       # For any incoming tcp packet respond by echoing the incomming message.
       {:tcp, ^socket, message} ->
-        :ok = TCP.send(socket, "ECHO: #{String.strip(message)}\r\n")
-        loop(socket)
+        case mod.handle_packet(message, state) do
+          {:send, message, new_state} ->
+            :ok = TCP.send(socket, message)
+            loop(socket, {mod, new_state})
+        end
       # Send any erlang message that matches this pattern to the connected client.
       {:data, message} ->
-        :ok = TCP.send(socket, "#{message}\r\n")
-        loop(socket)
+        case mod.handle_info(message, state) do
+          {:send, message, _state} ->
+            :ok = TCP.send(socket, message)
+          end
+        loop(socket, app)
       # If the socket is closed print a debug message.
       # Do not reenter handling loop.
       {:tcp_closed, ^socket} ->
-        IO.puts("Socket connection closed")
+        case mod.terminate(:tcp_closed, state) do
+          :ok ->
+            :ok
+        end
     end
   end
+
 end
