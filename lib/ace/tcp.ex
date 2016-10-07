@@ -1,21 +1,4 @@
 defmodule Ace.TCP do
-  defmodule DefaultServer do
-    def init(_connection, state = {:greeting, greeting}) do
-      {:send, greeting, state}
-    end
-
-    def handle_packet(inbound, state) do
-      {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
-    end
-
-    def handle_info(notification, state) do
-      {:send, "#{notification}\r\n", state}
-    end
-
-    def terminate(_reason, _state) do
-      IO.puts("Socket connection closed")
-    end
-  end
   @moduledoc """
   TCP connections are handled by the `Ace.TCP` server.
 
@@ -53,7 +36,7 @@ defmodule Ace.TCP do
   @doc """
   Starts the server listening on the given port.
   """
-  def start(port, app \\ {DefaultServer, {:greeting, "WELCOME\r\n"}}) do
+  def start(port, app) do
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)
 

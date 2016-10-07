@@ -1,4 +1,4 @@
-defmodule Counter do
+defmodule CounterServer do
   def init(_, num) do
     {:nosend, num}
   end
@@ -13,22 +13,51 @@ defmodule Counter do
   end
 end
 
+defmodule GreetingServer do
+  def init(_, message) do
+    {:send, "#{message}\r\n", []}
+  end
+
+  def terminate(_reason, _state) do
+    IO.puts("Socket connection closed")
+  end
+end
+
+defmodule EchoServer do
+  def init(_, state) do
+    {:nosend, state}
+  end
+
+  def handle_packet(inbound, state) do
+    {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
+  end
+end
+
+defmodule BroadcastServer do
+  def init(_, state) do
+    {:nosend, state}
+  end
+
+  def handle_info(notification, state) do
+    {:send, "#{notification}\r\n", state}
+  end
+end
+
 defmodule Ace.TCPTest do
   use ExUnit.Case, async: true
 
   test "echos each message" do
     port = 10001
-    {:ok, server} = Ace.TCP.start(port)
+    {:ok, _server} = Ace.TCP.start(port, {EchoServer, []})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    {:ok, _welcome_message} = :gen_tcp.recv(client, 0)
     :ok = :gen_tcp.send(client, "blob\r\n")
     assert {:ok, "ECHO: blob\r\n"} = :gen_tcp.recv(client, 0)
   end
 
   test "says welcome for new connection" do
     port = 10002
-    {:ok, server} = Ace.TCP.start(port)
+    {:ok, _server} = Ace.TCP.start(port, {GreetingServer, "WELCOME"})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
@@ -36,17 +65,16 @@ defmodule Ace.TCPTest do
 
   test "socket broadcasts server message" do
     port = 10_003
-    {:ok, server} = Ace.TCP.start(port)
+    {:ok, server} = Ace.TCP.start(port, {BroadcastServer, []})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    {:ok, _welcome_message} = :gen_tcp.recv(client, 0, 2000)
     send(server, {:data, "HELLO"})
     assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
   end
 
   test "process for closed socket has died" do
     port = 10_004
-    {:ok, server} = Ace.TCP.start(port)
+    {:ok, server} = Ace.TCP.start(port, {GreetingServer, "WELCOME"})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
@@ -57,7 +85,7 @@ defmodule Ace.TCPTest do
 
   test "state is passed through messages" do
     port = 10_004
-    {:ok, server} = Ace.TCP.start(port, {Counter, 0})
+    {:ok, _server} = Ace.TCP.start(port, {CounterServer, 0})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "anything\r\n")
