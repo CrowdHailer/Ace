@@ -74,21 +74,21 @@ defmodule Ace.TCP do
     # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
     :ok = :inet.setopts(socket, active: :once)
     receive do
-      # For any incoming tcp packet respond by echoing the incomming message.
+      # For any incoming tcp packet call the `handle_packet` action.
       {:tcp, ^socket, message} ->
         case mod.handle_packet(message, state) do
           {:send, message, new_state} ->
             :ok = TCP.send(socket, message)
             loop(socket, {mod, new_state})
         end
-      # Send any erlang message that matches this pattern to the connected client.
+      # For any incoming erlang message the `handle_info` action.
       {:data, message} ->
         case mod.handle_info(message, state) do
           {:send, message, _state} ->
             :ok = TCP.send(socket, message)
           end
         loop(socket, app)
-      # If the socket is closed print a debug message.
+      # If the socket is closed call the `terminate` action.
       # Do not reenter handling loop.
       {:tcp_closed, ^socket} ->
         case mod.terminate(:tcp_closed, state) do
