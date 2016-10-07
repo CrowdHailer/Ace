@@ -8,7 +8,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider "virtualbox" do |v|
     # Running Dialyzer takes up a lot of memory and does not give useful errors if it runs out of memory.
     # http://stackoverflow.com/questions/39854839/dialyxir-mix-task-to-create-plt-exits-without-error-or-creating-table?noredirect=1#comment66998902_39854839
-    v.memory = 2048
+    v.memory = 3000
     v.cpus = 2
   end
 end

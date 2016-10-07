@@ -20,7 +20,39 @@
 
 ## Usage
 
-#### startup
+Ace manages TCP connections by refering to a application level server specification.
+A server must implement 4 callbacks:
+
+- `init(connection, configuration)` for establishing a new connection.
+- `handle_packet(packet, state)` to handle incomming TCP packets.
+- `handle_info(message, state)` to handle application messages sent to the server.
+- `terminate` to do any cleanup when the connection is closed.
+
+#### Server
+
+```elixir
+defmodule MyServer do
+  def init(_connection, state = {:greeting, greeting}) do
+    {:send, greeting, state}
+  end
+
+  def handle_packet(inbound, state) do
+    {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
+  end
+
+  def handle_info(notification, state) do
+    {:send, "#{notification}\r\n", state}
+  end
+
+  def terminate(_reason, _state) do
+    IO.puts("Socket connection closed")
+  end
+end
+```
+
+Defining my server above we can use it to start a server managed by Ace.
+
+#### Startup
 
 From the console, start mix.
 
@@ -30,7 +62,7 @@ iex -S mix
 
 In the `iex` console, start a TCP server.
 ```elixir
-{:ok, server} = Ace.TCP.start(8080)
+{:ok, server} = Ace.TCP.start(8080, {MyServer, {:greeting, "WELCOME"}})
 ```
 
 #### Connect
