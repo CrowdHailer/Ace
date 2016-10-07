@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.x.x](https://github.com/CrowdHailer/Ace/tree/0.4.0) - 2016-10-xx
+
+## Added
+- Connection behaviour is specified by server module.
+
 ## [0.4.0](https://github.com/CrowdHailer/Ace/tree/0.4.0) - 2016-10-06
 
 ## Added
