@@ -38,7 +38,7 @@ defmodule BroadcastServer do
     {:nosend, state}
   end
 
-  def handle_info(notification, state) do
+  def handle_info({:notify, notification}, state) do
     {:send, "#{notification}\r\n", state}
   end
 end
@@ -68,7 +68,7 @@ defmodule Ace.TCPTest do
     {:ok, server} = Ace.TCP.start(port, {BroadcastServer, []})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    send(server, {:data, "HELLO"})
+    send(server, {:notify, "HELLO"})
     assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
   end
 

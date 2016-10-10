@@ -40,7 +40,7 @@ defmodule MyServer do
     {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
   end
 
-  def handle_info(notification, state) do
+  def handle_info({:notify, notification}, state) do
     {:send, "#{notification}\r\n", state}
   end
 
@@ -84,7 +84,7 @@ ECHO: hi
 In the iex session
 
 ```
-send(server, {:data, "BOO!"})
+send(server, {:notify, "BOO!"})
 ```
 
 back in telnet terminal

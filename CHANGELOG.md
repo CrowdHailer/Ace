@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.5.0](https://github.com/CrowdHailer/Ace/tree/0.4.0) - 2016-10-07
+## [0.5.1](https://github.com/CrowdHailer/Ace/tree/0.5.1) - 2016-10-10
+
+## Changed
+- Send any message that is not TCP related to the `handle_info` callback,
+  previous only messages that matched {:data, info} where handled.
+
+## [0.5.0](https://github.com/CrowdHailer/Ace/tree/0.5.0) - 2016-10-07
 
 ## Added
 - How to hande a tcp connection is specified by an application server module.

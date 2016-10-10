@@ -81,13 +81,6 @@ defmodule Ace.TCP do
             :ok = TCP.send(socket, message)
             loop(socket, {mod, new_state})
         end
-      # For any incoming erlang message the `handle_info` action.
-      {:data, message} ->
-        case mod.handle_info(message, state) do
-          {:send, message, _state} ->
-            :ok = TCP.send(socket, message)
-          end
-        loop(socket, app)
       # If the socket is closed call the `terminate` action.
       # Do not reenter handling loop.
       {:tcp_closed, ^socket} ->
@@ -95,6 +88,13 @@ defmodule Ace.TCP do
           :ok ->
             :ok
         end
+      # For any incoming erlang message the `handle_info` action.
+      message ->
+        case mod.handle_info(message, state) do
+          {:send, message, _state} ->
+            :ok = TCP.send(socket, message)
+        end
+        loop(socket, app)
     end
   end
 
