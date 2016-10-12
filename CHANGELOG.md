@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased](https://github.com/CrowdHailer/Ace/tree/0.5.1) - 2016-10-x
+
+## Changed
+- The governor will keeps starting server processes to match demand.
+
 ## [0.5.1](https://github.com/CrowdHailer/Ace/tree/0.5.1) - 2016-10-10
 
 ## Changed

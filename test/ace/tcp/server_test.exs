@@ -1,8 +1,8 @@
-defmodule Ace.TCPTest do
+defmodule Ace.TCP.ServerTest do
   use ExUnit.Case, async: true
 
   test "server process dies when socket is closed" do
-    port = 10_004
+    port = 10_014
     {:ok, listen_socket} = :gen_tcp.listen(port, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, server} = Ace.TCP.Server.start_link({GreetingServer, "WELCOME"})
     Task.async(fn

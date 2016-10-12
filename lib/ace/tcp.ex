@@ -34,7 +34,7 @@ defmodule Ace.TCP do
   ]
 
   @doc """
-  Starts the server listening on the given port.
+  Starts an tcp endpoint on the given port.
   """
   def start(port, app) do
     # Setup a socket to listen with our TCP options
@@ -44,20 +44,10 @@ defmodule Ace.TCP do
     {:ok, port} = Inet.port(listen_socket)
     IO.puts("Listening on port: #{port}")
 
-    # Start a server process that will listen for a connection.
-    {:ok, supervisor} = Ace.TCP.Server.Supervisor.start_link(app)
+    # Start supervisors for the servers and the governors.
+    {:ok, server_sup} = Ace.TCP.Server.Supervisor.start_link(app)
+    {:ok, _governor_sup} = Ace.TCP.Governor.Supervisor.start_link(server_sup, listen_socket)
 
-    # The accept callback is a blocking call.
-    # It will only complete once there is a client connection.
-    # Therefore it needs to be wrapped in a async task
-    # Task.async(Ace.TCP.Server, :accept, [supervisor, listen_socket])
-    {:ok, server} = Supervisor.start_child(supervisor, [])
-    Task.async(fn
-      () ->
-        Ace.TCP.Server.accept(server, listen_socket)
-    end)
-
-    # Return the server process
-    {:ok, supervisor}
+    {:ok, listen_socket}
   end
 end

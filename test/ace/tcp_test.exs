@@ -11,6 +11,10 @@ defmodule CounterServer do
   def handle_info(_, last) do
     {:nosend, last}
   end
+
+  def terminate(_, _) do
+    :ok
+  end
 end
 
 defmodule GreetingServer do
@@ -66,7 +70,7 @@ defmodule Ace.TCPTest do
 
   test "socket broadcasts server message" do
     port = 10_003
-    {:ok, server} = Ace.TCP.start(port, {BroadcastServer, self})
+    {:ok, _server} = Ace.TCP.start(port, {BroadcastServer, self})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     receive do
@@ -85,5 +89,16 @@ defmodule Ace.TCPTest do
     assert {:ok, "1\r\n"} = :gen_tcp.recv(client, 0)
     :ok = :gen_tcp.send(client, "anything\r\n")
     assert {:ok, "2\r\n"} = :gen_tcp.recv(client, 0)
+  end
+
+  test "start multiple connections" do
+    port = 10_005
+    {:ok, _endpoint} = Ace.TCP.start(port, {CounterServer, 0})
+    {:ok, client1} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    {:ok, client2} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    :ok = :gen_tcp.send(client1, "anything\r\n")
+    assert {:ok, "1\r\n"} = :gen_tcp.recv(client1, 0)
+    :ok = :gen_tcp.send(client2, "anything\r\n")
+    assert {:ok, "1\r\n"} = :gen_tcp.recv(client2, 0)
   end
 end
