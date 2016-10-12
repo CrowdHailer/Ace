@@ -15,7 +15,6 @@ defmodule Ace.TCP.ServerTest do
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
     :ok = :gen_tcp.close(client)
     :timer.sleep(50)
-    # assert false == Supervisor.which_children(server)
     assert false == Process.alive?(server)
   end
 end
