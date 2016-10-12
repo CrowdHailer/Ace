@@ -8,6 +8,9 @@ defmodule Ace.TCP.Governor.Supervisor do
   # MODULE CALLBACKS
 
   def init({server_supervisor, listen_socket}) do
+    # To speed up a server multiple process can be listening for a connection simultaneously.
+    # In this case 5 Governors will start 5 Servers listening before a single connection is received.
+    # FIXME make the acceptor pool size part of configuration
     children = [
       worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"1"),
       worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"2"),
