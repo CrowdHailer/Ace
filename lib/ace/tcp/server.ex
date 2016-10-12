@@ -74,7 +74,12 @@ defmodule Ace.TCP.Server do
 
   def handle_call({:accept, listen_socket}, _from, {:awaiting, {mod, state}}) do
     # Accept and incoming connection request on the listening socket.
-    {:ok, socket} = TCP.accept(listen_socket)
+    {:ok, socket} = case TCP.accept(listen_socket) do
+      {:ok, socket} ->
+        {:ok, socket}
+      {:error, :closed} ->
+        exit(:normal)
+    end
 
     # Initialise the server with the app secification.
     # Enter the message handling loop after sending a message if required.

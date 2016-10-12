@@ -9,7 +9,11 @@ defmodule Ace.TCP.Governor.Supervisor do
 
   def init({server_supervisor, listen_socket}) do
     children = [
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor])
+      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"1"),
+      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"2"),
+      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"3"),
+      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"4"),
+      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"5")
     ]
 
     supervise(children, strategy: :one_for_one)
