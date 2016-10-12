@@ -1,19 +1,5 @@
-defmodule Ace.TCP do
-  @moduledoc """
-  Provide a service over TCP.
-
-  To start an enpoint run `Ace.TCP.start/2`.
-
-  Individual TCP connections are handled by the `Ace.TCP.Server` module.
-  """
-
-  # Alias erlang libraries so the following code is more readable.
-
-  # Interface for TCP/IP sockets.
-  alias :gen_tcp, as: TCP
-
-  # Helpers for the TCP/IP protocols.
-  alias :inet, as: Inet
+defmodule Ace.TCP.Endpoint do
+  use Supervisor
 
   # Settings for the TCP socket
   @tcp_options [
@@ -35,15 +21,14 @@ defmodule Ace.TCP do
     {:reuseaddr, true}
   ]
 
-  @doc """
-  Start a TCP endpoint at the given port.
-  """
-  def start_endpoint(port, app) do
-    # Maybe I should still pass in the socket so that I can access information.
-    Supervisor.start_child(Ace.TCP.Endpoint.Supervisor, [app, port: port])
+  def start_link(app, opts \\ [], sup_opts \\ []) do
+    Supervisor.start_link(__MODULE__, {app, opts}, sup_opts)
   end
 
-  def start(port, app) do
+  ## Supervisor Callbacks
+
+  def init({app, opts}) do
+    port = Keyword.get(opts, :port, 8080)
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)
 
@@ -51,10 +36,12 @@ defmodule Ace.TCP do
     {:ok, port} = Inet.port(listen_socket)
     IO.puts("Listening on port: #{port}")
 
-    # Start supervisors for the servers and the governors.
-    {:ok, server_sup} = Ace.TCP.Server.Supervisor.start_link(app)
-    {:ok, _governor_sup} = Ace.TCP.Governor.Supervisor.start_link(server_sup, listen_socket)
+    # Instead of providing the name for the server supervisor, this supervisor could commit suicide and then it would be restarted by the endpoint supervisor.
+    children = [
+      supervisor(Ace.TCP.Server.Supervisor, [app, [name: :"Server.Supervisor.#{port}"]]),
+      supervisor(Ace.TCP.Governor.Supervisor, [:"Server.Supervisor.#{port}", listen_socket])
+    ]
 
-    {:ok, listen_socket}
+    supervise(children, strategy: :one_for_one)
   end
 end
