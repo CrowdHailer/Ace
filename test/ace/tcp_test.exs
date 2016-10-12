@@ -34,8 +34,9 @@ defmodule EchoServer do
 end
 
 defmodule BroadcastServer do
-  def init(_, state) do
-    {:nosend, state}
+  def init(_, pid) do
+    send(pid, {:register, self})
+    {:nosend, pid}
   end
 
   def handle_info({:notify, notification}, state) do
@@ -65,22 +66,14 @@ defmodule Ace.TCPTest do
 
   test "socket broadcasts server message" do
     port = 10_003
-    {:ok, server} = Ace.TCP.start(port, {BroadcastServer, []})
+    {:ok, server} = Ace.TCP.start(port, {BroadcastServer, self})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    send(server, {:notify, "HELLO"})
+    receive do
+      {:register, pid} ->
+        send(pid, {:notify, "HELLO"})
+      end
     assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
-  end
-
-  test "process for closed socket has died" do
-    port = 10_004
-    {:ok, server} = Ace.TCP.start(port, {GreetingServer, "WELCOME"})
-
-    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
-    :ok = :gen_tcp.close(client)
-    :timer.sleep(50)
-    assert false == Process.alive?(server)
   end
 
   test "state is passed through messages" do
