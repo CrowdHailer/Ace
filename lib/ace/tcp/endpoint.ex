@@ -1,4 +1,10 @@
 defmodule Ace.TCP.Endpoint do
+  @moduledoc """
+  Starting the combination of socket, governors and server supervisor.
+
+  Endpoints are started with a fixed pool of governors under the `Ace.TCP.Governor.Supervisor`.
+  The number of governors is equal to the maximum number of servers that can be accepting new connections.
+  """
 
   use GenServer
 
@@ -30,9 +36,16 @@ defmodule Ace.TCP.Endpoint do
     {:reuseaddr, true}
   ]
 
-  def start_link(app, opts, gen_opts \\ []) do
-    port = Keyword.get(opts, :port, 8080)
-    GenServer.start_link(__MODULE__, {app, opts}, [name: :"Endpoint{#{port}}"])
+  @doc """
+  Start a new endpoint with the app behaviour.
+
+   ## Options
+
+   * `:port` - the port to run the server on.
+     Defaults to port 8080.
+  """
+  def start_link(app, opts) do
+    GenServer.start_link(__MODULE__, {app, opts})
   end
 
   def init({app, opts}) do
@@ -48,15 +61,5 @@ defmodule Ace.TCP.Endpoint do
     IO.puts("Listening on port: #{port}")
 
     {:ok, {listen_socket, server_supervisor, governor_supervisor}}
-  end
-
-  def handle_info(m, s) do
-    IO.inspect(m)
-    {:noreply, s}
-  end
-
-  def terminate(r, s) do
-    IO.inspect(r)
-    {:ok, r}
   end
 end
