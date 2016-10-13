@@ -17,6 +17,8 @@ If you are looking for a production webserver I would recommend one of:
 TCP endpoints are started with a pool of acceptors.
 Servers are started on demand for each client connection.
 
+*[Many servers one client, NOT many clients one server.](http://joearms.github.io/2016/03/13/Managing-two-million-webservers.html)*
+
 Ace is responsible for managing server *processes*.
 Server *modules* describe the communication patterns with clients.
 
