@@ -1,8 +1,24 @@
-# Ace - Educational Webserver
+# Ace
+**Ace server for managing TCP endpoints and connections.**
 
-> Say hi, send me a message via twitter/gh-issue etc, they're all good.
-> I want to take a deep dive into TCP/HTTP and network protocols in general, so if your curious or on a similar voyage of discovery would be great to chat.
-> Cheers.
+I tackled this project as an interesting Elixir exercise and to learn about TCP.
+The code is designed to be accessible and is thoroughly commented.
+
+For more details look at [Ace 0.1](https://github.com/CrowdHailer/Ace/tree/0.1.0).
+
+If you are looking for a production webserver I would recommend one of:
+
+- [elli](https://github.com/knutin/elli)
+- [cowboy](https://ninenines.eu/docs/en/cowboy/1.0/guide/)/[ranch](https://ninenines.eu/docs/en/ranch/1.2/guide/)
+- [mochiweb](https://github.com/mochi/mochiweb)
+
+## Introduction
+
+TCP endpoints are started with a pool of acceptors.
+Servers are started on demand for each client connection.
+
+Ace is responsible for managing server *processes*.
+Server *modules* describe the communication patterns with clients.
 
 [Documentation for Ace is available on hexdoc](https://hexdocs.pm/ace)
 
@@ -13,12 +29,12 @@
   1. Add `ace` to your list of dependencies in `mix.exs`:
 
         def deps do
-          [{:ace, "~> 0.5.2"}]
+          [{:ace, "~> 0.6.0"}]
         end
 
 ## Usage
 
-Ace manages TCP connections by refering to a application provided server specification.
+Ace manages TCP connections by refering to a user defined server behaviour.
 An Ace server must implement 4 callbacks:
 
 - `init(connection, configuration)` for establishing a new connection.
@@ -50,9 +66,9 @@ defmodule MyServer do
 end
 ```
 
-Defining `MyServer` above we can use it to start a server managed by Ace.
+Defining `MyServer` above we can use it to start an Ace endpoint.
 
-#### Startup
+#### Quick start
 
 From the console, start mix.
 
@@ -62,7 +78,20 @@ iex -S mix
 
 In the `iex` console, start a TCP endpoint.
 ```elixir
-{:ok, server} = Ace.TCP.start(8080, {MyServer, {:greeting, "WELCOME"}})
+app = {MyServer, {:greeting, "WELCOME"}}
+{:ok, pid} = Ace.TCP.Endpoint.start_link(app, port: 8080)
+```
+
+#### Embedded endpoints
+
+It is not a good idea to start unsupervised processes.
+For this reason an Ace endpoint can be added to you application supervision tree.
+
+```elixir
+children = [
+  worker(Ace.TCP.Endpoint, [{MyServer, {:greeting, "WELCOME"}}, port: 8080])
+]
+Supervisor.start_link(children, opts)
 ```
 
 #### Connect

@@ -48,12 +48,12 @@ defmodule BroadcastServer do
   end
 end
 
-defmodule Ace.TCPTest do
+defmodule Ace.TCP.EndpointTest do
   use ExUnit.Case, async: true
 
   test "echos each message" do
     port = 10001
-    {:ok, _server} = Ace.TCP.start(port, {EchoServer, []})
+    {:ok, _server} = Ace.TCP.Endpoint.start_link({EchoServer, []}, port: port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "blob\r\n")
@@ -62,7 +62,7 @@ defmodule Ace.TCPTest do
 
   test "says welcome for new connection" do
     port = 10002
-    {:ok, _server} = Ace.TCP.start(port, {GreetingServer, "WELCOME"})
+    {:ok, _server} = Ace.TCP.Endpoint.start_link({GreetingServer, "WELCOME"}, port: port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
@@ -70,7 +70,7 @@ defmodule Ace.TCPTest do
 
   test "socket broadcasts server message" do
     port = 10_003
-    {:ok, _server} = Ace.TCP.start(port, {BroadcastServer, self})
+    {:ok, _server} = Ace.TCP.Endpoint.start_link({BroadcastServer, self}, port: port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     receive do
@@ -82,7 +82,7 @@ defmodule Ace.TCPTest do
 
   test "state is passed through messages" do
     port = 10_004
-    {:ok, _server} = Ace.TCP.start(port, {CounterServer, 0})
+    {:ok, _server} = Ace.TCP.Endpoint.start_link({CounterServer, 0}, port: port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "anything\r\n")
@@ -93,39 +93,12 @@ defmodule Ace.TCPTest do
 
   test "start multiple connections" do
     port = 10_005
-    {:ok, _endpoint} = Ace.TCP.start(port, {CounterServer, 0})
+    {:ok, _endpoint} = Ace.TCP.Endpoint.start_link({CounterServer, 0}, port: port)
     {:ok, client1} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, client2} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client1, "anything\r\n")
     assert {:ok, "1\r\n"} = :gen_tcp.recv(client1, 0)
     :ok = :gen_tcp.send(client2, "anything\r\n")
     assert {:ok, "1\r\n"} = :gen_tcp.recv(client2, 0)
-  end
-
-  test "scratch" do
-    me = self()
-    t = Task.async fn () ->
-      {:ok, s} = :gen_tcp.listen(8090, mode: :binary)
-      :erlang.process_flag(:trap_exit, true)
-      Process.link(s) |> IO.inspect
-      send(me, {:lsock, s})
-      :timer.sleep(500)
-      receive do
-        s -> s |> IO.inspect
-      end
-    end
-    lsock = receive do
-      {:lsock, s} ->
-        s
-    end
-    Process.link(lsock) |> IO.inspect
-    :gen_tcp.listen(8090, mode: :binary) |> IO.inspect
-
-    IEx.Info.Port.info(lsock) |> IO.inspect
-    :timer.sleep(1000)
-    :gen_tcp.close(lsock)
-    |> IO.inspect
-    IEx.Info.Port.info(lsock) |> IO.inspect
-    assert {_, ^lsock, _} = Task.await(t)
   end
 end

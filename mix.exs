@@ -15,8 +15,7 @@ defmodule Ace.Mixfile do
 
   def application do
     [
-      applications: [:logger],
-      mod: {Ace, []}
+      applications: [:logger]
     ]
   end
 
@@ -29,7 +28,7 @@ defmodule Ace.Mixfile do
 
   defp description do
     """
-    An Elixir webserver.
+    Ace server for managing TCP endpoints and connections.
     """
   end
 
