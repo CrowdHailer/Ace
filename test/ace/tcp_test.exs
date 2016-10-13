@@ -126,6 +126,6 @@ defmodule Ace.TCPTest do
     :gen_tcp.close(lsock)
     |> IO.inspect
     IEx.Info.Port.info(lsock) |> IO.inspect
-    assert_receive :bob, 1_000
+    assert {_, ^lsock, _} = Task.await(t)
   end
 end
