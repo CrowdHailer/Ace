@@ -15,7 +15,8 @@ defmodule Ace.Mixfile do
 
   def application do
     [
-      applications: [:logger]
+      applications: [:logger],
+      mod: {Ace, []}
     ]
   end
 

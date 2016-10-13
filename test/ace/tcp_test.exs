@@ -101,4 +101,31 @@ defmodule Ace.TCPTest do
     :ok = :gen_tcp.send(client2, "anything\r\n")
     assert {:ok, "1\r\n"} = :gen_tcp.recv(client2, 0)
   end
+
+  test "scratch" do
+    me = self()
+    t = Task.async fn () ->
+      {:ok, s} = :gen_tcp.listen(8090, mode: :binary)
+      :erlang.process_flag(:trap_exit, true)
+      Process.link(s) |> IO.inspect
+      send(me, {:lsock, s})
+      :timer.sleep(500)
+      receive do
+        s -> s |> IO.inspect
+      end
+    end
+    lsock = receive do
+      {:lsock, s} ->
+        s
+    end
+    Process.link(lsock) |> IO.inspect
+    :gen_tcp.listen(8090, mode: :binary) |> IO.inspect
+
+    IEx.Info.Port.info(lsock) |> IO.inspect
+    :timer.sleep(1000)
+    :gen_tcp.close(lsock)
+    |> IO.inspect
+    IEx.Info.Port.info(lsock) |> IO.inspect
+    assert_receive :bob, 1_000
+  end
 end
