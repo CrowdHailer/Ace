@@ -12,16 +12,14 @@
 
   1. Add `ace` to your list of dependencies in `mix.exs`:
 
-    ```elixir
-    def deps do
-      [{:ace, "~> 0.2.0"}]
-    end
-    ```
+        def deps do
+          [{:ace, "~> 0.5.2"}]
+        end
 
 ## Usage
 
-Ace manages TCP connections by refering to a application level server specification.
-A server must implement 4 callbacks:
+Ace manages TCP connections by refering to a application provided server specification.
+An Ace server must implement 4 callbacks:
 
 - `init(connection, configuration)` for establishing a new connection.
 - `handle_packet(packet, state)` to handle incomming TCP packets.
@@ -29,6 +27,8 @@ A server must implement 4 callbacks:
 - `terminate` to do any cleanup when the connection is closed.
 
 #### Server
+
+Example server.
 
 ```elixir
 defmodule MyServer do
@@ -50,7 +50,7 @@ defmodule MyServer do
 end
 ```
 
-Defining my server above we can use it to start a server managed by Ace.
+Defining `MyServer` above we can use it to start a server managed by Ace.
 
 #### Startup
 
@@ -60,19 +60,19 @@ From the console, start mix.
 iex -S mix
 ```
 
-In the `iex` console, start a TCP server.
+In the `iex` console, start a TCP endpoint.
 ```elixir
 {:ok, server} = Ace.TCP.start(8080, {MyServer, {:greeting, "WELCOME"}})
 ```
 
 #### Connect
-Use telnet to communicate with the echo server.
+Use telnet to communicate with the server.
 
 ```
 telnet localhost 8080
 ```
 
-Wihin the telnet terminal
+Wihin the telnet terminal.
 
 ```
 # once connected
@@ -81,13 +81,13 @@ hi
 ECHO: hi
 ```
 
-In the iex session
+In the iex session.
 
 ```
 send(server, {:notify, "BOO!"})
 ```
 
-back in telnet terminal
+back in telnet terminal.
 
 ```
 BOO!
@@ -111,7 +111,7 @@ The [change log](https://github.com/CrowdHailer/Ace/blob/master/CHANGELOG.md) do
 Vagrant manages virtual machine provisioning.
 Using Vagrant allows you to quickly get started with `Ace` without needing to install Elixir/erlang on you machine.
 
-*If you do not know vagrant on you machine I would suggest just installing elixir on your host machine and ignoring the instructions here.*
+*If you do not know vagrant, or have it on your machine, I would suggest just installing Elixir on your machine and ignoring this section.*
 
 ```
 vagrant up

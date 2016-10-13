@@ -1,18 +1,21 @@
 defmodule Ace.TCP.Governor do
-  @doc """
-  The governor process acts to throttle the creation of servers.
+  @moduledoc """
+  The governor acts to throttle the creation of servers.
 
-  The process starts a server under the supervision of a server supervisor.
+  A governor process starts a server under the supervision of a server supervisor.
   It will then wait untill the server has accepted a connection.
-  Once it's server has accepted a connection it will repeat the process.
+  Once it's server has accepted a connection the governor will start a new server.
   """
-  use GenServer
 
+  @doc """
+  Start a new governor, linked to the calling process.
+  """
   def start_link(listen_socket, server_supervisor) do
     pid = spawn_link(__MODULE__, :loop, [listen_socket, server_supervisor])
     {:ok, pid}
   end
 
+  @doc false
   def loop(listen_socket, server_supervisor) do
     {:ok, server} = Supervisor.start_child(server_supervisor, [])
     :ok = Ace.TCP.Server.accept(server, listen_socket)

@@ -1,7 +1,8 @@
 defmodule Ace.TCP.Server do
   @moduledoc """
-  Each `TCP.Server` manages a single TCP connection.
-  They are responsible for managing communication between the TCP client and the larger application.
+  Each `Ace.TCP.Server` manages a single TCP connection.
+  They are responsible for managing communication between a TCP client and the larger application.
+
   The server process accepts as well as manages the connection.
   There is no separate acceptor process.
   This means that that is no need to switch the connections owning process.
@@ -42,7 +43,7 @@ defmodule Ace.TCP.Server do
   alias :inet, as: Inet
 
   @doc """
-  Start a new `TCP.Server` linked to the calling process.
+  Start a new `Ace.TCP.Server` linked to the calling process.
 
   A server process is started with an app to describe handling connections.
   The app is a comination of behaviour and state `app = {module, config}`

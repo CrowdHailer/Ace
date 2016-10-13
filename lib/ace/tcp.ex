@@ -1,13 +1,15 @@
 defmodule Ace.TCP do
   @moduledoc """
-  TCP connections are handled by the `Ace.TCP` server.
+  Provide a service over TCP.
 
-  To start the server run `Ace.TCP.start(port)`.
+  To start an enpoint run `Ace.TCP.start/2`.
+
+  Individual TCP connections are handled by the `Ace.TCP.Server` module.
   """
 
   # Alias erlang libraries so the following code is more readable.
 
-  # Interface to TCP/IP sockets.
+  # Interface for TCP/IP sockets.
   alias :gen_tcp, as: TCP
 
   # Helpers for the TCP/IP protocols.
@@ -34,7 +36,7 @@ defmodule Ace.TCP do
   ]
 
   @doc """
-  Starts an tcp endpoint on the given port.
+  Start a TCP endpoint at the given port.
   """
   def start(port, app) do
     # Setup a socket to listen with our TCP options
