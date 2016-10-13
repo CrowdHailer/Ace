@@ -1,5 +1,14 @@
 defmodule Ace.TCP.Endpoint do
-  use Supervisor
+
+  use GenServer
+
+  # Alias erlang libraries so the following code is more readable.
+
+  # Interface for TCP/IP sockets.
+  alias :gen_tcp, as: TCP
+
+  # Helpers for the TCP/IP protocols.
+  alias :inet, as: Inet
 
   # Settings for the TCP socket
   @tcp_options [
@@ -21,27 +30,33 @@ defmodule Ace.TCP.Endpoint do
     {:reuseaddr, true}
   ]
 
-  def start_link(app, opts \\ [], sup_opts \\ []) do
-    Supervisor.start_link(__MODULE__, {app, opts}, sup_opts)
+  def start_link(app, opts, gen_opts \\ []) do
+    port = Keyword.get(opts, :port, 8080)
+    GenServer.start_link(__MODULE__, {app, opts}, [name: :"Endpoint{#{port}}"])
   end
-
-  ## Supervisor Callbacks
 
   def init({app, opts}) do
     port = Keyword.get(opts, :port, 8080)
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)
 
+    {:ok, server_supervisor} = Ace.TCP.Server.Supervisor.start_link(app)
+    {:ok, governor_supervisor} = Ace.TCP.Governor.Supervisor.start_link(server_supervisor, listen_socket)
+
     # Fetch and display the port information for the listening socket.
     {:ok, port} = Inet.port(listen_socket)
     IO.puts("Listening on port: #{port}")
 
-    # Instead of providing the name for the server supervisor, this supervisor could commit suicide and then it would be restarted by the endpoint supervisor.
-    children = [
-      supervisor(Ace.TCP.Server.Supervisor, [app, [name: :"Server.Supervisor.#{port}"]]),
-      supervisor(Ace.TCP.Governor.Supervisor, [:"Server.Supervisor.#{port}", listen_socket])
-    ]
+    {:ok, {listen_socket, server_supervisor, governor_supervisor}}
+  end
 
-    supervise(children, strategy: :one_for_one)
+  def handle_info(m, s) do
+    IO.inspect(m)
+    {:noreply, s}
+  end
+
+  def terminate(r, s) do
+    IO.inspect(r)
+    {:ok, r}
   end
 end
