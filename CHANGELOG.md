@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Changed
 - Send any message that is not TCP related to the `handle_info` callback,
-  previous only messages that matched {:data, info} where handled.
+  previous only messages that matched `{:data, info}` where handled.
 
 ## [0.5.0](https://github.com/CrowdHailer/Ace/tree/0.5.0) - 2016-10-07
 
