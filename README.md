@@ -81,7 +81,7 @@ iex -S mix
 In the `iex` console, start a TCP endpoint.
 ```elixir
 app = {MyServer, {:greeting, "WELCOME"}}
-{:ok, pid} = Ace.TCP.Endpoint.start_link(app, port: 8080)
+{:ok, pid} = Ace.TCP.start_link(app, port: 8080)
 ```
 
 #### Embedded endpoints
@@ -91,7 +91,7 @@ For this reason an Ace endpoint can be added to you application supervision tree
 
 ```elixir
 children = [
-  worker(Ace.TCP.Endpoint, [{MyServer, {:greeting, "WELCOME"}}, port: 8080])
+  worker(Ace.TCP, [{MyServer, {:greeting, "WELCOME"}}, port: 8080])
 ]
 Supervisor.start_link(children, opts)
 ```
