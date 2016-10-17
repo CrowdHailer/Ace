@@ -101,4 +101,17 @@ defmodule Ace.TCP.EndpointTest do
     :ok = :gen_tcp.send(client2, "anything\r\n")
     assert {:ok, "1\r\n"} = :gen_tcp.recv(client2, 0)
   end
+
+  test "can fetch the listened to port from an endpoint" do
+    port = 10_006
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({EchoServer, []}, port: port)
+    assert {:ok, port} == Ace.TCP.Endpoint.port(endpoint)
+  end
+
+  test "will show OS allocated port" do
+    port = 0
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({EchoServer, []}, port: port)
+    {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
+    assert port > 10_000
+  end
 end

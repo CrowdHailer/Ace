@@ -48,6 +48,15 @@ defmodule Ace.TCP.Endpoint do
     GenServer.start_link(__MODULE__, {app, opts})
   end
 
+  @doc """
+  Retrieve the port number for an endpoint.
+  """
+  def port(endpoint) do
+    GenServer.call(endpoint, :port)
+  end
+
+  ## Server Callbacks
+
   def init({app, opts}) do
     port = Keyword.get(opts, :port, 8080)
     # Setup a socket to listen with our TCP options
@@ -61,5 +70,10 @@ defmodule Ace.TCP.Endpoint do
     IO.puts("Listening on port: #{port}")
 
     {:ok, {listen_socket, server_supervisor, governor_supervisor}}
+  end
+
+  def handle_call(:port, _from, state = {listen_socket, _, _}) do
+    port = :inet.port(listen_socket)
+    {:reply, port, state}
   end
 end
