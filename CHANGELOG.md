@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.5.2](https://github.com/CrowdHailer/Ace/tree/0.5.1) - 2016-10-13
+## [0.6.0](https://github.com/CrowdHailer/Ace/tree/0.6.0) - 2016-10-17
+
+## Added
+- Collect all processes in an endpoint `GenServer` so that they can be started as a unit and only the endpoint is linked to the calling process. This allows for endpoints to be added to supervision tree.
+
+## Removed
+- `Ace.TCP.start/2` use `start_link/2` instead which takes app as the first argument not the second.
+
+## [0.5.2](https://github.com/CrowdHailer/Ace/tree/0.5.2) - 2016-10-13
 
 ## Changed
 - The governors will keeps starting server processes to match demand.
