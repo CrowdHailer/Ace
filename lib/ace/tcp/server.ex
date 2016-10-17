@@ -106,6 +106,9 @@ defmodule Ace.TCP.Server do
         :ok = TCP.send(socket, message)
         :ok = Inet.setopts(socket, active: :once)
         {:noreply, {{mod, new_state}, socket}}
+      {:nosend, new_state} ->
+        :ok = Inet.setopts(socket, active: :once)
+        {:noreply, {{mod, new_state}, socket}}
     end
   end
   def handle_info({:tcp_closed, socket}, {{mod, state}, socket}) do
@@ -121,6 +124,9 @@ defmodule Ace.TCP.Server do
     case mod.handle_info(message, state) do
       {:send, message, new_state} ->
         :ok = TCP.send(socket, message)
+        :ok = Inet.setopts(socket, active: :once)
+        {:noreply, {{mod, new_state}, socket}}
+      {:nosend, new_state} ->
         :ok = Inet.setopts(socket, active: :once)
         {:noreply, {{mod, new_state}, socket}}
       end

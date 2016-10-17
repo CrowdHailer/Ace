@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.TCP.Endpoint.port/1` will return the port an endpoint is listening too.
   Required when the port option is set to `0` and the port is allocated by the OS.
 
+## Fixed
+- The `handle_packet` and `handle_info` callbacks for a server module are able produce a return of the format `{:nosend, state}`.
+
 
 ## [0.6.0](https://github.com/CrowdHailer/Ace/tree/0.6.0) - 2016-10-17
 

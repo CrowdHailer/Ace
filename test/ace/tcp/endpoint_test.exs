@@ -3,9 +3,12 @@ defmodule CounterServer do
     {:nosend, num}
   end
 
-  def handle_packet(_, last) do
-    count = last + 1
+  def handle_packet("TOTAL" <> _rest, count) do
     {:send, "#{count}\r\n", count}
+  end
+  def handle_packet("INC" <> _rest, last) do
+    count = last + 1
+    {:nosend, count}
   end
 
   def handle_info(_, last) do
@@ -46,6 +49,10 @@ defmodule BroadcastServer do
   def handle_info({:notify, notification}, state) do
     {:send, "#{notification}\r\n", state}
   end
+
+  def handle_info(_, state) do
+    {:nosend, state}
+  end
 end
 
 defmodule Ace.TCP.EndpointTest do
@@ -68,7 +75,7 @@ defmodule Ace.TCP.EndpointTest do
     assert {:ok, "WELCOME\r\n"} = :gen_tcp.recv(client, 0, 2000)
   end
 
-  test "socket broadcasts server message" do
+  test "socket broadcasts server notification" do
     port = 10_003
     {:ok, _server} = Ace.TCP.Endpoint.start_link({BroadcastServer, self}, port: port)
 
@@ -80,15 +87,29 @@ defmodule Ace.TCP.EndpointTest do
     assert {:ok, "HELLO\r\n"} = :gen_tcp.recv(client, 0)
   end
 
+  test "socket ignores debug messages" do
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({BroadcastServer, self}, port: 0)
+    {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    receive do
+      {:register, pid} ->
+        send(pid, :debug)
+    end
+    assert {:error, :timeout} == :gen_tcp.recv(client, 0, 1000)
+  end
+
   test "state is passed through messages" do
     port = 10_004
     {:ok, _server} = Ace.TCP.Endpoint.start_link({CounterServer, 0}, port: port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    :ok = :gen_tcp.send(client, "anything\r\n")
-    assert {:ok, "1\r\n"} = :gen_tcp.recv(client, 0)
-    :ok = :gen_tcp.send(client, "anything\r\n")
-    assert {:ok, "2\r\n"} = :gen_tcp.recv(client, 0)
+    :ok = :gen_tcp.send(client, "INC\r\n")
+    # If sending raw packets they can be read as part of the same packet if sent too fast.
+    :timer.sleep(100)
+    :ok = :gen_tcp.send(client, "INC\r\n")
+    :timer.sleep(100)
+    :ok = :gen_tcp.send(client, "TOTAL\r\n")
+    assert {:ok, "2\r\n"} = :gen_tcp.recv(client, 0, 2000)
   end
 
   test "start multiple connections" do
@@ -96,10 +117,10 @@ defmodule Ace.TCP.EndpointTest do
     {:ok, _endpoint} = Ace.TCP.Endpoint.start_link({CounterServer, 0}, port: port)
     {:ok, client1} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, client2} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    :ok = :gen_tcp.send(client1, "anything\r\n")
-    assert {:ok, "1\r\n"} = :gen_tcp.recv(client1, 0)
-    :ok = :gen_tcp.send(client2, "anything\r\n")
-    assert {:ok, "1\r\n"} = :gen_tcp.recv(client2, 0)
+    :ok = :gen_tcp.send(client1, "TOTAL\r\n")
+    assert {:ok, "0\r\n"} = :gen_tcp.recv(client1, 0)
+    :ok = :gen_tcp.send(client2, "TOTAL\r\n")
+    assert {:ok, "0\r\n"} = :gen_tcp.recv(client2, 0)
   end
 
   test "can fetch the listened to port from an endpoint" do
