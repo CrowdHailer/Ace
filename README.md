@@ -91,10 +91,12 @@ For this reason an Ace endpoint can be added to you application supervision tree
 
 ```elixir
 children = [
-  worker(Ace.TCP, [{MyServer, {:greeting, "WELCOME"}}, port: 8080])
+  worker(Ace.TCP, [{MyServer, {:greeting, "WELCOME"}}, [port: 8080]])
 ]
 Supervisor.start_link(children, opts)
 ```
+
+See "01 Quote of the Day" for an example setup.
 
 #### Connect
 Use telnet to communicate with the server.
