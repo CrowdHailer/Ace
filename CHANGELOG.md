@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/CrowdHailer/Ace/tree/0.6.0) - 2016-10-x
+## [0.6.1](https://github.com/CrowdHailer/Ace/tree/0.6.1) - 2016-10-17
 
 ## Added
 - `Ace.TCP.Endpoint.port/1` will return the port an endpoint is listening too.

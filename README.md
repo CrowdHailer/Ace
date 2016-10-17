@@ -31,7 +31,7 @@ Server *modules* describe the communication patterns with clients.
   1. Add `ace` to your list of dependencies in `mix.exs`:
 
         def deps do
-          [{:ace, "~> 0.6.0"}]
+          [{:ace, "~> 0.6.1"}]
         end
 
 ## Usage
