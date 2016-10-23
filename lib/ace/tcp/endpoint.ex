@@ -39,13 +39,18 @@ defmodule Ace.TCP.Endpoint do
   @doc """
   Start a new endpoint with the app behaviour.
 
-   ## Options
+    ## Options
 
-   * `:port` - the port to run the server on.
-     Defaults to port 8080.
+    * `:port` - the port to run the server on.
+      Defaults to port 8080.
+
+    * `:name` - name to register the spawned endpoint under.
+      The supported values are the same as GenServers.
+
   """
   def start_link(app, opts) do
-    GenServer.start_link(__MODULE__, {app, opts})
+    name = Keyword.get(opts, :name)
+    GenServer.start_link(__MODULE__, {app, opts}, [name: name])
   end
 
   @doc """

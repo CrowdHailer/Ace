@@ -135,4 +135,9 @@ defmodule Ace.TCP.EndpointTest do
     {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
     assert port > 10_000
   end
+
+  test "will register the new enpoint with the given name" do
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({EchoServer, []}, port: 0, name: NamedEndpoint)
+    assert endpoint == Process.whereis(NamedEndpoint)
+  end
 end
