@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.6.2](https://github.com/CrowdHailer/Ace/tree/0.6.2) - 2016-10-24
+
+## Added
+- Endpoints can be registered as named processes by passing in a value for the `:name` option.
+  Possible values for this are the same as for the underlying `GenServer`.
+- The number of servers simultaneously accepting can now be configured.
+  Pass an integer value to the `:acceptors` option when starting and endpoint.
+  Default value is 50.
+
 ## [0.6.1](https://github.com/CrowdHailer/Ace/tree/0.6.1) - 2016-10-17
 
 ## Added
@@ -12,7 +21,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Fixed
 - The `handle_packet` and `handle_info` callbacks for a server module are able produce a return of the format `{:nosend, state}`.
-
 
 ## [0.6.0](https://github.com/CrowdHailer/Ace/tree/0.6.0) - 2016-10-17
 
