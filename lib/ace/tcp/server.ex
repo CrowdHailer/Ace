@@ -75,6 +75,7 @@ defmodule Ace.TCP.Server do
 
   def handle_call({:accept, listen_socket}, _from, {:awaiting, {mod, state}}) do
     # Accept and incoming connection request on the listening socket.
+    # :timer.sleep(1)
     {:ok, socket} = case TCP.accept(listen_socket) do
       {:ok, socket} ->
         {:ok, socket}

@@ -47,6 +47,9 @@ defmodule Ace.TCP.Endpoint do
     * `:name` - name to register the spawned endpoint under.
       The supported values are the same as GenServers.
 
+    * `:acceptors` - The number of servers simultaneously waiting for a connection.
+      Defaults to 50.
+
   """
   def start_link(app, opts) do
     name = Keyword.get(opts, :name)
@@ -64,11 +67,15 @@ defmodule Ace.TCP.Endpoint do
 
   def init({app, opts}) do
     port = Keyword.get(opts, :port, 8080)
+
+    # A better name might be acceptors_count, but is rather verbose.
+    acceptors = Keyword.get(opts, :acceptors, 50)
+
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)
 
     {:ok, server_supervisor} = Ace.TCP.Server.Supervisor.start_link(app)
-    {:ok, governor_supervisor} = Ace.TCP.Governor.Supervisor.start_link(server_supervisor, listen_socket)
+    {:ok, governor_supervisor} = Ace.TCP.Governor.Supervisor.start_link(server_supervisor, listen_socket, acceptors)
 
     # Fetch and display the port information for the listening socket.
     {:ok, port} = Inet.port(listen_socket)

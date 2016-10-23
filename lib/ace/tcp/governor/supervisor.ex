@@ -9,23 +9,18 @@ defmodule Ace.TCP.Governor.Supervisor do
   @doc """
   Starts a supervised pool of governor processes.
   """
-  def start_link(server_supervisor, listen_socket, sup_opts \\ []) do
-    Supervisor.start_link(__MODULE__, {server_supervisor, listen_socket}, sup_opts)
+  def start_link(server_supervisor, listen_socket, acceptors, sup_opts \\ []) do
+    Supervisor.start_link(__MODULE__, {server_supervisor, listen_socket, acceptors}, sup_opts)
   end
 
   ## SERVER CALLBACKS
 
-  def init({server_supervisor, listen_socket}) do
+  def init({server_supervisor, listen_socket, acceptors}) do
     # To speed up a server multiple process can be listening for a connection simultaneously.
-    # In this case 5 Governors will start 5 Servers listening before a single connection is received.
-    # FIXME make the acceptor pool size part of configuration
-    children = [
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"1"),
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"2"),
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"3"),
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"4"),
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: :"5")
-    ]
+    # In this case n Governors will start n Servers listening before a single connection is received.
+    children = for i <- 1..acceptors do
+      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: "#{i}")
+    end
 
     supervise(children, strategy: :one_for_one)
   end
