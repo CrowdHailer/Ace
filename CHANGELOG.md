@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Added
 - Support a response with a timeout from server modules.
-  Passed directly to GenServer so integer and `:hibernate` responses are supported
+  Passed directly to GenServer so integer and `:hibernate` responses are supported.
+- Support closing the connection from the server side.
+  It is best to reserver server side closing for misbehaving connections.
 
 ## [0.6.3](https://github.com/CrowdHailer/Ace/tree/0.6.3) - 2016-10-24
 

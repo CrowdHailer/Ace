@@ -97,6 +97,8 @@ defmodule Ace.TCP.Server do
         {:reply, :ok, {{mod, new_state}, socket}}
       {:timeout, timeout} ->
         {:reply, :ok, {{mod, new_state}, socket}, timeout}
+      :close ->
+        {:stop, :normal, new_state}
     end
   end
 
@@ -112,6 +114,8 @@ defmodule Ace.TCP.Server do
         {:noreply, {{mod, new_state}, socket}}
       {:timeout, timeout} ->
         {:noreply, {{mod, new_state}, socket}, timeout}
+      :close ->
+        {:stop, :normal, new_state}
     end
   end
   def handle_info({:tcp_closed, socket}, {{mod, state}, socket}) do
@@ -133,6 +137,8 @@ defmodule Ace.TCP.Server do
         {:noreply, {{mod, new_state}, socket}}
       {:timeout, timeout} ->
         {:noreply, {{mod, new_state}, socket}, timeout}
+      :close ->
+        {:stop, :normal, new_state}
     end
   end
 
@@ -155,5 +161,9 @@ defmodule Ace.TCP.Server do
   defp send_response({:nosend, state, timeout}, socket) do
     :ok = Inet.setopts(socket, active: :once)
     {state, {:timeout, timeout}}
+  end
+  defp send_response({:close, state}, socket) do
+    :ok = TCP.close(socket)
+    {state, :close}
   end
 end
