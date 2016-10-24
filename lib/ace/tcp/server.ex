@@ -83,46 +83,35 @@ defmodule Ace.TCP.Server do
         exit(:normal)
     end
 
-    # Initialise the server with the app secification.
-    # Enter the message handling loop after sending a message if required.
+    # Gather required information from new connection.
     {:ok, peername} = Inet.peername(socket)
-    {new_state, timeout} = case mod.init(%{peer: peername}, state) do
-      {:send, message, new_state} ->
-        :ok = TCP.send(socket, message)
-        {new_state, nil}
-      {:send, message, new_state, timeout} ->
-        :ok = TCP.send(socket, message)
-        {new_state, timeout}
-      {:nosend, new_state} ->
-        {new_state, nil}
-    end
 
-    # Set the socket to send a single received packet as a message to this process.
-    # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
-    :ok = Inet.setopts(socket, active: :once)
+    # Initialise the server with the app secification.
+    response = mod.init(%{peer: peername}, state)
 
-    case timeout do
-      nil ->
+    # Handle the application response by sending any message and deciding the next step behaviour.
+    {new_state, next} = send_response(response, socket)
+
+    case next do
+      :normal ->
         {:reply, :ok, {{mod, new_state}, socket}}
-      timeout ->
+      {:timeout, timeout} ->
         {:reply, :ok, {{mod, new_state}, socket}, timeout}
     end
   end
 
+
   def handle_info({:tcp, socket, packet}, {{mod, state}, socket}) do
     # For any incoming tcp packet call the `handle_packet` action.
-    case mod.handle_packet(packet, state) do
-      {:send, message, new_state} ->
-        :ok = TCP.send(socket, message)
-        :ok = Inet.setopts(socket, active: :once)
+    response = mod.handle_packet(packet, state)
+
+    {new_state, next} = send_response(response, socket)
+
+    case next do
+      :normal ->
         {:noreply, {{mod, new_state}, socket}}
-      {:send, message, new_state, timeout} ->
-        :ok = TCP.send(socket, message)
-        :ok = Inet.setopts(socket, active: :once)
+      {:timeout, timeout} ->
         {:noreply, {{mod, new_state}, socket}, timeout}
-      {:nosend, new_state} ->
-        :ok = Inet.setopts(socket, active: :once)
-        {:noreply, {{mod, new_state}, socket}}
     end
   end
   def handle_info({:tcp_closed, socket}, {{mod, state}, socket}) do
@@ -135,14 +124,32 @@ defmodule Ace.TCP.Server do
   end
   def handle_info(message, {{mod, state}, socket}) do
     # For any incoming erlang message the `handle_info` action.
-    case mod.handle_info(message, state) do
-      {:send, message, new_state} ->
-        :ok = TCP.send(socket, message)
-        :ok = Inet.setopts(socket, active: :once)
+    response = mod.handle_info(message, state)
+
+    {new_state, next} = send_response(response, socket)
+
+    case next do
+      :normal ->
         {:noreply, {{mod, new_state}, socket}}
-      {:nosend, new_state} ->
-        :ok = Inet.setopts(socket, active: :once)
-        {:noreply, {{mod, new_state}, socket}}
-      end
+      {:timeout, timeout} ->
+        {:noreply, {{mod, new_state}, socket}, timeout}
     end
+  end
+
+  defp send_response({:send, message, state}, socket) do
+    :ok = TCP.send(socket, message)
+    # Set the socket to send a single received packet as a message to this process.
+    # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
+    :ok = Inet.setopts(socket, active: :once)
+    {state, :normal}
+  end
+  defp send_response({:send, message, state, timeout}, socket) do
+    :ok = TCP.send(socket, message)
+    :ok = Inet.setopts(socket, active: :once)
+    {state, {:timeout, timeout}}
+  end
+  defp send_response({:nosend, state}, socket) do
+    :ok = Inet.setopts(socket, active: :once)
+    {state, :normal}
+  end
 end
