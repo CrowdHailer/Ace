@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased](https://github.com/CrowdHailer/Ace/tree/0.xx.xx) - 2016-xx-xx
+
+## Added
+- Support a response with a timeout from server modules.
+  Passed directly to GenServer so integer and `:hibernate` responses are supported
+
 ## [0.6.3](https://github.com/CrowdHailer/Ace/tree/0.6.3) - 2016-10-24
 
 ## Changed

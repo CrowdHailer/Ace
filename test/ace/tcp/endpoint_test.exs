@@ -63,12 +63,16 @@ defmodule Forwarder do
 end
 
 defmodule Timeout do
-  def init(conn, duration) do
+  def init(_conn, duration) do
     {:send, "HI\r\n", duration, duration}
   end
 
-  def handle_packet(packet, duration) do
+  def handle_packet("PING" <> _, duration) do
     {:send, "PONG\r\n", duration, duration}
+  end
+
+  def handle_packet(_packet, duration) do
+    {:nosend, duration, duration}
   end
 
   def handle_info(:timeout, duration) do
@@ -196,6 +200,18 @@ defmodule Ace.TCP.EndpointTest do
 
     :ok = :gen_tcp.send(client, "PING\r\n")
     {:ok, "PONG\r\n"} = :gen_tcp.recv(client, 0, 1000)
+    {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
+  end
+
+  test "can set a timeout in response to a packet with no immediate reply" do
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({Timeout, 10}, port: 0, acceptors: 2)
+    {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+
+    {:ok, "HI\r\n"} = :gen_tcp.recv(client, 0, 1000)
+    {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
+
+    :ok = :gen_tcp.send(client, "OTHER\r\n")
     {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
   end
 end

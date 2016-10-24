@@ -152,4 +152,8 @@ defmodule Ace.TCP.Server do
     :ok = Inet.setopts(socket, active: :once)
     {state, :normal}
   end
+  defp send_response({:nosend, state, timeout}, socket) do
+    :ok = Inet.setopts(socket, active: :once)
+    {state, {:timeout, timeout}}
+  end
 end
