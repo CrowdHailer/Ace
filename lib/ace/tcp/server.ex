@@ -85,7 +85,8 @@ defmodule Ace.TCP.Server do
 
     # Initialise the server with the app secification.
     # Enter the message handling loop after sending a message if required.
-    new_state = case mod.init(Inet.peername(socket), state) do
+    {:ok, peername} = Inet.peername(socket)
+    new_state = case mod.init(%{peer: peername}, state) do
       {:send, message, new_state} ->
         :ok = TCP.send(socket, message)
         new_state

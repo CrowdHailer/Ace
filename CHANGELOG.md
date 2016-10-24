@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.6.3](https://github.com/CrowdHailer/Ace/tree/0.6.3) - 2016-10-24
+
+## Changed
+- Information for new connections is now passed to the server as a map.
+
 ## [0.6.2](https://github.com/CrowdHailer/Ace/tree/0.6.2) - 2016-10-24
 
 ## Added

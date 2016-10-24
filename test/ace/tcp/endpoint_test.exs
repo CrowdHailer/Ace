@@ -55,6 +55,13 @@ defmodule BroadcastServer do
   end
 end
 
+defmodule Forwarder do
+  def init(conn, pid) do
+    send(pid, {:conn, conn})
+    {:nosend, pid}
+  end
+end
+
 defmodule Ace.TCP.EndpointTest do
   use ExUnit.Case, async: true
 
@@ -145,5 +152,14 @@ defmodule Ace.TCP.EndpointTest do
     {:ok, endpoint} = Ace.TCP.Endpoint.start_link({EchoServer, []}, port: 0, acceptors: 10)
     {_, _, governor_supervisor} = :sys.get_state(endpoint)
     assert %{active: 10} = Supervisor.count_children(governor_supervisor)
+  end
+
+  test "server is initialised with correct peer information" do
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({Forwarder, self}, port: 0, acceptors: 10)
+    {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    {:ok, client_name} = :inet.sockname(client)
+
+    assert_receive {:conn, %{peer: ^client_name}}
   end
 end
