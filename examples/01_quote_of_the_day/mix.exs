@@ -17,6 +17,7 @@ defmodule QuoteOfTheDay.Mixfile do
 
   defp deps do
     [
+      {:dialyxir, "~> 0.3.5", only: :dev},
       {:ace, ">= 0.6.0", path: "../../"}
     ]
   end
