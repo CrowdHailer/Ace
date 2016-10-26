@@ -56,6 +56,8 @@ defmodule BroadcastServer do
 end
 
 defmodule Forwarder do
+  @behaviour Ace.TCP.Server
+
   def init(conn, pid) do
     send(pid, {:conn, conn})
     {:nosend, pid}
