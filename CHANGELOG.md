@@ -4,14 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/CrowdHailer/Ace/tree/0.xx.xx) - 2016-xx-xx
+## [0.7.0](https://github.com/CrowdHailer/Ace/tree/0.xx.xx) - 2016-10-26
 
 ## Added
 - Support a response with a timeout from server modules.
   Passed directly to GenServer so integer and `:hibernate` responses are supported.
 - Support closing the connection from the server side.
   It is best to reserver server side closing for misbehaving connections.
-- Added callbacks to `Ace.TCP.Server` so that is can be included as a behaviour. 
+- Added callbacks to `Ace.TCP.Server` so that is can be included as a behaviour.
 
 ## [0.6.3](https://github.com/CrowdHailer/Ace/tree/0.6.3) - 2016-10-24
 
