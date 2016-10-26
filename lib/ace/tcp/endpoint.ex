@@ -4,6 +4,8 @@ defmodule Ace.TCP.Endpoint do
 
   Endpoints are started with a fixed pool of governors under the `Ace.TCP.Governor.Supervisor`.
   The number of governors is equal to the maximum number of servers that can be accepting new connections.
+
+  An endpoint is configured by the options passed to `start_link/2`.
   """
 
   use GenServer
@@ -39,7 +41,7 @@ defmodule Ace.TCP.Endpoint do
   @doc """
   Start a new endpoint with the app behaviour.
 
-    ## Options
+  ## Options
 
     * `:port` - the port to run the server on.
       Defaults to port 8080.
@@ -51,25 +53,46 @@ defmodule Ace.TCP.Endpoint do
       Defaults to 50.
 
   """
-  def start_link(app, opts) do
-    name = Keyword.get(opts, :name)
-    GenServer.start_link(__MODULE__, {app, opts}, [name: name])
+  @typedoc """
+  Reference to the endpoint.
+  """
+  @type endpoint :: pid
+
+  @typedoc """
+  Configuration options used when starting and endpoint.
+  """
+  @type options :: [option]
+
+  @typedoc """
+  Option values used to start an endpoint.
+  """
+  @type option :: {:name, GenServer.name}
+                | {:acceptors, non_neg_integer}
+                | {:port, :inet.port_number}
+
+  @spec start_link(app, options) :: {:ok, endpoint} when
+    app: Ace.TCP.Server.app
+
+  def start_link(app, options) do
+    name = Keyword.get(options, :name)
+    GenServer.start_link(__MODULE__, {app, options}, [name: name])
   end
 
   @doc """
   Retrieve the port number for an endpoint.
   """
+  @spec port(endpoint) :: {:ok, :inet.port_number}
   def port(endpoint) do
     GenServer.call(endpoint, :port)
   end
 
   ## Server Callbacks
 
-  def init({app, opts}) do
-    port = Keyword.get(opts, :port, 8080)
+  def init({app, options}) do
+    port = Keyword.get(options, :port, 8080)
 
     # A better name might be acceptors_count, but is rather verbose.
-    acceptors = Keyword.get(opts, :acceptors, 50)
+    acceptors = Keyword.get(options, :acceptors, 50)
 
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = TCP.listen(port, @tcp_options)

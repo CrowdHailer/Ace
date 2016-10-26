@@ -12,17 +12,20 @@ defmodule Ace.TCP.Server.Supervisor do
 
   Each worker will be started with the same app defined behaviour.
   """
-  def start_link(app, sup_opts \\ []) do
-    Supervisor.start_link(__MODULE__, app, sup_opts)
+  @spec start_link(Ace.TCP.Server.app) :: {:ok, pid}
+  def start_link(app) do
+    Supervisor.start_link(__MODULE__, app)
   end
 
   ## MODULE CALLBACKS
 
+  @doc false
   def init(app) do
     children = [
       worker(Ace.TCP.Server, [app], restart: :temporary)
     ]
 
+    # Connections are temporary, if a server crashes we rely upon the client to make a new connection.
     supervise(children, strategy: :simple_one_for_one)
   end
 end
