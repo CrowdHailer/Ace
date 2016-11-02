@@ -112,14 +112,6 @@ defmodule Ace.TCP.Server do
   # Use OTP behaviour so the server can be added to a supervision tree.
   use GenServer
 
-  # Alias erlang libraries so the following code is more readable.
-
-  # Interface to TCP/IP sockets.
-  alias :gen_tcp, as: TCP
-
-  # Helpers for the TCP/IP protocols.
-  alias :inet, as: Inet
-
   @doc """
   Start a new `Ace.TCP.Server` linked to the calling process.
 
@@ -157,7 +149,7 @@ defmodule Ace.TCP.Server do
   def handle_call({:accept, listen_socket}, _from, {:awaiting, {mod, state}}) do
     # Accept and incoming connection request on the listening socket.
     # :timer.sleep(1)
-    {:ok, socket} = case TCP.accept(listen_socket) do
+    {:ok, socket} = case :gen_tcp.accept(listen_socket) do
       {:ok, socket} ->
         {:ok, socket}
       {:error, :closed} ->
@@ -165,7 +157,7 @@ defmodule Ace.TCP.Server do
     end
 
     # Gather required information from new connection.
-    {:ok, peername} = Inet.peername(socket)
+    {:ok, peername} = :inet.peername(socket)
 
     # Initialise the server with the app secification.
     response = mod.init(%{peer: peername}, state)
@@ -224,27 +216,27 @@ defmodule Ace.TCP.Server do
   end
 
   defp send_response({:send, message, state}, socket) do
-    :ok = TCP.send(socket, message)
+    :ok = :gen_tcp.send(socket, message)
     # Set the socket to send a single received packet as a message to this process.
     # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
-    :ok = Inet.setopts(socket, active: :once)
+    :ok = :inet.setopts(socket, active: :once)
     {state, :normal}
   end
   defp send_response({:send, message, state, timeout}, socket) do
-    :ok = TCP.send(socket, message)
-    :ok = Inet.setopts(socket, active: :once)
+    :ok = :gen_tcp.send(socket, message)
+    :ok = :inet.setopts(socket, active: :once)
     {state, {:timeout, timeout}}
   end
   defp send_response({:nosend, state}, socket) do
-    :ok = Inet.setopts(socket, active: :once)
+    :ok = :inet.setopts(socket, active: :once)
     {state, :normal}
   end
   defp send_response({:nosend, state, timeout}, socket) do
-    :ok = Inet.setopts(socket, active: :once)
+    :ok = :inet.setopts(socket, active: :once)
     {state, {:timeout, timeout}}
   end
   defp send_response({:close, state}, socket) do
-    :ok = TCP.close(socket)
+    :ok = :gen_tcp.close(socket)
     {state, :close}
   end
 end

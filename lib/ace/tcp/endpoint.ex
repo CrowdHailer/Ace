@@ -10,14 +10,6 @@ defmodule Ace.TCP.Endpoint do
 
   use GenServer
 
-  # Alias erlang libraries so the following code is more readable.
-
-  # Interface for TCP/IP sockets.
-  alias :gen_tcp, as: TCP
-
-  # Helpers for the TCP/IP protocols.
-  alias :inet, as: Inet
-
   # Settings for the TCP socket
   @tcp_options [
     # Received packets are delivered as a binary("string").
@@ -95,13 +87,13 @@ defmodule Ace.TCP.Endpoint do
     acceptors = Keyword.get(options, :acceptors, 50)
 
     # Setup a socket to listen with our TCP options
-    {:ok, listen_socket} = TCP.listen(port, @tcp_options)
+    {:ok, listen_socket} = :gen_tcp.listen(port, @tcp_options)
 
     {:ok, server_supervisor} = Ace.TCP.Server.Supervisor.start_link(app)
     {:ok, governor_supervisor} = Ace.TCP.Governor.Supervisor.start_link(server_supervisor, listen_socket, acceptors)
 
     # Fetch and display the port information for the listening socket.
-    {:ok, port} = Inet.port(listen_socket)
+    {:ok, port} = :inet.port(listen_socket)
     IO.puts("Listening on port: #{port}")
 
     {:ok, {listen_socket, server_supervisor, governor_supervisor}}
