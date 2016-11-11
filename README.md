@@ -26,13 +26,14 @@ Server *modules* describe the communication patterns with clients.
 
 ## Installation
 
-[Available on Hex](https://hex.pm/packages/ace), the package can be installed as:
+The package is available on [Hex](https://hex.pm/packages/ace).
+Ace can be installed by adding it to your list of dependencies in `mix.exs`:
 
-  1. Add `ace` to your list of dependencies in `mix.exs`:
-
-        def deps do
-          [{:ace, "~> 0.7.0"}]
-        end
+```elixir
+def deps do
+  [{:ace, "~> 0.7.0"}]
+end
+```
 
 ## Usage
 
