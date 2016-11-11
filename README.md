@@ -37,39 +37,33 @@ end
 
 ## Usage
 
-Ace manages TCP connections by refering to a user defined server behaviour.
-An Ace server must implement 4 callbacks:
-
-- `init(connection, configuration)` for establishing a new connection.
-- `handle_packet(packet, state)` to handle incomming TCP packets.
-- `handle_info(message, state)` to handle application messages sent to the server.
-- `terminate` to do any cleanup when the connection is closed.
-
 #### Server
 
-Example server.
+Define the server that will be used to start an Ace endpoint.
 
 ```elixir
 defmodule MyServer do
+  # Initialise a server for a new client.
   def init(_connection, state = {:greeting, greeting}) do
     {:send, greeting, state}
   end
 
+  # React to a message that was sent from the client.
   def handle_packet(inbound, state) do
     {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
   end
 
+  # React to a message recieved from the application.
   def handle_info({:notify, notification}, state) do
     {:send, "#{notification}\r\n", state}
   end
 
+  # Response to the client closing the connection.
   def terminate(_reason, _state) do
     IO.puts("Socket connection closed")
   end
 end
 ```
-
-Defining `MyServer` above we can use it to start an Ace endpoint.
 
 #### Quick start
 
