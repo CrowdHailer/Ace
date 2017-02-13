@@ -8,6 +8,7 @@ defmodule Ace.TCP.Endpoint do
   An endpoint is configured by the options passed to `start_link/2`.
   """
 
+  require Logger
   use GenServer
 
   # Settings for the TCP socket
@@ -94,7 +95,8 @@ defmodule Ace.TCP.Endpoint do
 
     # Fetch and display the port information for the listening socket.
     {:ok, port} = :inet.port(listen_socket)
-    IO.puts("Listening on port: #{port}")
+    name = Keyword.get(options, :name, __MODULE__)
+    Logger.debug("#{name} listening on port: #{port}")
 
     {:ok, {listen_socket, server_supervisor, governor_supervisor}}
   end
