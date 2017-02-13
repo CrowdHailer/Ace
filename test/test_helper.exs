@@ -42,7 +42,7 @@ end
 
 defmodule BroadcastServer do
   def init(_, pid) do
-    send(pid, {:register, self})
+    send(pid, {:register, self()})
     {:nosend, pid}
   end
 
@@ -84,7 +84,7 @@ end
 
 defmodule CloseIt do
   def init(_conn, test_pid) do
-    send(test_pid, {:close, self})
+    send(test_pid, {:close, self()})
     {:nosend, test_pid}
   end
 

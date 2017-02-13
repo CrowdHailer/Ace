@@ -20,7 +20,7 @@ defmodule Ace.TCP.EndpointTest do
 
   test "socket broadcasts server notification" do
     port = 10_003
-    {:ok, _server} = Ace.TCP.Endpoint.start_link({BroadcastServer, self}, port: port)
+    {:ok, _server} = Ace.TCP.Endpoint.start_link({BroadcastServer, self()}, port: port)
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     receive do
@@ -31,7 +31,7 @@ defmodule Ace.TCP.EndpointTest do
   end
 
   test "socket ignores debug messages" do
-    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({BroadcastServer, self}, port: 0)
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({BroadcastServer, self()}, port: 0)
     {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     receive do
@@ -91,7 +91,7 @@ defmodule Ace.TCP.EndpointTest do
   end
 
   test "server is initialised with correct peer information" do
-    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({Forwarder, self}, port: 0, acceptors: 2)
+    {:ok, endpoint} = Ace.TCP.Endpoint.start_link({Forwarder, self()}, port: 0, acceptors: 2)
     {:ok, port} = Ace.TCP.Endpoint.port(endpoint)
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, client_name} = :inet.sockname(client)
