@@ -31,7 +31,7 @@ Ace can be installed by adding it to your list of dependencies in `mix.exs`:
 
     ```elixir
     def deps do
-      [{:ace, "~> 0.7.0"}]
+      [{:ace, "~> 0.7.1"}]
     end
     ```
 

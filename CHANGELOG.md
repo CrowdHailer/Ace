@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.1](https://github.com/CrowdHailer/Ace/tree/0.7.7) - 2017-02-13
+
+## Changed
+- Startup information is printed using `Logger` and not directly `IO`.
+
+## Fixed
+- Remove warnings about bracket use from Elixir 1.4.
+
 ## [0.7.0](https://github.com/CrowdHailer/Ace/tree/0.7.7) - 2016-10-26
 
 ## Added
