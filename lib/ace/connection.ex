@@ -3,6 +3,8 @@ defmodule Ace.Connection do
     case :gen_tcp.accept(socket) do
       {:ok, connection} ->
         {:ok, {:tcp, connection}}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

@@ -82,15 +82,7 @@ defmodule Ace.Server do
         send(pid, connection_ack(connection_ref, connection_info))
         {mod, state} = app
         mod.handle_connect(connection_info, state)
-        |> case do
-          {:send, packet, state} ->
-            :ok = Connection.send(connection, packet)
-            :ok = :inet.setopts(connection |> elem(1), active: :once)
-            {:noreply, {:connected, {mod, state}, connection}}
-          {:nosend, state} ->
-            :ok = :inet.setopts(connection |> elem(1), active: :once)
-            {:noreply, {:connected, {mod, state}, connection}}
-        end
+        |> next(mod, connection)
       {:error, :closed} ->
         exit(:normal)
     end
@@ -98,12 +90,7 @@ defmodule Ace.Server do
 
   def handle_info({:tcp, _, packet}, {:connected, {mod, state}, connection}) do
     mod.handle_packet(packet, state)
-    |> case do
-      {:send, packet, state} ->
-        :ok = Connection.send(connection, packet)
-        :ok = :inet.setopts(connection |> elem(1), active: :once)
-        {:noreply, {:connected, {mod, state}, connection}}
-    end
+    |> next(mod, connection)
   end
   def handle_info({:tcp_closed, socket}, {:connected, {mod, state}, connection}) do
     mod.handle_disconnect(:tcp_closed, state)
@@ -113,16 +100,26 @@ defmodule Ace.Server do
     end
   end
   def handle_info(message, {:connected, {mod, state}, connection}) do
-    case mod.handle_info(message, state) do
-      {:send, packet, state} ->
-        :ok = Connection.send(connection, packet)
-        :ok = :inet.setopts(connection |> elem(1), active: :once)
-        {:noreply, {:connected, {mod, state}, connection}}
-      {:nosend, state} ->
-        :ok = :inet.setopts(connection |> elem(1), active: :once)
-        {:noreply, {:connected, {mod, state}, connection}}
-    end
+    mod.handle_info(message, state)
+    |> next(mod, connection)
   end
 
-
+  defp next({:send, packet, state}, mod, connection) do
+    :ok = Connection.send(connection, packet)
+    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    {:noreply, {:connected, {mod, state}, connection}}
+  end
+  defp next({:send, packet, state, timeout}, mod, connection) do
+    :ok = Connection.send(connection, packet)
+    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    {:noreply, {:connected, {mod, state}, connection}, timeout}
+  end
+  defp next({:nosend, state}, mod, connection) do
+    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    {:noreply, {:connected, {mod, state}, connection}}
+  end
+  defp next({:nosend, state, timeout}, mod, connection) do
+    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    {:noreply, {:connected, {mod, state}, connection}, timeout}
+  end
 end

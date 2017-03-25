@@ -29,13 +29,14 @@ defmodule Ace.ServerTest do
 
   require Ace.Server
 
-  test "sends peer information on connect" do
+  test "server is initialised with correct peer information" do
     {:ok, server} = Ace.Server.start_link(TestApplication, self())
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    assert_receive Ace.Server.connection_ack(^ref, conn)
+    {:ok, client_name} = :inet.sockname(client)
+    assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: client_name, transport: :tcp})
     assert_receive ^conn
   end
 
@@ -88,10 +89,11 @@ defmodule Ace.ServerTest do
     assert {:error, :timeout} == :gen_tcp.recv(client, 0, 1000)
   end
 
-  @tag :skip
   test "state is passed through messages" do
-    {:ok, endpoint} = Ace.TCP.start_link({CounterServer, 0}, port: 0)
-    {:ok, port} = Ace.TCP.port(endpoint)
+    {:ok, server} = Ace.Server.start_link(CounterServer, 0)
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
+    {:ok, port} = :inet.port(listen_socket)
+    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "INC\r\n")
@@ -101,6 +103,49 @@ defmodule Ace.ServerTest do
     :timer.sleep(100)
     :ok = :gen_tcp.send(client, "TOTAL\r\n")
     assert {:ok, "2\r\n"} = :gen_tcp.recv(client, 0, 2000)
+  end
+
+  test "can set a timeout in response to new connection" do
+    {:ok, server} = Ace.Server.start_link(Timeout, 10)
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
+    {:ok, port} = :inet.port(listen_socket)
+    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+
+    assert {:ok, "HI\r\n"} = :gen_tcp.recv(client, 0)
+    assert {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
+  end
+
+  test "can set a timeout in response to a packet" do
+    {:ok, server} = Ace.Server.start_link(Timeout, 10)
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
+    {:ok, port} = :inet.port(listen_socket)
+    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+
+    {:ok, "HI\r\n"} = :gen_tcp.recv(client, 0, 1000)
+    {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
+
+    :ok = :gen_tcp.send(client, "PING\r\n")
+    {:ok, "PONG\r\n"} = :gen_tcp.recv(client, 0, 1000)
+    {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
+  end
+
+  test "can set a timeout in response to a packet with no immediate reply" do
+    {:ok, server} = Ace.Server.start_link(Timeout, 10)
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
+    {:ok, port} = :inet.port(listen_socket)
+    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+
+    {:ok, "HI\r\n"} = :gen_tcp.recv(client, 0, 1000)
+    {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
+
+    :ok = :gen_tcp.send(client, "OTHER\r\n")
+    {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
   end
 
   test "server exits when connection closes" do

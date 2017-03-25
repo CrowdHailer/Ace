@@ -15,7 +15,7 @@ defmodule CounterServer do
     {:nosend, last}
   end
 
-  def terminate(_, _) do
+  def handle_disconnect(_, _) do
     :ok
   end
 end
@@ -28,7 +28,7 @@ defmodule GreetingServer do
     {:send, "#{message}\n", []}
   end
 
-  def terminate(_reason, _state) do
+  def handle_disconnect(_reason, _state) do
     IO.puts("Socket connection closed")
   end
 end
@@ -68,7 +68,7 @@ defmodule Forwarder do
 end
 
 defmodule Timeout do
-  def init(_conn, duration) do
+  def handle_connect(_conn, duration) do
     {:send, "HI\r\n", duration, duration}
   end
 
