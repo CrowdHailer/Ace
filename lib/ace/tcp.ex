@@ -21,4 +21,12 @@ defmodule Ace.TCP do
   def start_link(app, options) do
     Ace.TCP.Endpoint.start_link(app, options)
   end
+
+  @doc """
+  Retrieve the port number for an endpoint.
+  """
+  @spec port(Ace.TCP.Endpoint.endpoint) :: {:ok, :inet.port_number}
+  def port(endpoint) do
+    Ace.TCP.Endpoint.port(endpoint)
+  end
 end
