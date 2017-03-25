@@ -1,4 +1,28 @@
 defmodule Ace.Application do
+  @moduledoc """
+  ## Example
+
+  The `#{__MODULE__}` abstracts the common code required to manage a TCP connection.
+  Developers only need to their own Server module to define app specific behaviour.
+
+  ```elixir
+  defmodule CounterServer do
+    def init(_, num) do
+      {:nosend, num}
+    end
+
+    def handle_packet(_, last) do
+      count = last + 1
+      {:send, "\#{count}\r\n", count}
+    end
+
+    def handle_info(_, last) do
+      {:nosend, last}
+    end
+  end
+  ```
+  """
+
   @typedoc """
   Information about the servers connection to the client
   """
@@ -46,4 +70,24 @@ defmodule Ace.Application do
     {:nosend, state} |
     {:nosend, state, timeout} |
     {:close, state}
+
+  @doc """
+  Every erlang message recieved by the server invokes this callback.
+
+  The return actions are the same as for the `init/2` callback
+  """
+  @callback handle_info(term, state) ::
+    {:send, term, state} |
+    {:send, term, state, timeout} |
+    {:nosend, state} |
+    {:nosend, state, timeout} |
+    {:close, state}
+
+  @doc """
+  Called whenever the connection to the client is lost.
+
+  *Note a server will not always call `handle_disconnect` on exiting.*
+  """
+  @callback handle_disconnect(reason, state) :: term when
+    reason: term
 end

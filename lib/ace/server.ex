@@ -1,4 +1,22 @@
 defmodule Ace.Server do
+  @moduledoc """
+  `#{__MODULE__}` manages a single client connection.
+
+  A server is started with an module to define behaviour and configuration as initial state.
+
+  See the README.md for a complete overview on how to make a server available.
+
+  *The server process accepts as well as manages the connection.
+  There is no separate acceptor process.
+  This means that that is no need to switch the connections owning process.
+  Several erlang servers do use separate acceptor pools.*
+  """
+
+  @typedoc """
+  The current state of an individual server process.
+  """
+  @type state :: term
+
   use GenServer
   alias Ace.Connection
 
@@ -8,10 +26,31 @@ defmodule Ace.Server do
     end
   end
 
+  @doc """
+  Start a new `#{__MODULE__}` linked to the calling process.
+
+  A server is started with an app to describe its behaviour and configuration for initial state.
+
+  The server process is returned immediatly.
+  This is allow a supervisor to start several servers without waiting for connections.
+
+  To accept a connection `accept_connection/2` must be called.
+
+  A provisioned server will remain in an awaiting state until accept is called.
+  """
+  @spec start_link(module, state) :: GenServer.on_start
   def start_link(application, config) do
     GenServer.start_link(__MODULE__, {application, config}, [])
   end
 
+  @doc """
+  Manage a client connect with server
+
+  Accept can only be called once for each server.
+  After a connection has been closed the server will terminate.
+  """
+  @spec accept_connection(server, :inet.socket) :: :ok when
+    server: pid
   def accept_connection(server, socket) do
     GenServer.call(server, {:accept, socket})
   end
@@ -27,6 +66,8 @@ defmodule Ace.Server do
         {:ok, connection_info}
     end
   end
+
+  ## Server callbacks
 
   def init(state) do
     {:ok, {:initialized, state}}
