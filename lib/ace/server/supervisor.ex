@@ -1,4 +1,4 @@
-defmodule Ace.TCP.Server.Supervisor do
+defmodule Ace.Server.Supervisor do
   @moduledoc """
   Supervise a collection of servers, that are listening or handling connections.
 
@@ -12,7 +12,7 @@ defmodule Ace.TCP.Server.Supervisor do
 
   Each worker will be started with the same app defined behaviour.
   """
-  @spec start_link(Ace.TCP.Server.app) :: {:ok, pid}
+  @spec start_link(Ace.Server.app) :: {:ok, pid}
   def start_link(app) do
     Supervisor.start_link(__MODULE__, app)
   end
@@ -20,9 +20,9 @@ defmodule Ace.TCP.Server.Supervisor do
   ## MODULE CALLBACKS
 
   @doc false
-  def init(app) do
+  def init({app, config}) do
     children = [
-      worker(Ace.TCP.Server, [app], restart: :temporary)
+      worker(Ace.Server, [app, config], restart: :temporary)
     ]
 
     # Connections are temporary, if a server crashes we rely upon the client to make a new connection.

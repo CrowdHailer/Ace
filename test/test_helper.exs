@@ -1,5 +1,5 @@
 defmodule CounterServer do
-  def init(_, num) do
+  def handle_connect(_, num) do
     {:nosend, num}
   end
 

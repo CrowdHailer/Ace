@@ -90,8 +90,8 @@ defmodule Ace.TCP.Endpoint do
     # Setup a socket to listen with our TCP options
     {:ok, listen_socket} = :gen_tcp.listen(port, @tcp_options)
 
-    {:ok, server_supervisor} = Ace.TCP.Server.Supervisor.start_link(app)
-    {:ok, governor_supervisor} = Ace.TCP.Governor.Supervisor.start_link(server_supervisor, listen_socket, acceptors)
+    {:ok, server_supervisor} = Ace.Server.Supervisor.start_link(app)
+    {:ok, governor_supervisor} = Ace.Governor.Supervisor.start_link(server_supervisor, {:tcp, listen_socket}, acceptors)
 
     # Fetch and display the port information for the listening socket.
     {:ok, port} = :inet.port(listen_socket)

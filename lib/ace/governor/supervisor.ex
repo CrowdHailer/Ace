@@ -1,4 +1,4 @@
-defmodule Ace.TCP.Governor.Supervisor do
+defmodule Ace.Governor.Supervisor do
   @moduledoc """
   To ensure the pool of listening servers is kept constant, the governor processes are supervised.
 
@@ -21,7 +21,7 @@ defmodule Ace.TCP.Governor.Supervisor do
     # To speed up a server multiple process can be listening for a connection simultaneously.
     # In this case n Governors will start n Servers listening before a single connection is received.
     children = for i <- 1..acceptors do
-      worker(Ace.TCP.Governor, [listen_socket, server_supervisor], id: "#{i}")
+      worker(Ace.Governor, [listen_socket, server_supervisor], id: "#{i}")
     end
 
     # The number of governors should be kept constent, for each governor that crashes a replacement should be started.

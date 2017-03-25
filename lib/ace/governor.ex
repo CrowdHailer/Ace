@@ -1,4 +1,4 @@
-defmodule Ace.TCP.Governor do
+defmodule Ace.Governor do
   @moduledoc """
   The governor acts to throttle the creation of servers.
 
@@ -20,7 +20,7 @@ defmodule Ace.TCP.Governor do
   @doc false
   def loop(listen_socket, server_supervisor) do
     {:ok, server} = Supervisor.start_child(server_supervisor, [])
-    :ok = Ace.TCP.Server.accept(server, listen_socket)
+    {:ok, _connection_info} = Ace.Server.await_connection(server, listen_socket)
     loop(listen_socket, server_supervisor)
   end
 
