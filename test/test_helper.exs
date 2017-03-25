@@ -22,7 +22,10 @@ end
 
 defmodule GreetingServer do
   def init(_, message) do
-    {:send, "#{message}\r\n", []}
+    {:send, "#{message}\n", []}
+  end
+  def handle_connect(_, message) do
+    {:send, "#{message}\n", []}
   end
 
   def terminate(_reason, _state) do
@@ -41,7 +44,7 @@ defmodule EchoServer do
 end
 
 defmodule BroadcastServer do
-  def init(_, pid) do
+  def handle_connect(_, pid) do
     send(pid, {:register, self()})
     {:nosend, pid}
   end
