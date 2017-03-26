@@ -1,14 +1,11 @@
-defmodule Ace.TCP do
+defmodule Ace.TLS do
   @moduledoc """
-  Serve application from TCP endpoint.
+  TLS endpoint for secure connections to a service.
 
-  To start a TCP endpoint run `start_link/2`.
-  """
+  An endpoint is started with a application definition(`Ace.Application`) and configuration.
 
-  @typedoc """
-  Reference to the endpoint.
+  Each client connection is handle by an individual server.
   """
-  @type endpoint :: pid
 
   @typedoc """
   Configuration options used when starting and endpoint.
@@ -25,17 +22,14 @@ defmodule Ace.TCP do
   require Logger
   use GenServer
 
-  # Settings for the TCP socket
   @socket_options [
     # Received packets are delivered as a binary("string").
-    # Alternative option is list('char list').
     {:mode, :binary},
 
-    # Received packets are delineated on each new line.
+    # Handle packets as soon as they are available.
     {:packet, :raw},
 
-    # Set the socket to execute in passive mode.
-    # The process must explicity receive incoming data by calling `TCP.recv/2`
+    # Set the socket to execute in passive mode, it must be prompted to read data.
     {:active, false},
 
     # it is possible for the process to complete before the kernel has released the associated network resource, and this port cannot be bound to another process until the kernel has decided that it is done.
@@ -46,48 +40,46 @@ defmodule Ace.TCP do
   ]
 
   @doc """
-  Start a new endpoint with the app behaviour.
+  Start a secure endpoint with the service.
 
   ## Options
 
+    * `:certificate` - **required**, the certificate.
+
+    * `:certificate_key` - **required**, the private key used to sign the certificate request.
+
     * `:port` - the port to run the server on.
-      Defaults to port 8080.
+      Defaults to port 8443.
 
     * `:name` - name to register the spawned endpoint under.
       The supported values are the same as GenServers.
 
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 50.
-
   """
+
   @spec start_link(app, options) :: {:ok, endpoint} when
-    app: Ace.Server.app,
-    endpoint: endpoint,
-    options: options
+    app: Ace.TCP.Server.app,
+    endpoint: Ace.TCP.Endpoint.endpoint,
+    options: Ace.TCP.Endpoint.options
   def start_link(app, options) do
     name = Keyword.get(options, :name)
     GenServer.start_link(__MODULE__, {app, options}, [name: name])
   end
 
-  @doc """
-  Retrieve the port number for an endpoint.
-  """
-  @spec port(endpoint) :: {:ok, :inet.port_number}
-  def port(endpoint) do
-    GenServer.call(endpoint, :port)
-  end
-
   ## Server Callbacks
 
   def init({app, options}) do
-    port = Keyword.get(options, :port, 8080)
+    port = Keyword.get(options, :port, 8443)
+    {:ok, certfile} = Keyword.fetch(options, :certificate)
+    {:ok, keyfile} = Keyword.fetch(options, :certificate_key)
 
     # A better name might be acceptors_count, but is rather verbose.
     acceptors = Keyword.get(options, :acceptors, 50)
 
-    # Setup a socket to listen with our TCP options
-    {:ok, listen_socket} = :gen_tcp.listen(port, @socket_options)
-    socket = {:tcp, listen_socket}
+    # Setup a socket to listen with our TLS options
+    {:ok, listen_socket} = :ssl.listen(port, @socket_options ++ [certfile: certfile, keyfile: keyfile])
+    socket = {:tls, listen_socket}
 
     {:ok, server_supervisor} = Ace.Server.Supervisor.start_link(app)
     {:ok, governor_supervisor} = Ace.Governor.Supervisor.start_link(server_supervisor, socket, acceptors)
@@ -95,13 +87,8 @@ defmodule Ace.TCP do
     # Fetch and display the port information for the listening socket.
     {:ok, port} = Ace.Connection.port(socket)
     name = Keyword.get(options, :name, __MODULE__)
-    :ok = Logger.debug("#{name} listening on port: #{port}")
+    Logger.debug("#{name} listening on port: #{port}")
 
     {:ok, {listen_socket, server_supervisor, governor_supervisor}}
-  end
-
-  def handle_call(:port, _from, state = {listen_socket, _, _}) do
-    port = :inet.port(listen_socket)
-    {:reply, port, state}
   end
 end

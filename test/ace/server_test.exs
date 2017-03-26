@@ -29,7 +29,8 @@ defmodule Ace.ServerTest do
 
   require Ace.Server
 
-  test "server is initialised with correct peer information" do
+
+  test "server is initialised with tcp connection information" do
     {:ok, server} = Ace.Server.start_link({TestApplication, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
@@ -37,6 +38,26 @@ defmodule Ace.ServerTest do
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, client_name} = :inet.sockname(client)
     assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: client_name, transport: :tcp})
+    assert_receive ^conn
+  end
+
+
+  test "server is initialised with tls connection information" do
+    cert_path = Path.expand("./tls/cert.pem", __ENV__.file |> Path.dirname)
+    key_path = Path.expand("./tls/key.pem", __ENV__.file |> Path.dirname)
+    {:ok, server} = Ace.Server.start_link({TestApplication, self()})
+    {:ok, listen_socket} = :ssl.listen(0,
+      mode: :binary,
+      packet: :line,
+      active: false,
+      reuseaddr: true,
+      certfile: cert_path,
+      keyfile: key_path)
+    {:ok, {_, port}} = :ssl.sockname(listen_socket)
+    {:ok, ref} = Ace.Server.accept_connection(server, {:tls, listen_socket})
+    {:ok, client} = :ssl.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    {:ok, client_name} = :ssl.sockname(client)
+    assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: client_name, transport: :tls})
     assert_receive ^conn
   end
 

@@ -98,12 +98,12 @@ defmodule Ace.Server do
     end
   end
 
-  def handle_info({:tcp, _, packet}, {:connected, {mod, state}, connection}) do
+  def handle_info({transport, _, packet}, {:connected, {mod, state}, connection}) when transport in [:tcp, :ssl] do
     # For any incoming tcp packet call the `handle_packet` action.
     mod.handle_packet(packet, state)
     |> next(mod, connection)
   end
-  def handle_info({:tcp_closed, socket}, {:connected, {mod, state}, connection}) do
+  def handle_info({transport, socket}, {:connected, {mod, state}, connection}) when transport in [:tcp_closed, :ssl_closed] do
     # If the socket is closed call the `handle_disconnect` action.
     mod.handle_disconnect(:tcp_closed, state)
     |> case do
