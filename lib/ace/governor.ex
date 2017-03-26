@@ -7,21 +7,34 @@ defmodule Ace.Governor do
   Once it's server has accepted a connection the governor will start a new server.
   """
 
+  use GenServer
+  alias Ace.Server
+  import Server, only: [connection_ack: 2]
+
   @doc """
   Start a new governor, linked to the calling process.
   """
   @spec start_link(:inet.socket, supervisor) :: {:ok, pid} when
     supervisor: pid()
   def start_link(listen_socket, server_supervisor) do
-    pid = spawn_link(__MODULE__, :loop, [listen_socket, server_supervisor])
-    {:ok, pid}
+    GenServer.start_link(__MODULE__, {listen_socket, server_supervisor})
   end
 
-  @doc false
-  def loop(listen_socket, server_supervisor) do
+  ## Server callbacks
+
+  def init({listen_socket, server_supervisor}) do
     {:ok, server} = Supervisor.start_child(server_supervisor, [])
-    {:ok, _connection_info} = Ace.Server.await_connection(server, listen_socket)
-    loop(listen_socket, server_supervisor)
+    true = Process.link(server)
+    {:ok, ref} = Server.accept_connection(server, listen_socket)
+    {:ok, {listen_socket, server_supervisor, ref, server}}
+  end
+
+  def handle_info(connection_ack(ref, _), {listen_socket, server_supervisor, ref, server}) do
+    true = Process.unlink(server)
+    {:ok, new_server} = Supervisor.start_child(server_supervisor, [])
+    true = Process.link(new_server)
+    {:ok, new_ref} = Server.accept_connection(new_server, listen_socket)
+    {:noreply, {listen_socket, server_supervisor, new_ref, new_server}}
   end
 
 end

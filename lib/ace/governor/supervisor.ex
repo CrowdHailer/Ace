@@ -11,20 +11,38 @@ defmodule Ace.Governor.Supervisor do
   """
   @spec start_link(pid, Ace.Connection.connection, non_neg_integer) :: {:ok, pid}
   def start_link(server_supervisor, listen_socket, acceptors) do
-    Supervisor.start_link(__MODULE__, {server_supervisor, listen_socket, acceptors}, [])
+    {:ok, supervisor} = Supervisor.start_link(__MODULE__, {server_supervisor, listen_socket}, [])
+    # To speed up a server multiple process can be listening for a connection simultaneously.
+    # In this case n Governors will start n Servers listening before a single connection is received.
+    for i <- 1..acceptors do
+      Supervisor.start_child(supervisor, [])
+    end
+    {:ok, supervisor}
+  end
+
+  def drain(supervisor) do
+    Supervisor.which_children(supervisor)
+    |> Enum.map(fn({_i, pid, :worker, _}) ->
+      ref = Process.monitor(pid)
+      true = Process.exit(pid, :shutdown)
+      ref
+    end)
+    |> Enum.map(fn(ref) ->
+      receive do
+        {:DOWN, ^ref, :process, _pid, _reason} ->
+          :ok
+      end
+    end)
+    :ok
   end
 
   ## SERVER CALLBACKS
 
   @doc false
-  def init({server_supervisor, listen_socket, acceptors}) do
-    # To speed up a server multiple process can be listening for a connection simultaneously.
-    # In this case n Governors will start n Servers listening before a single connection is received.
-    children = for i <- 1..acceptors do
-      worker(Ace.Governor, [listen_socket, server_supervisor], id: "#{i}")
-    end
-
-    # The number of governors should be kept constent, for each governor that crashes a replacement should be started.
-    supervise(children, strategy: :one_for_one)
+  def init({server_supervisor, listen_socket}) do
+    children = [
+      worker(Ace.Governor, [listen_socket, server_supervisor], restart: :transient)
+    ]
+    supervise(children, strategy: :simple_one_for_one)
   end
 end

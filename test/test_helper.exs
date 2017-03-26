@@ -34,12 +34,12 @@ defmodule GreetingServer do
 end
 
 defmodule EchoServer do
-  def init(_, state) do
+  def handle_connect(_, state) do
     {:nosend, state}
   end
 
   def handle_packet(inbound, state) do
-    {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
+    {:send, "ECHO: #{String.strip(inbound)}\n", state}
   end
 end
 
