@@ -14,7 +14,7 @@ defmodule Ace.TCP do
   """
 
   @spec start_link(app, options) :: {:ok, endpoint} when
-    app: Ace.TCP.Server.app,
+    app: Ace.Server.app,
     endpoint: Ace.TCP.Endpoint.endpoint,
     options: Ace.TCP.Endpoint.options
 

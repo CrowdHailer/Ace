@@ -58,7 +58,7 @@ defmodule Ace.Server do
   Accept can only be called once for each server.
   After a connection has been closed the server will terminate.
   """
-  @spec accept_connection(server, :inet.socket) :: :ok when
+  @spec accept_connection(server, {:tcp, :inet.socket}) :: {:ok, reference} when
     server: pid
   def accept_connection(server, socket) do
     GenServer.call(server, {:accept, socket})

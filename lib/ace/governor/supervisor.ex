@@ -9,7 +9,7 @@ defmodule Ace.Governor.Supervisor do
   @doc """
   Starts a supervised pool of governor processes.
   """
-  @spec start_link(pid, :inet.socket, non_neg_integer) :: {:ok, pid}
+  @spec start_link(pid, Ace.Connection.connection, non_neg_integer) :: {:ok, pid}
   def start_link(server_supervisor, listen_socket, acceptors) do
     Supervisor.start_link(__MODULE__, {server_supervisor, listen_socket, acceptors}, [])
   end

@@ -64,7 +64,7 @@ defmodule Ace.TCP.Endpoint do
                 | {:port, :inet.port_number}
 
   @spec start_link(app, options) :: {:ok, endpoint} when
-    app: Ace.TCP.Server.app
+    app: Ace.Server.app
 
   def start_link(app, options) do
     name = Keyword.get(options, :name)
@@ -96,7 +96,7 @@ defmodule Ace.TCP.Endpoint do
     # Fetch and display the port information for the listening socket.
     {:ok, port} = :inet.port(listen_socket)
     name = Keyword.get(options, :name, __MODULE__)
-    Logger.debug("#{name} listening on port: #{port}")
+    :ok = Logger.debug("#{name} listening on port: #{port}")
 
     {:ok, {listen_socket, server_supervisor, governor_supervisor}}
   end
