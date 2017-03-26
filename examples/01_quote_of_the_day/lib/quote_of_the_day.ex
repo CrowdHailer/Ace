@@ -13,7 +13,7 @@ defmodule QuoteOfTheDay do
     Supervisor.start_link(children, opts)
   end
 
-  def init(conn = %{peer: peer}, _state) do
+  def handle_connect(conn = %{peer: peer}, _state) do
     {{a,b,c,d}, port} = peer
     IO.puts("Socket connection opened from #{a}.#{b}.#{c}.#{d}:#{port}")
     {:send, "The future is here, just unevenly distributed\r\n", conn}
@@ -25,6 +25,10 @@ defmodule QuoteOfTheDay do
 
   def handle_info(_, state) do
     {:nosend, state}
+  end
+
+  def handle_disconnect(_, _) do
+    :ok
   end
 
   def terminate(_reason, %{peer: peer}) do
