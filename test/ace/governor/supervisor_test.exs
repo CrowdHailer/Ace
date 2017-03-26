@@ -39,7 +39,6 @@ defmodule Ace.Governor.SupervisorTest do
     {:ok, server_supervisor} = Server.Supervisor.start_link({EchoServer, :explode})
     {:ok, socket} = :gen_tcp.listen(0, @socket_options)
     socket = {:tcp, socket}
-    {:ok, port} = Connection.port(socket)
 
     {:ok, governor_supervisor} = Governor.Supervisor.start_link(server_supervisor, socket, 2)
     capture_log(fn() ->

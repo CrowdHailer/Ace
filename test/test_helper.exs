@@ -58,15 +58,6 @@ defmodule BroadcastServer do
   end
 end
 
-defmodule Forwarder do
-  @behaviour Ace.TCP.Server
-
-  def init(conn, pid) do
-    send(pid, {:conn, conn})
-    {:nosend, pid}
-  end
-end
-
 defmodule Timeout do
   def handle_connect(_conn, duration) do
     {:send, "HI\r\n", duration, duration}

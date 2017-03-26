@@ -7,7 +7,7 @@ defmodule Ace.ServerTest do
       send(test, info)
       {:nosend, test}
     end
-    def handle_disconnect(info, test) do
+    def handle_disconnect(_info, _test) do
       :ok
     end
 
@@ -37,7 +37,7 @@ defmodule Ace.ServerTest do
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, client_name} = :inet.sockname(client)
-    assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: client_name, transport: :tcp})
+    assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: ^client_name, transport: :tcp})
     assert_receive ^conn
   end
 
@@ -57,7 +57,7 @@ defmodule Ace.ServerTest do
     {:ok, ref} = Ace.Server.accept_connection(server, {:tls, listen_socket})
     {:ok, client} = :ssl.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     {:ok, client_name} = :ssl.sockname(client)
-    assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: client_name, transport: :tls})
+    assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: ^client_name, transport: :tls})
     assert_receive ^conn
   end
 
@@ -65,7 +65,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({EchoServer, []})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "blob\n")
@@ -76,7 +76,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({GreetingServer, "WELCOME"})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert {:ok, "WELCOME\n"} = :gen_tcp.recv(client, 0, 2000)
@@ -86,7 +86,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({BroadcastServer, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     receive do
@@ -100,7 +100,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({BroadcastServer, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     receive do
@@ -114,7 +114,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({CounterServer, 0})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "INC\r\n")
@@ -130,7 +130,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({Timeout, 10})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
 
@@ -142,7 +142,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({Timeout, 10})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
 
@@ -158,7 +158,7 @@ defmodule Ace.ServerTest do
     {:ok, server} = Ace.Server.start_link({Timeout, 10})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
 
@@ -172,9 +172,7 @@ defmodule Ace.ServerTest do
   test "can respond by closing the connection" do
     {:ok, server} = Ace.Server.start_link({CloseIt, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
-    {:ok, port} = :inet.port(listen_socket)
-    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
-
+    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
 
     {:ok, port} = :inet.port(listen_socket)
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
