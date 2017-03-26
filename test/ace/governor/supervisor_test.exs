@@ -1,5 +1,6 @@
 defmodule Ace.Governor.SupervisorTest do
   use ExUnit.Case
+  import ExUnit.CaptureLog
 
   alias Ace.{Server, Governor, Connection}
 
@@ -31,5 +32,19 @@ defmodule Ace.Governor.SupervisorTest do
     # Establish connection still available
     :ok = :gen_tcp.send(client, "blob\n")
     assert {:ok, "ECHO: blob\n"} = :gen_tcp.recv(client, 0)
+  end
+
+  test "supervisor crashes if socket closed" do
+    Process.flag(:trap_exit, true)
+    {:ok, server_supervisor} = Server.Supervisor.start_link({EchoServer, :explode})
+    {:ok, socket} = :gen_tcp.listen(0, @socket_options)
+    socket = {:tcp, socket}
+    {:ok, port} = Connection.port(socket)
+
+    {:ok, governor_supervisor} = Governor.Supervisor.start_link(server_supervisor, socket, 2)
+    capture_log(fn() ->
+      :gen_tcp.close(socket |> elem(1))
+      assert_receive {:EXIT, ^governor_supervisor, :shutdown}
+    end)
   end
 end

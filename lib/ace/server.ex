@@ -85,17 +85,13 @@ defmodule Ace.Server do
   def handle_call({:accept, socket}, from = {pid, _ref}, {:initialized, {mod, state}}) do
     connection_ref = make_ref()
     GenServer.reply(from, {:ok, connection_ref})
-    case Connection.accept(socket) do
-      {:ok, connection} ->
-        # Accept connection and send connection information to governer.
-        connection_info = Connection.information(connection)
-        send(pid, connection_ack(connection_ref, connection_info))
-          # Handle the application response by sending any message and deciding the next step behaviour.
-        mod.handle_connect(connection_info, state)
-        |> next(mod, connection)
-      {:error, :closed} ->
-        exit(:normal)
-    end
+    {:ok, connection} = Connection.accept(socket)
+    # Accept connection and send connection information to governer.
+    connection_info = Connection.information(connection)
+    send(pid, connection_ack(connection_ref, connection_info))
+      # Handle the application response by sending any message and deciding the next step behaviour.
+    mod.handle_connect(connection_info, state)
+    |> next(mod, connection)
   end
 
   def handle_info({transport, _, packet}, {:connected, {mod, state}, connection}) when transport in [:tcp, :ssl] do

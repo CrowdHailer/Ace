@@ -97,11 +97,11 @@ defmodule Ace.TCP do
     name = Keyword.get(options, :name, __MODULE__)
     :ok = Logger.debug("#{name} listening on port: #{port}")
 
-    {:ok, {listen_socket, server_supervisor, governor_supervisor}}
+    {:ok, {socket, server_supervisor, governor_supervisor}}
   end
 
-  def handle_call(:port, _from, state = {listen_socket, _, _}) do
-    port = :inet.port(listen_socket)
+  def handle_call(:port, _from, state = {socket, _, _}) do
+    port = Ace.Connection.port(socket)
     {:reply, port, state}
   end
 end

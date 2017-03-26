@@ -67,6 +67,13 @@ defmodule Ace.TLS do
     GenServer.start_link(__MODULE__, {app, options}, [name: name])
   end
 
+  @doc """
+  Retrieve the port number for an endpoint.
+  """
+  def port(endpoint) do
+    GenServer.call(endpoint, :port)
+  end
+
   ## Server Callbacks
 
   def init({app, options}) do
@@ -89,6 +96,11 @@ defmodule Ace.TLS do
     name = Keyword.get(options, :name, __MODULE__)
     Logger.debug("#{name} listening on port: #{port}")
 
-    {:ok, {listen_socket, server_supervisor, governor_supervisor}}
+    {:ok, {socket, server_supervisor, governor_supervisor}}
+  end
+
+  def handle_call(:port, _from, state = {socket, _, _}) do
+    port = Ace.Connection.port(socket)
+    {:reply, port, state}
   end
 end
