@@ -15,13 +15,13 @@ defmodule Ace.Mixfile do
 
   def application do
     [
-      applications: [:logger]
+      applications: [:logger, :ssl]
     ]
   end
 
   defp deps do
     [
-      {:dialyxir, "~> 0.3.5", only: :dev},
+      {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end

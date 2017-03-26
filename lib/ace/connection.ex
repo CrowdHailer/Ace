@@ -4,8 +4,9 @@ defmodule Ace.Connection do
 
   Options:
   - :tcp
+  - :tls
   """
-  @type transport :: :tcp
+  @type transport :: :tcp | :tls
 
   @typedoc """
   Details of a servers connection with a client.
@@ -15,8 +16,12 @@ defmodule Ace.Connection do
     transport: transport
   }
 
-  @type connection :: {:tcp, :inet.socket}
+  @typedoc """
+  Generic client connection from either tcp or tls socket.
+  """
+  @type connection :: {:tcp, :inet.socket} | {:tls, :ssl.socket}
 
+  @spec accept(connection) :: {:ok, connection}
   def accept({:tcp, socket}) do
     case :gen_tcp.accept(socket) do
       {:ok, connection} ->

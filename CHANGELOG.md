@@ -4,7 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.7.1](https://github.com/CrowdHailer/Ace/tree/0.7.7) - 2017-02-13
+## [0.8.0](https://github.com/CrowdHailer/Ace/tree/0.8.0) - 2017-03-26
+
+## Added
+- `Ace.TLS` for tcp/ssl endpoints, matching `Ace.TCP` function profiles.
+- `Ace.Connection` to normalise `:gen_tcp`/`:ssl` interfaces.
+- Governors can be throttled to zero to drain connections,
+  see `Ace.Governor.Supervisor.drain/1`
+
+## Changed
+- `Ace.TCP` is now the callback module when starting and endpoint,
+  there is no `Ace.TCP.Endpoint` module anymore.
+- `Ace.Governor` now a `GenServer` to handle OTP sys calls
+
+## Removed
+- `Ace.TCP.Server`, now `Ace.Server`.
+- `Ace.TCP.Server.Supervisor`, now `Ace.Server.Supervisor`.
+- `Ace.TCP.Governor`, now `Ace.Governor`.
+- `Ace.TCP.Governor.Supervisor`, now `Ace.Governor.Supervisor`.
+
+## [0.7.1](https://github.com/CrowdHailer/Ace/tree/0.7.1) - 2017-02-13
 
 ## Changed
 - Startup information is printed using `Logger` and not directly `IO`.
@@ -12,7 +31,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Fixed
 - Remove warnings about bracket use from Elixir 1.4.
 
-## [0.7.0](https://github.com/CrowdHailer/Ace/tree/0.7.7) - 2016-10-26
+## [0.7.0](https://github.com/CrowdHailer/Ace/tree/0.7.0) - 2016-10-26
 
 ## Added
 - Support a response with a timeout from server modules.

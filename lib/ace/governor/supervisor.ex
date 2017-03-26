@@ -1,8 +1,6 @@
 defmodule Ace.Governor.Supervisor do
   @moduledoc """
-  To ensure the pool of listening servers is kept constant, the governor processes are supervised.
-
-  The each governor in the pool is replaced on a one for one basis.
+  Supervise governors to maintain a pool of accepting servers.
   """
   use Supervisor
 
@@ -14,7 +12,7 @@ defmodule Ace.Governor.Supervisor do
     {:ok, supervisor} = Supervisor.start_link(__MODULE__, {server_supervisor, listen_socket}, [])
     # To speed up a server multiple process can be listening for a connection simultaneously.
     # In this case n Governors will start n Servers listening before a single connection is received.
-    for i <- 1..acceptors do
+    for _index <- 1..acceptors do
       Supervisor.start_child(supervisor, [])
     end
     {:ok, supervisor}
@@ -38,7 +36,6 @@ defmodule Ace.Governor.Supervisor do
 
   ## SERVER CALLBACKS
 
-  @doc false
   def init({server_supervisor, listen_socket}) do
     children = [
       worker(Ace.Governor, [listen_socket, server_supervisor], restart: :transient)

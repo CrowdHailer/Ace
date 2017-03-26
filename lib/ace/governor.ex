@@ -1,6 +1,6 @@
 defmodule Ace.Governor do
   @moduledoc """
-  The governor acts to throttle the creation of servers.
+  A governor maintains servers ready to handle clients.
 
   A governor process starts a server under the supervision of a server supervisor.
   It will then wait until the server has accepted a connection.

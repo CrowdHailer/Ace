@@ -1,66 +1,44 @@
 # Ace
-**Ace server for managing TCP endpoints and connections.**
+**Serve internet applications over TCP or TLS(ssl) connections.**
 
-I tackled this project as an interesting Elixir exercise and to learn about TCP.
-The code is designed to be accessible and is thoroughly commented.
+- [Install from hex](https://hex.pm/packages/ace)
+- [Documentation on hexdoc](https://hexdocs.pm/ace)
 
-For more details look at [Ace 0.1](https://github.com/CrowdHailer/Ace/tree/0.1.0).
+## Application
 
-If you are looking for a production webserver I would recommend one of:
+An `Ace.Application` module defines a servers behaviour.
 
-- [elli](https://github.com/knutin/elli)
-- [cowboy](https://ninenines.eu/docs/en/cowboy/1.0/guide/)/[ranch](https://ninenines.eu/docs/en/ranch/1.2/guide/)
-- [mochiweb](https://github.com/mochi/mochiweb)
-
-## Introduction
-
-TCP endpoints are started with a pool of acceptors.
-Servers are started on demand for each client connection.
-
-*[Many servers one client, NOT many clients one server.](http://joearms.github.io/2016/03/13/Managing-two-million-webservers.html)*
-
-Ace is responsible for managing server *processes*.
-Server *modules* describe the communication patterns with clients.
-
-[Documentation for Ace is available on hexdoc](https://hexdocs.pm/ace)
-
-## Installation
-
-The package is available on [Hex](https://hex.pm/packages/ace).
-Ace can be installed by adding it to your list of dependencies in `mix.exs`:
-
-    ```elixir
-    def deps do
-      [{:ace, "~> 0.7.1"}]
-    end
-    ```
-
-## Usage
-
-#### Server
-
-Define the server that will be used to start an Ace endpoint.
 
 ```elixir
-defmodule MyServer do
-  # Initialise a server for a new client.
-  def init(_connection, state = {:greeting, greeting}) do
+defmodule MyApp do
+  # MyApp is a server application.
+  use Ace.Application
+
+  # Handle client opening a new connection.
+  def handle_connect(_connection, state = {:greeting, greeting}) do
     {:send, greeting, state}
   end
 
   # React to a message that was sent from the client.
   def handle_packet(inbound, state) do
-    {:send, "ECHO: #{String.strip(inbound)}\r\n", state}
+    {:send, "ECHO: #{String.strip(inbound)}\n", state}
   end
 
   # React to a message recieved from the application.
   def handle_info({:notify, notification}, state) do
-    {:send, "#{notification}\r\n", state}
+    {:send, "#{notification}\n", state}
   end
 
   # Response to the client closing the connection.
-  def terminate(_reason, _state) do
+  def handle_disconnect(_reason, _state) do
     IO.puts("Socket connection closed")
+  end
+
+  # Define start_link to `MyApp` can be added to supervision tree.
+  def start_link(greeting, options \\ []) do
+    config = {:greeting, greeting}
+    app = {__MODULE__, config}
+    Ace.TCP.start_link(app, options)
   end
 end
 ```
@@ -75,23 +53,8 @@ iex -S mix
 
 In the `iex` console, start a TCP endpoint.
 ```elixir
-app = {MyServer, {:greeting, "WELCOME"}}
-{:ok, pid} = Ace.TCP.start_link(app, port: 8080)
+{:ok, pid} = MyApp.start_link("WELCOME", port: 8080)
 ```
-
-#### Embedded endpoints
-
-It is not a good idea to start unsupervised processes.
-For this reason an Ace endpoint can be added to you application supervision tree.
-
-```elixir
-children = [
-  worker(Ace.TCP, [{MyServer, {:greeting, "WELCOME"}}, [port: 8080]])
-]
-Supervisor.start_link(children, opts)
-```
-
-See "01 Quote of the Day" for an example setup.
 
 #### Connect
 Use telnet to communicate with the server.
@@ -120,6 +83,31 @@ back in telnet terminal.
 ```
 BOO!
 ```
+
+#### Embedded endpoints
+
+It is not a good idea to start unsupervised processes.
+Ace endpoints should be added to you application supervision tree.
+
+```elixir
+@tcp_options [
+  port: 8080
+]
+
+@tls_options [
+  port: 8443,
+  certificate: "path/to/cert.pm",
+  certificate_key: "path/to/key.pm"
+]
+
+children = [
+  worker(Ace.TCP, [{MyApp, {:greeting, "WELCOME"}}, @tcp_options])
+  worker(Ace.TLS, [{MyApp, {:greeting, "WELCOME"}}, @tls_options])
+]
+Supervisor.start_link(children, opts)
+```
+
+See "01 Quote of the Day" for an example setup.
 
 ### Ace 0.1 (TCP echo)
 

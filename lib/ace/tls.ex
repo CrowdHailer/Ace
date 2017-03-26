@@ -59,7 +59,7 @@ defmodule Ace.TLS do
   """
 
   @spec start_link(app, options) :: {:ok, endpoint} when
-    app: Ace.TCP.Server.app,
+    app: app,
     endpoint: Ace.TCP.Endpoint.endpoint,
     options: Ace.TCP.Endpoint.options
   def start_link(app, options) do

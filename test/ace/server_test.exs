@@ -17,7 +17,7 @@ defmodule Ace.ServerTest do
   end
 
   defmodule EchoServer do
-    @behaviour Ace.Application
+    use Ace.Application
     def handle_connect(_, state) do
       {:nosend, state}
     end

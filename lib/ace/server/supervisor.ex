@@ -19,7 +19,6 @@ defmodule Ace.Server.Supervisor do
 
   ## MODULE CALLBACKS
 
-  @doc false
   def init(app) do
     children = [
       worker(Ace.Server, [app], restart: :temporary)

@@ -21,7 +21,7 @@ defmodule Ace.Server do
   The configuration used to start each server.
 
   A server configuration consists of behaviour, the `module`, and state.
-  The module should implement the `Ace.TCP.Server` behaviour.
+  The module should implement the `Ace.Application` behaviour.
   Any value can be passed as the state.
   """
   @type app :: {module, state}
@@ -99,9 +99,9 @@ defmodule Ace.Server do
     mod.handle_packet(packet, state)
     |> next(mod, connection)
   end
-  def handle_info({transport, socket}, {:connected, {mod, state}, connection}) when transport in [:tcp_closed, :ssl_closed] do
+  def handle_info({transport, _socket}, {:connected, {mod, state}, _connection}) when transport in [:tcp_closed, :ssl_closed] do
     # If the socket is closed call the `handle_disconnect` action.
-    mod.handle_disconnect(:tcp_closed, state)
+    mod.handle_disconnect(transport, state)
     |> case do
       :ok ->
         {:stop, :normal, state}

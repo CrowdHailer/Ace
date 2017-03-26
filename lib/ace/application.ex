@@ -1,14 +1,15 @@
 defmodule Ace.Application do
-  # TODO rename service
   @moduledoc """
-  ## Example
+  Behaviour module for implementing a server to handle tcp/tls connections.
 
-  The `#{__MODULE__}` abstracts the common code required to manage a TCP connection.
-  Developers only need to their own Server module to define app specific behaviour.
+  See `Ace.Server` to start a server with an application
+  ## Example
 
   ```elixir
   defmodule CounterServer do
-    def init(_, num) do
+    use Ace.Application
+
+    def handle_connect(_, num) do
       {:nosend, num}
     end
 
@@ -25,18 +26,12 @@ defmodule Ace.Application do
   """
 
   @typedoc """
-  Information about the servers connection to the client
-  """
-  @type connection :: %{peer: {:inet.ip_address, :inet.port_number}}
-
-  @typedoc """
-  The current state of an individual server process.
+  The current state of a server.
   """
   @type state :: term
 
   @doc """
-  Invoked when a new client connects.
-  `accept/2` will block until a client connects and the server has initialised
+  Invoked when a new client connects to the server.
 
   The `state` is the second element in the `app` tuple that was used to start the endpoint.
 
@@ -51,12 +46,14 @@ defmodule Ace.Application do
 
   Returning `{:close, state}` will shutdown the server without any messages being sent or recieved
   """
-  @callback handle_connect(connection, state) ::
+  @callback handle_connect(information, state) ::
     {:send, iodata, state} |
     {:send, iodata, state, timeout} |
     {:nosend, state} |
     {:nosend, state, timeout} |
     {:close, state}
+  when
+    information: Ace.Connection.information()
 
   @doc """
   Every packet recieved from the client invokes this callback.
@@ -73,7 +70,7 @@ defmodule Ace.Application do
     {:close, state}
 
   @doc """
-  Every erlang message recieved by the server invokes this callback.
+  Every message recieved by the server, that was not sent from the client, invokes this callback.
 
   The return actions are the same as for the `init/2` callback
   """
@@ -85,10 +82,16 @@ defmodule Ace.Application do
     {:close, state}
 
   @doc """
-  Called whenever the connection to the client is lost.
+  Invoked when connection to the client is lost, or client disconnects.
 
   *Note a server will not always call `handle_disconnect` on exiting.*
   """
   @callback handle_disconnect(reason, state) :: term when
     reason: term
+
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour unquote(__MODULE__)
+    end
+  end
 end

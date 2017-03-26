@@ -60,10 +60,7 @@ defmodule Ace.TCP do
       Defaults to 50.
 
   """
-  @spec start_link(app, options) :: {:ok, endpoint} when
-    app: Ace.Server.app,
-    endpoint: endpoint,
-    options: options
+  @spec start_link({module, term}, options) :: {:ok, endpoint}
   def start_link(app, options) do
     name = Keyword.get(options, :name)
     GenServer.start_link(__MODULE__, {app, options}, [name: name])
