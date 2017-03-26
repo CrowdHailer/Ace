@@ -20,9 +20,9 @@ defmodule Ace.Server.Supervisor do
   ## MODULE CALLBACKS
 
   @doc false
-  def init({app, config}) do
+  def init(app) do
     children = [
-      worker(Ace.Server, [app, config], restart: :temporary)
+      worker(Ace.Server, [app], restart: :temporary)
     ]
 
     # Connections are temporary, if a server crashes we rely upon the client to make a new connection.

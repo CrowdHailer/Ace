@@ -17,6 +17,15 @@ defmodule Ace.Server do
   """
   @type state :: term
 
+  @typedoc """
+  The configuration used to start each server.
+
+  A server configuration consists of behaviour, the `module`, and state.
+  The module should implement the `Ace.TCP.Server` behaviour.
+  Any value can be passed as the state.
+  """
+  @type app :: {module, state}
+
   use GenServer
   alias Ace.Connection
 
@@ -38,8 +47,8 @@ defmodule Ace.Server do
 
   A provisioned server will remain in an awaiting state until accept is called.
   """
-  @spec start_link(module, state) :: GenServer.on_start
-  def start_link(application, config) do
+  @spec start_link(app) :: GenServer.on_start
+  def start_link({application, config}) do
     GenServer.start_link(__MODULE__, {application, config}, [])
   end
 
@@ -73,14 +82,15 @@ defmodule Ace.Server do
     {:ok, {:initialized, state}}
   end
 
-  def handle_call({:accept, socket}, from = {pid, _ref}, {:initialized, app}) do
+  def handle_call({:accept, socket}, from = {pid, _ref}, {:initialized, {mod, state}}) do
     connection_ref = make_ref()
     GenServer.reply(from, {:ok, connection_ref})
     case Connection.accept(socket) do
       {:ok, connection} ->
+        # Accept connection and send connection information to governer.
         connection_info = Connection.information(connection)
         send(pid, connection_ack(connection_ref, connection_info))
-        {mod, state} = app
+          # Handle the application response by sending any message and deciding the next step behaviour.
         mod.handle_connect(connection_info, state)
         |> next(mod, connection)
       {:error, :closed} ->
@@ -89,10 +99,12 @@ defmodule Ace.Server do
   end
 
   def handle_info({:tcp, _, packet}, {:connected, {mod, state}, connection}) do
+    # For any incoming tcp packet call the `handle_packet` action.
     mod.handle_packet(packet, state)
     |> next(mod, connection)
   end
   def handle_info({:tcp_closed, socket}, {:connected, {mod, state}, connection}) do
+    # If the socket is closed call the `handle_disconnect` action.
     mod.handle_disconnect(:tcp_closed, state)
     |> case do
       :ok ->
@@ -100,26 +112,33 @@ defmodule Ace.Server do
     end
   end
   def handle_info(message, {:connected, {mod, state}, connection}) do
+    # For any incoming erlang message the `handle_info` action.
     mod.handle_info(message, state)
     |> next(mod, connection)
   end
 
   defp next({:send, packet, state}, mod, connection) do
+    # Set the socket to send a single received packet as a message to this process.
+    # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
     :ok = Connection.send(connection, packet)
-    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    :ok = Connection.set_active(connection, :once)
     {:noreply, {:connected, {mod, state}, connection}}
   end
   defp next({:send, packet, state, timeout}, mod, connection) do
     :ok = Connection.send(connection, packet)
-    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    :ok = Connection.set_active(connection, :once)
     {:noreply, {:connected, {mod, state}, connection}, timeout}
   end
   defp next({:nosend, state}, mod, connection) do
-    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    :ok = Connection.set_active(connection, :once)
     {:noreply, {:connected, {mod, state}, connection}}
   end
   defp next({:nosend, state, timeout}, mod, connection) do
-    :ok = :inet.setopts(connection |> elem(1), active: :once)
+    :ok = Connection.set_active(connection, :once)
     {:noreply, {:connected, {mod, state}, connection}, timeout}
+  end
+  defp next({:close, state}, mod, connection) do
+    :ok = Connection.close(connection)
+    {:stop, :normal, {mod, state}}
   end
 end

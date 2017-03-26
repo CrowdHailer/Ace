@@ -30,7 +30,7 @@ defmodule Ace.ServerTest do
   require Ace.Server
 
   test "server is initialised with correct peer information" do
-    {:ok, server} = Ace.Server.start_link(TestApplication, self())
+    {:ok, server} = Ace.Server.start_link({TestApplication, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -41,7 +41,7 @@ defmodule Ace.ServerTest do
   end
 
   test "echos each message" do
-    {:ok, server} = Ace.Server.start_link(EchoServer, [])
+    {:ok, server} = Ace.Server.start_link({EchoServer, []})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -52,7 +52,7 @@ defmodule Ace.ServerTest do
   end
 
   test "says welcome for new connection" do
-    {:ok, server} = Ace.Server.start_link(GreetingServer, "WELCOME")
+    {:ok, server} = Ace.Server.start_link({GreetingServer, "WELCOME"})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -62,7 +62,7 @@ defmodule Ace.ServerTest do
   end
 
   test "socket broadcasts server notification" do
-    {:ok, server} = Ace.Server.start_link(BroadcastServer, self())
+    {:ok, server} = Ace.Server.start_link({BroadcastServer, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -76,7 +76,7 @@ defmodule Ace.ServerTest do
   end
 
   test "socket ignores debug messages" do
-    {:ok, server} = Ace.Server.start_link(BroadcastServer, self())
+    {:ok, server} = Ace.Server.start_link({BroadcastServer, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -90,7 +90,7 @@ defmodule Ace.ServerTest do
   end
 
   test "state is passed through messages" do
-    {:ok, server} = Ace.Server.start_link(CounterServer, 0)
+    {:ok, server} = Ace.Server.start_link({CounterServer, 0})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -106,7 +106,7 @@ defmodule Ace.ServerTest do
   end
 
   test "can set a timeout in response to new connection" do
-    {:ok, server} = Ace.Server.start_link(Timeout, 10)
+    {:ok, server} = Ace.Server.start_link({Timeout, 10})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -118,7 +118,7 @@ defmodule Ace.ServerTest do
   end
 
   test "can set a timeout in response to a packet" do
-    {:ok, server} = Ace.Server.start_link(Timeout, 10)
+    {:ok, server} = Ace.Server.start_link({Timeout, 10})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -134,7 +134,7 @@ defmodule Ace.ServerTest do
   end
 
   test "can set a timeout in response to a packet with no immediate reply" do
-    {:ok, server} = Ace.Server.start_link(Timeout, 10)
+    {:ok, server} = Ace.Server.start_link({Timeout, 10})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
@@ -148,8 +148,26 @@ defmodule Ace.ServerTest do
     {:ok, "TIMEOUT 10\r\n"} = :gen_tcp.recv(client, 0, 1000)
   end
 
+  test "can respond by closing the connection" do
+    {:ok, server} = Ace.Server.start_link({CloseIt, self()})
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
+    {:ok, port} = :inet.port(listen_socket)
+    {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
+
+
+    {:ok, port} = :inet.port(listen_socket)
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+
+    assert true == Process.alive?(server)
+    send(server, :close)
+
+    assert {:error, :closed} = :gen_tcp.recv(client, 0, 1000)
+    :timer.sleep(1000)
+    assert false == Process.alive?(server)
+  end
+
   test "server exits when connection closes" do
-    {:ok, server} = Ace.Server.start_link(TestApplication, self())
+    {:ok, server} = Ace.Server.start_link({TestApplication, self()})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
