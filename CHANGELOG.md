@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   see `Ace.Governor.Supervisor.drain/1`
 
 ## Changed
+- New connection calls `handle_connect/2` not `init/2`
+- Connection lost calls `handle_disconnect/2` not `terminate/2`
 - `Ace.TCP` is now the callback module when starting and endpoint,
   there is no `Ace.TCP.Endpoint` module anymore.
 - `Ace.Governor` now a `GenServer` to handle OTP sys calls

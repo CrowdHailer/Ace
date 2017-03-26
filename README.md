@@ -1,5 +1,5 @@
 # Ace
-**Serve internet applications over TCP or TLS(ssl) connections.**
+**Serve internet applications from TCP or TLS(ssl) endpoints.**
 
 - [Install from hex](https://hex.pm/packages/ace)
 - [Documentation on hexdoc](https://hexdocs.pm/ace)

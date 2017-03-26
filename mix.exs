@@ -3,7 +3,7 @@ defmodule Ace.Mixfile do
 
   def project do
     [app: :ace,
-    version: "0.7.1",
+    version: "0.8.0",
     elixir: "~> 1.0",
     build_embedded: Mix.env == :prod,
     start_permanent: Mix.env == :prod,
@@ -28,7 +28,7 @@ defmodule Ace.Mixfile do
 
   defp description do
     """
-    Ace server for managing TCP endpoints and connections.
+    Serve internet applications from TCP or TLS(ssl) endpoints.
     """
   end
 
