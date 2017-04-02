@@ -61,7 +61,13 @@ defmodule Ace.TCP do
 
   """
   @spec start_link({module, term}, options) :: {:ok, endpoint}
-  def start_link(app, options) do
+  def start_link(app = {mod, _}, options) do
+    case Ace.Application.is_implemented?(mod) do
+      true ->
+        :ok
+      false ->
+        Logger.warn("#{__MODULE__}: #{mod} does not implement Ace.Application behaviour.")
+    end
     name = Keyword.get(options, :name)
     GenServer.start_link(__MODULE__, {app, options}, [name: name])
   end

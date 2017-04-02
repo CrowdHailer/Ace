@@ -94,4 +94,19 @@ defmodule Ace.Application do
       @behaviour unquote(__MODULE__)
     end
   end
+
+  @doc """
+  Check if a module is an implementation of `Ace.Application`.
+
+      iex> is_implemented?(EchoServer)
+      true
+
+      iex> is_implemented?(IO)
+      false
+  """
+  def is_implemented?(module) do
+    module.module_info[:attributes]
+    |> Keyword.get(:behaviour, [])
+    |> Enum.member?(__MODULE__)
+  end
 end

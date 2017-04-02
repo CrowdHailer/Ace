@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.8.1](https://github.com/CrowdHailer/Ace/tree/0.8.0) - NOT-released
+
+## Added
+- Warning message when a behaviour module is not using the `Ace.Application` behaviour.
+
 ## [0.8.0](https://github.com/CrowdHailer/Ace/tree/0.8.0) - 2017-03-26
 
 ## Added

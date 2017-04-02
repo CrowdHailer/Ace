@@ -34,6 +34,7 @@ defmodule GreetingServer do
 end
 
 defmodule EchoServer do
+  use Ace.Application
   def handle_connect(_, state) do
     {:nosend, state}
   end
