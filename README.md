@@ -1,8 +1,10 @@
 # Ace
-**Serve internet applications from TCP or TLS(ssl) endpoints.**
+**Easy TCP and TLS(ssl) servers.**
 
 - [Install from hex](https://hex.pm/packages/ace)
 - [Documentation on hexdoc](https://hexdocs.pm/ace)
+
+*For a HTTP webserver see [Ace.HTTP](https://hex.pm/packages/ace_http).*
 
 ## Application
 

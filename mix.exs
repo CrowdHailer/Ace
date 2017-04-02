@@ -3,7 +3,7 @@ defmodule Ace.Mixfile do
 
   def project do
     [app: :ace,
-    version: "0.8.0",
+    version: "0.8.1",
     elixir: "~> 1.0",
     build_embedded: Mix.env == :prod,
     start_permanent: Mix.env == :prod,
@@ -28,7 +28,9 @@ defmodule Ace.Mixfile do
 
   defp description do
     """
-    Serve internet applications from TCP or TLS(ssl) endpoints.
+    Easy TCP and TLS(ssl) servers.
+
+    For a HTTP webserver see https://hex.pm/packages/ace_http.
     """
   end
 
