@@ -58,7 +58,7 @@ defmodule Ace.Application do
   @doc """
   Every packet recieved from the client invokes this callback.
 
-  The return actions are the same as for the `init/2` callback
+  The return actions are the same as for the `handle_disconnect/2` callback
 
   *No additional packets will be taken from the socket until this callback returns*
   """
@@ -72,7 +72,7 @@ defmodule Ace.Application do
   @doc """
   Every message recieved by the server, that was not sent from the client, invokes this callback.
 
-  The return actions are the same as for the `init/2` callback
+  The return actions are the same as for the `handle_disconnect/2` callback
   """
   @callback handle_info(term, state) ::
     {:send, term, state} |

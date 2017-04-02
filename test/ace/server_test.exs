@@ -2,18 +2,24 @@ defmodule Ace.ServerTest do
   use ExUnit.Case
 
   defmodule TestApplication do
+    use Ace.Application
 
     def handle_connect(info, test) do
       send(test, info)
       {:nosend, test}
     end
+
+    def handle_packet(_packet, state) do
+      {:nosend, state}
+    end
+
+    def handle_info(_info, state) do
+      {:nosend, state}
+    end
+
     def handle_disconnect(_info, _test) do
       :ok
     end
-
-    # def handle_packet(packet, state) do
-    #
-    # end
   end
 
   defmodule EchoServer do
@@ -25,10 +31,17 @@ defmodule Ace.ServerTest do
     def handle_packet(inbound, state) do
       {:send, "ECHO: #{String.strip(inbound)}\n", state}
     end
+
+    def handle_info(_info, state) do
+      {:nosend, state}
+    end
+
+    def handle_disconnect(_info, _test) do
+      :ok
+    end
   end
 
   require Ace.Server
-
 
   test "server is initialised with tcp connection information" do
     {:ok, server} = Ace.Server.start_link({TestApplication, self()})

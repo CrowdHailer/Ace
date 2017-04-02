@@ -1,4 +1,5 @@
 defmodule CounterServer do
+  use Ace.Application
   def handle_connect(_, num) do
     {:nosend, num}
   end
@@ -21,11 +22,17 @@ defmodule CounterServer do
 end
 
 defmodule GreetingServer do
-  def init(_, message) do
-    {:send, "#{message}\n", []}
-  end
+  use Ace.Application
   def handle_connect(_, message) do
     {:send, "#{message}\n", []}
+  end
+
+  def handle_packet(_packet, state) do
+    {:nosend, state}
+  end
+
+  def handle_info(_info, state) do
+    {:nosend, state}
   end
 
   def handle_disconnect(_reason, _state) do
@@ -42,12 +49,25 @@ defmodule EchoServer do
   def handle_packet(inbound, state) do
     {:send, "ECHO: #{String.strip(inbound)}\n", state}
   end
+
+  def handle_info(_info, state) do
+    {:nosend, state}
+  end
+
+  def handle_disconnect(_info, _test) do
+    :ok
+  end
 end
 
 defmodule BroadcastServer do
+  use Ace.Application
   def handle_connect(_, pid) do
     send(pid, {:register, self()})
     {:nosend, pid}
+  end
+
+  def handle_packet(_packet, state) do
+    {:nosend, state}
   end
 
   def handle_info({:notify, notification}, state) do
@@ -57,9 +77,14 @@ defmodule BroadcastServer do
   def handle_info(_, state) do
     {:nosend, state}
   end
+
+  def handle_disconnect(_info, _test) do
+    :ok
+  end
 end
 
 defmodule Timeout do
+  use Ace.Application
   def handle_connect(_conn, duration) do
     {:send, "HI\r\n", duration, duration}
   end
@@ -75,16 +100,29 @@ defmodule Timeout do
   def handle_info(:timeout, duration) do
     {:send, "TIMEOUT #{duration}\r\n", duration}
   end
+
+  def handle_disconnect(_info, _test) do
+    :ok
+  end
 end
 
 defmodule CloseIt do
+  use Ace.Application
   def handle_connect(_conn, test_pid) do
     send(test_pid, {:close, self()})
     {:nosend, test_pid}
   end
 
+  def handle_packet(_packet, state) do
+    {:nosend, state}
+  end
+
   def handle_info(:close, state) do
     {:close, state}
+  end
+
+  def handle_disconnect(_info, _test) do
+    :ok
   end
 end
 
