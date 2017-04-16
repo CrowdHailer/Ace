@@ -117,24 +117,6 @@ The simplest TCP echo server that works.
 Checkout the source of [version 0.1.0](https://github.com/CrowdHailer/Ace/blob/0.1.0/server.ex).
 The [change log](https://github.com/CrowdHailer/Ace/blob/master/CHANGELOG.md) documents all enhancements to this prototype server.
 
-
-## Using Vagrant
-
-Vagrant manages virtual machine provisioning.
-Using Vagrant allows you to quickly get started with `Ace` without needing to install Elixir/erlang on you machine.
-
-*If you do not know vagrant, or have it on your machine, I would suggest just installing Elixir on your machine and ignoring this section.*
-
-```
-vagrant up
-
-vagrant ssh
-
-cd /vagrant
-```
-
-From this directory instructions will be that same as users running Elixir on their machine.
-
 ## Contributing
 
 Before opening a pull request, please open an issue first.
