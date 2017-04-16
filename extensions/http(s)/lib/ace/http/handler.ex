@@ -8,77 +8,38 @@ defmodule Ace.HTTP.Handler do
     {:nosend, {app, partial, buffer}}
   end
 
-  # If streaming response all new packets should be added to the buffer
-  # States are
-  # - basic (all new packets slowly build a request, dispatched as soon as ready)
-  # - chunked (all new packets are buffered)
-  # - streaming/websockets (new packets are streamed to some process)
-  # - create an app protocol so that it can be called for many updates
-  # %Basic{app: {mod, state}}
-  # %Chunked{mod: mod}
-  # Server.handle_request(app, request)
-  # erlang deliveres messages in order so assume that info messages arrive in order.
-
   def handle_packet(packet, {app, partial, buffer}) do
     case process_buffer(buffer <> packet, partial) do
       {:more, partial, buffer} ->
         {:nosend, {app, partial, buffer}}
       {:ok, request, buffer} ->
         {mod, state} = app
-        # call process_request function
         case mod.handle_request(request, state) do
-          %{body: body, headers: headers, status: status_code} ->
-            raw = [
-              HTTPStatus.status_line(status_code),
-              header_lines(headers),
-              "\r\n",
-              body
-            ]
-            # Check keep alive status
-            # {:keep_alive, response} for 100
-            # {:continue, response} for 100
-            # {:close, response}
+          chunked_response = %Ace.ChunkedResponse{} ->
+            to_write = Ace.Response.serialize(chunked_response)
+            app = chunked_response.app || app
+            {:send, to_write, {:streaming, app}}
+          basic_response = %{body: _, headers: _, status: _} ->
+            raw = Ace.Response.serialize(basic_response)
             {:send, raw, {app, {:start_line, %{}}, buffer}}
-          upgrade = %Raxx.Chunked{} ->
-            headers = upgrade.headers
-            headers = if !List.keymember?(headers, "content-type", 0) do
-              headers ++ [{"content-type", "text/plain"}]
-            end || headers
-            headers = headers ++ [{"transfer-encoding", "chunked"}]
-            response = [
-              HTTPStatus.status_line(200),
-              header_lines(headers),
-              "\r\n"
-            ]
-            # make sure next requests can keep coming in.
-            # QUERY will a client keep sending request content if the response is chunked
-            {:send, response, {upgrade, request, buffer}}
         end
     end
   end
 
-  # Move to `Raxx.Headers` or `HTTP.Headers`
-  defp header_lines(headers) do
-    Enum.map(headers, &header_line/1)
-  end
-
-  defp header_line({field_name, field_value}) do
-    "#{field_name}: #{field_value}\r\n"
-  end
-
-  def handle_info(message, {%Raxx.Chunked{app: {mod, state}}, partial, buffer}) do
-    case mod.handle_info(message, state) do
-      {:chunk, data, state} ->
-        {:send, Raxx.Chunked.to_packet(data), {%Raxx.Chunked{app: {mod, state}}, partial, buffer}}
-      {:close, state} ->
-        {:send, Raxx.Chunked.end_chunk, {%Raxx.Chunked{app: {mod, state}}, partial, buffer}}
+  def handle_info(message, {:streaming, {mod, state}}) do
+    chunks = mod.handle_info(message, state)
+    case chunks do
+      [] ->
+        {:nosend, {:streaming, {mod, state}}}
+      data when is_list(data) ->
+        chunks = Enum.map(data, &Ace.Chunk.serialize/1)
+        {:send, chunks, {:streaming, {mod, state}}}
     end
   end
+
   def handle_disconnect(_reason, {_app, _partial, _buffer}) do
     :ok
   end
-
-  # Process part sould look like a function that you can pass to reduce
 
   def process_buffer(buffer, {:start_line, conn}) do
     case :erlang.decode_packet(:http_bin, buffer, []) do
