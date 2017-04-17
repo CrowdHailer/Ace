@@ -1,4 +1,8 @@
 defmodule Ace.Response do
+  @moduledoc false
+  # This module is not part of the public API.
+  # Contained functionalitly is likely to move to the Raxx project.
+
   # It should be possible just to make this a Chars.to_string implementation
   def serialize(response = %{status: status, headers: headers}) do
     [

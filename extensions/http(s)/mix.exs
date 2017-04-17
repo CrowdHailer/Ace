@@ -29,7 +29,7 @@ defmodule Ace.HTTP.Mixfile do
 
   defp description do
     """
-    HTTP Server built on top of Ace TCP connection manager
+    HTTP and HTTPS webservers built with the Ace connection manager
     """
   end
 

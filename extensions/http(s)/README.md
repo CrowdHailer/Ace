@@ -1,23 +1,48 @@
 # Ace.HTTP
 
-**HTTP Server built on top of Ace TCP connection manager**
+**HTTP and HTTPS webservers built with the Ace connection manager.**
 
-## Installation
+- [Install from Hex](https://hex.pm/packages/ace_http)
+- [Documentation available on hexdoc](https://hexdocs.pm/ace_http)
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed as:
+## Raxx interface
 
-  1. Add `ace_http` to your list of dependencies in `mix.exs`:
+`Ace.HTTP` and `Ace.HTTPS` will serve [Raxx](https://hexdocs.pm/raxx) applications.
+For instruction on developing applications see the Raxx documentation:
 
-    ```elixir
-    def deps do
-      [{:ace_http, "~> 0.1.2"}]
-    end
-    ```
+- https://hexdocs.pm/raxx
 
-  2. Ensure `ace_http` is started before your application:
+## Chunked Responses
 
-    ```elixir
-    def application do
-      [applications: [:ace_http]]
-    end
-    ```
+`Ace.ChunkedResponse` is an extension to the Raxx interface that allows a server to push data over a connection.
+
+## Development
+
+### Requirements
+
+Running `Ace.HTTP` requires Elixir 1.4 or higher.
+
+### Source code
+
+Development is as part of the Ace project,
+all code is available on Github.
+
+- https://github.com/CrowdHailer/Ace
+
+### Contributions
+
+1. Fork it (https://github.com/crowdhailer/ace/fork)
+2. Create your feature branch (`git checkout -b my-new-feature`)
+3. Commit your changes (`git commit -am 'Add some feature'`)
+4. Run all [tests](#testing)
+5. Push to the branch (`git push origin my-new-feature`)
+6. Create a new Pull Request
+
+### Testing
+
+The included tests can be run from mix.
+
+```
+mix deps.get
+mix test
+```
