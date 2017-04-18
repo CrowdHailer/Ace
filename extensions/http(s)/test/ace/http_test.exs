@@ -56,4 +56,26 @@ defmodule Ace.HTTPTest do
     send(server, [""])
     assert_receive %{chunk: "content"}, 1000
   end
+
+  def handle_error({:invalid_request_line, data}) do
+    Raxx.Response.bad_request([{"connection", "close"}, {"content-length", "0"}])
+  end
+
+  test "400 response for invalid start_line", %{port: port} do
+    {:ok, connection} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(connection, "rubbish\n")
+    assert_receive {:tcp, ^connection, response}, 1_000
+    assert response == "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
+
+  def handle_error({:invalid_header_line, line}) do
+    Raxx.Response.bad_request([{"connection", "close"}, {"content-length", "0"}])
+  end
+
+  test "400 response for invalid headers", %{port: port} do
+    {:ok, connection} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(connection, "GET / HTTP/1.1\r\na \r\n::\r\n")
+    assert_receive {:tcp, ^connection, response}, 1_000
+    assert response == "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
 end

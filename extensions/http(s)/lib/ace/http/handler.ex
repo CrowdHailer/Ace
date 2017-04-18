@@ -23,6 +23,15 @@ defmodule Ace.HTTP.Handler do
             raw = Ace.Response.serialize(basic_response)
             {:send, raw, {app, {:start_line, %{}}, buffer}}
         end
+      {:error, reason, buffer} ->
+        {mod, state} = app
+        case mod.handle_error(reason) do
+          binary_response when is_binary(binary_response) ->
+            {:send, binary_response, {app, {:start_line, %{}}, buffer}}
+          basic_response = %{body: _, headers: _, status: _} ->
+            raw = Ace.Response.serialize(basic_response)
+            {:send, raw, {app, {:start_line, %{}}, buffer}}
+        end
     end
   end
 
@@ -54,6 +63,8 @@ defmodule Ace.HTTP.Handler do
         path = Raxx.Request.split_path(path)
         request = %Raxx.Request{method: method, path: path, query: query, headers: []}
         process_buffer(rest, {:headers, request})
+      {:ok, {:http_error, line}, rest} ->
+        {:error, {:invalid_request_line, line}, rest}
     end
   end
   def process_buffer(buffer, {:headers, request}) do
@@ -63,6 +74,8 @@ defmodule Ace.HTTP.Handler do
       # Key values is binary for unknown headers, atom and capitalised for known.
       {:ok, {:http_header, _, key, _, value}, rest} ->
         process_buffer(rest, {:headers, add_header(request, key, value)})
+      {:ok, {:http_error, line}, rest} ->
+        {:error, {:invalid_header_line, line}, rest}
       {:ok, :http_eoh, rest} ->
         process_buffer(rest, {:body, request})
     end

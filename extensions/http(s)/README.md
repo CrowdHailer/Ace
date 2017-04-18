@@ -16,6 +16,10 @@ For instruction on developing applications see the Raxx documentation:
 
 `Ace.ChunkedResponse` is an extension to the Raxx interface that allows a server to push data over a connection.
 
+## Request errors
+
+When a the data sent over a socket cannot be cast to a request in time then the applications `handle_error/1` callback will be invoked.
+
 ## Development
 
 ### Requirements
