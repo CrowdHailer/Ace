@@ -1,7 +1,6 @@
 defmodule Ace.HTTP do
   @moduledoc """
   Serve a web application from an HTTP endpoint.
-  Running a HTTP server on [Ace](https://hex.pm/packages/ace)
 
   To start an endpoint use `start_link/2`.
 

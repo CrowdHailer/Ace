@@ -58,7 +58,7 @@ defmodule Ace.ChunkedResponse do
     end
 
     # Indicate the response has no more content to stream
-    def handle_info(:info, _) do
+    def handle_info(:done, _) do
       [""]
     end
 

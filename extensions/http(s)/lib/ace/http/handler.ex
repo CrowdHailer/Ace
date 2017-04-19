@@ -46,7 +46,7 @@ defmodule Ace.HTTP.Handler do
     end
   end
 
-  def handle_disconnect(_reason, {_app, _partial, _buffer}) do
+  def handle_disconnect(_reason, _) do
     :ok
   end
 
