@@ -111,7 +111,8 @@ defmodule Ace.HTTP.RequestTest do
     :timer.sleep(10)
     :gen_tcp.send(socket, Enum.join(second))
     :timer.sleep(10)
-    assert_receive %{host: "www.raxx.com", path: [], body: nil}
-    assert_receive %{host: "www.raxx.com", path: [], body: nil}
+    {:ok, client} = :inet.sockname(socket)
+    assert_receive %{host: "www.raxx.com", path: [], body: nil, peer: ^client}
+    assert_receive %{host: "www.raxx.com", path: [], body: nil, peer: ^client}
   end
 end

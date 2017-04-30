@@ -1,17 +1,16 @@
 defmodule Ace.HTTP.Handler do
   use Ace.Application
   @moduledoc false
-  def handle_connect(conn, app) do
-    partial = {:start_line, conn}
+  def handle_connect(conn_info, app) do
+    partial = {:start_line, conn_info}
     buffer = ""
-    # Need to keep track of conn for keep-alive, 4th spot might also be where to keep upgrade
-    {:nosend, {app, partial, buffer}}
+    {:nosend, {app, partial, buffer, conn_info}}
   end
 
-  def handle_packet(packet, {app, partial, buffer}) do
+  def handle_packet(packet, {app, partial, buffer, conn_info}) do
     case process_buffer(buffer <> packet, partial) do
       {:more, partial, buffer} ->
-        {:nosend, {app, partial, buffer}}
+        {:nosend, {app, partial, buffer, conn_info}}
       {:ok, request, buffer} ->
         {mod, state} = app
         case mod.handle_request(request, state) do
@@ -21,16 +20,16 @@ defmodule Ace.HTTP.Handler do
             {:send, to_write, {:streaming, app}}
           basic_response = %{body: _, headers: _, status: _} ->
             raw = Ace.Response.serialize(basic_response)
-            {:send, raw, {app, {:start_line, %{}}, buffer}}
+            {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
         end
       {:error, reason, buffer} ->
         {mod, state} = app
         case mod.handle_error(reason) do
           binary_response when is_binary(binary_response) ->
-            {:send, binary_response, {app, {:start_line, %{}}, buffer}}
+            {:send, binary_response, {app, {:start_line, conn_info}, buffer, conn_info}}
           basic_response = %{body: _, headers: _, status: _} ->
             raw = Ace.Response.serialize(basic_response)
-            {:send, raw, {app, {:start_line, %{}}, buffer}}
+            {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
         end
     end
   end
@@ -50,10 +49,10 @@ defmodule Ace.HTTP.Handler do
     :ok
   end
 
-  def process_buffer(buffer, {:start_line, conn}) do
+  def process_buffer(buffer, {:start_line, conn_info}) do
     case :erlang.decode_packet(:http_bin, buffer, []) do
       {:more, :undefined} ->
-        {:more, {:start_line, conn}, buffer}
+        {:more, {:start_line, conn_info}, buffer}
       {:ok, {:http_request, method, {:abs_path, path_string}, _version}, rest} ->
         %{path: path, query: query_string} = URI.parse(path_string)
         # DEBT in case of path '//' then parsing returns path of nil.
@@ -61,7 +60,19 @@ defmodule Ace.HTTP.Handler do
         path = path || "/"
         {:ok, query} = URI2.Query.decode(query_string || "")
         path = Raxx.Request.split_path(path)
-        request = %Raxx.Request{method: method, path: path, query: query, headers: []}
+        scheme = case conn_info.transport do
+          :tcp -> "http"
+          :ssl -> "https"
+        end
+        peer = conn_info.peer
+        request = %Raxx.Request{
+          scheme: scheme,
+          peer: peer,
+          method: method,
+          path: path,
+          query: query,
+          headers: []
+        }
         process_buffer(rest, {:headers, request})
       {:ok, {:http_error, line}, rest} ->
         {:error, {:invalid_request_line, line}, rest}
@@ -101,7 +112,7 @@ defmodule Ace.HTTP.Handler do
       [host] -> [host, 80]
     end
     headers = headers ++ [{"host", location}]
-    %{request | headers: headers, host: host, port: port, scheme: "http"}
+    %{request | headers: headers, host: host, port: port}
   end
   def add_header(request = %{headers: headers}, key, value) do
     key = String.downcase("#{key}")
