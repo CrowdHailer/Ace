@@ -25,6 +25,7 @@ defmodule Ace.Governor do
   def init({listen_socket, server_supervisor}) do
     {:ok, server} = Supervisor.start_child(server_supervisor, [])
     true = Process.link(server)
+    Process.monitor(server) # Normal exit will stop governor
     {:ok, ref} = Server.accept_connection(server, listen_socket)
     {:ok, {listen_socket, server_supervisor, ref, server}}
   end
@@ -33,6 +34,7 @@ defmodule Ace.Governor do
     true = Process.unlink(server)
     {:ok, new_server} = Supervisor.start_child(server_supervisor, [])
     true = Process.link(new_server)
+    Process.monitor(server)
     {:ok, new_ref} = Server.accept_connection(new_server, listen_socket)
     {:noreply, {listen_socket, server_supervisor, new_ref, new_server}}
   end

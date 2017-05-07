@@ -33,6 +33,18 @@ defmodule Ace.GovernorTest do
     assert_receive {:EXIT, ^governor, :abnormal}
   end
 
+  test "governor will exit if server fails to establish connection" do
+    Process.flag(:trap_exit, true)
+    {:ok, supervisor} = Server.Supervisor.start_link({__MODULE__, :explode})
+    {:ok, socket} = :gen_tcp.listen(0, @socket_options)
+    {:ok, port} = :inet.port(socket) # listen_socket
+    socket = {:tcp, socket}
+
+    {:ok, governor} = Governor.start_link(socket, supervisor)
+    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    assert_receive {:EXIT, ^governor, {:undef, _}}
+  end
+
   test "governor will not exit if server exits after establishing connection" do
     Process.flag(:trap_exit, true)
     {:ok, supervisor} = Server.Supervisor.start_link({EchoServer, :explode})

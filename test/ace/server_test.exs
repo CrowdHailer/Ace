@@ -42,16 +42,48 @@ defmodule Ace.ServerTest do
   end
 
   require Ace.Server
+  @host {127, 0, 0, 1}
 
-  test "server is initialised with tcp connection information" do
-    {:ok, server} = Ace.Server.start_link({TestApplication, self()})
+  setup config do
+    config = Map.put(config, :pid, self())
+    {:ok, server} = Ace.Server.start_link({__MODULE__, config})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
     {:ok, port} = :inet.port(listen_socket)
     {:ok, ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
-    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    {:ok, port: port, ref: ref}
+  end
+
+  def handle_connect(
+    info,
+    %{test: :"test tcp connection information", pid: pid})
+  do
+    send(pid, info)
+    {:nosend, nil}
+  end
+
+  test "tcp connection information",
+    %{port: port, ref: ref}
+  do
+    {:ok, client} = connect_to(port)
     {:ok, client_name} = :inet.sockname(client)
     assert_receive Ace.Server.connection_ack(^ref, conn = %{peer: ^client_name, transport: :tcp})
     assert_receive ^conn
+  end
+
+  def handle_connect(
+    _info,
+    %{test: :"test writing data on connect", pid: pid})
+  do
+    {:send, "WELCOME", :no_state}
+  end
+
+  test "writing data on connect", %{port: port} do
+    {:ok, client} = connect_to(port)
+    assert {:ok, "WELCOME"} = :gen_tcp.recv(client, 0, 2000)
+  end
+
+  def connect_to(port) do
+    :gen_tcp.connect(@host, port, [{:active, false}, :binary])
   end
 
 
@@ -92,16 +124,6 @@ defmodule Ace.ServerTest do
     send(server, :message)
     assert_receive {:EXIT, ^server, details}, 10_000
     assert {%RuntimeError{}, _stacktrace} = details
-  end
-
-  test "says welcome for new connection" do
-    {:ok, server} = Ace.Server.start_link({GreetingServer, "WELCOME"})
-    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
-    {:ok, port} = :inet.port(listen_socket)
-    {:ok, _ref} = Ace.Server.accept_connection(server, {:tcp, listen_socket})
-
-    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    assert {:ok, "WELCOME\n"} = :gen_tcp.recv(client, 0, 2000)
   end
 
   test "socket broadcasts server notification" do
