@@ -48,8 +48,8 @@ defmodule Ace.Server do
   A provisioned server will remain in an awaiting state until accept is called.
   """
   @spec start_link(app) :: GenServer.on_start
-  def start_link({application, config}) do
-    GenServer.start_link(__MODULE__, {application, config}, [])
+  def start_link({mod, state}) do
+    GenServer.start_link(__MODULE__, {mod, state})
   end
 
   @doc """
@@ -61,7 +61,7 @@ defmodule Ace.Server do
   @spec accept_connection(server, {:tcp, :inet.socket}) :: {:ok, reference} when
     server: pid
   def accept_connection(server, socket) do
-    GenServer.call(server, {:accept, socket})
+    GenServer.call(server, {:accept, socket, self()})
   end
 
   def await_connection(server, socket) do
@@ -78,28 +78,34 @@ defmodule Ace.Server do
 
   ## Server callbacks
 
-  def init(state) do
-    {:ok, {:initialized, state}}
+  def init({mod, state}) do
+    {:ok, {mod, state, nil}}
   end
 
-  def handle_call({:accept, socket}, from = {pid, _ref}, {:initialized, {mod, state}}) do
+  def handle_call({:accept, socket, pid}, from, {mod, state, nil}) do
     connection_ref = make_ref()
     GenServer.reply(from, {:ok, connection_ref})
     {:ok, connection} = Connection.accept(socket)
     # Accept connection and send connection information to governer.
     connection_info = Connection.information(connection)
+    # TODO handle failure to connect
     send(pid, connection_ack(connection_ref, connection_info))
       # Handle the application response by sending any message and deciding the next step behaviour.
     mod.handle_connect(connection_info, state)
     |> next(mod, connection)
   end
 
-  def handle_info({transport, _, packet}, {:connected, {mod, state}, connection}) when transport in [:tcp, :ssl] do
+  def handle_info(_message, {_mod, _state, nil}) do
+    raise """
+    Ace.Server should not receive messages before connection is established.
+    """ |> String.strip()
+  end
+  def handle_info({transport, _, packet}, {mod, state, connection}) when transport in [:tcp, :ssl] do
     # For any incoming tcp packet call the `handle_packet` action.
     mod.handle_packet(packet, state)
     |> next(mod, connection)
   end
-  def handle_info({transport, _socket}, {:connected, {mod, state}, _connection}) when transport in [:tcp_closed, :ssl_closed] do
+  def handle_info({transport, _socket}, {mod, state, _connection}) when transport in [:tcp_closed, :ssl_closed] do
     # If the socket is closed call the `handle_disconnect` action.
     mod.handle_disconnect(transport, state)
     |> case do
@@ -107,7 +113,7 @@ defmodule Ace.Server do
         {:stop, :normal, state}
     end
   end
-  def handle_info(message, {:connected, {mod, state}, connection}) do
+  def handle_info(message, {mod, state, connection}) do
     # For any incoming erlang message the `handle_info` action.
     mod.handle_info(message, state)
     |> next(mod, connection)
@@ -118,20 +124,20 @@ defmodule Ace.Server do
     # This stops the mailbox getting flooded but also also the server to respond to non tcp messages, this was not possible `using gen_tcp.recv`.
     :ok = Connection.send(connection, packet)
     :ok = Connection.set_active(connection, :once)
-    {:noreply, {:connected, {mod, state}, connection}}
+    {:noreply, {mod, state, connection}}
   end
   defp next({:send, packet, state, timeout}, mod, connection) do
     :ok = Connection.send(connection, packet)
     :ok = Connection.set_active(connection, :once)
-    {:noreply, {:connected, {mod, state}, connection}, timeout}
+    {:noreply, {mod, state, connection}, timeout}
   end
   defp next({:nosend, state}, mod, connection) do
     :ok = Connection.set_active(connection, :once)
-    {:noreply, {:connected, {mod, state}, connection}}
+    {:noreply, {mod, state, connection}}
   end
   defp next({:nosend, state, timeout}, mod, connection) do
     :ok = Connection.set_active(connection, :once)
-    {:noreply, {:connected, {mod, state}, connection}, timeout}
+    {:noreply, {mod, state, connection}, timeout}
   end
   defp next({:close, state}, mod, connection) do
     :ok = Connection.close(connection)

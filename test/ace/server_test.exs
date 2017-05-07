@@ -85,6 +85,15 @@ defmodule Ace.ServerTest do
     assert {:ok, "ECHO: blob\n"} = :gen_tcp.recv(client, 0)
   end
 
+  test "error when recieves message before connection" do
+    Process.flag(:trap_exit, true)
+    {:ok, server} = Ace.Server.start_link({BroadcastServer, []})
+
+    send(server, :message)
+    assert_receive {:EXIT, ^server, details}, 10_000
+    assert {%RuntimeError{}, _stacktrace} = details
+  end
+
   test "says welcome for new connection" do
     {:ok, server} = Ace.Server.start_link({GreetingServer, "WELCOME"})
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, packet: :line, active: false, reuseaddr: true)
