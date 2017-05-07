@@ -2,6 +2,8 @@ defmodule Ace.HTTP.Handler do
   use Ace.Application
   @moduledoc false
   @max_line_buffer 2048
+  @packet_timeout 10_000
+  @max_body_size 10_000_000 # 10MB
 
   def handle_connect(conn_info, app) do
     partial = {:start_line, conn_info}
@@ -12,7 +14,7 @@ defmodule Ace.HTTP.Handler do
   def handle_packet(packet, {app, partial, buffer, conn_info}) do
     case process_buffer(buffer <> packet, partial) do
       {:more, partial, buffer} ->
-        {:nosend, {app, partial, buffer, conn_info}}
+        {:nosend, {app, partial, buffer, conn_info}, @packet_timeout}
       {:ok, request, buffer} ->
         {mod, state} = app
         case mod.handle_request(request, state) do
@@ -36,6 +38,19 @@ defmodule Ace.HTTP.Handler do
     end
   end
 
+  def handle_info(:timeout, state = {app = {mod, _config}, partial, _buffer, conn_info}) do
+    error = case partial do
+      {:body, _} ->
+        :body_timeout
+    end
+    case mod.handle_error(error) do
+      binary_response when is_binary(binary_response) ->
+        {:send, binary_response, state}
+      basic_response = %{body: _, headers: _, status: _} ->
+        raw = Ace.Response.serialize(basic_response)
+        {:send, raw, state}
+    end
+  end
   def handle_info(message, {:streaming, {mod, state}}) do
     chunks = mod.handle_info(message, state)
     case chunks do
@@ -102,11 +117,18 @@ defmodule Ace.HTTP.Handler do
         {:ok, request, buffer}
       raw ->
         length = :erlang.binary_to_integer(raw)
-        case buffer do
-          <<body :: binary-size(length)>> <> rest ->
-            {:ok, %{request | body: body}, rest}
-          _ ->
-            {:more, {:body, request}, buffer}
+        case length < @max_body_size do
+          true ->
+            case buffer do
+              <<body :: binary-size(length)>> <> rest ->
+                {:ok, %{request | body: body}, rest}
+              _ ->
+                {:more, {:body, request}, buffer}
+            end
+          false ->
+            reason = {:body_too_large, length}
+            # TODO exceptions to include what to do next
+            {:error, reason, :close}
         end
     end
   end

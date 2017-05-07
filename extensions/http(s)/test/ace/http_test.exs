@@ -98,4 +98,40 @@ defmodule Ace.HTTPTest do
     assert_receive {:tcp, ^connection, response}, 1_000
     assert response == "HTTP/1.1 414 URI Too Long\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
+
+  def handle_error(:body_timeout) do
+    Raxx.Response.request_timeout([{"connection", "close"}, {"content-length", "0"}])
+  end
+
+  test "Client too slow to deliver body", %{port: port} do
+    head = """
+    GET / HTTP/1.1
+    Host: www.raxx.com
+    Content-Length: 100
+
+    """
+    {:ok, connection} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(connection, head)
+    assert_receive {:tcp, ^connection, response}, 15_000
+    assert response == "HTTP/1.1 408 Request Timeout\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
+
+  def handle_error({:body_too_large, _}) do
+    Raxx.Response.payload_too_large([{"connection", "close"}, {"content-length", "0"}])
+  end
+
+  test "Request is too large", %{port: port} do
+    head = """
+    GET / HTTP/1.1
+    Host: www.raxx.com
+    Content-Length: 100000000
+
+    """
+    {:ok, connection} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(connection, head)
+    assert_receive {:tcp, ^connection, response}, 15_000
+    assert response == "HTTP/1.1 413 Payload Too Large\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
+
+  # TODO test slow client attack
 end
