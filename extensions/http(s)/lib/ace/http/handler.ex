@@ -79,7 +79,8 @@ defmodule Ace.HTTP.Handler do
         path = Raxx.Request.split_path(path)
         scheme = case conn_info.transport do
           :tcp -> "http"
-          :ssl -> "https"
+          :ssl -> "https" # DEBT remove
+          :tls -> "https"
         end
         peer = conn_info.peer
         request = %Raxx.Request{
