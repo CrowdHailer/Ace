@@ -1,6 +1,8 @@
 defmodule Ace.HTTP.Handler do
   use Ace.Application
   @moduledoc false
+  @max_line_buffer 2048
+
   def handle_connect(conn_info, app) do
     partial = {:start_line, conn_info}
     buffer = ""
@@ -49,7 +51,7 @@ defmodule Ace.HTTP.Handler do
     :ok
   end
 
-  def process_buffer(buffer, {:start_line, conn_info}) do
+  def process_buffer(buffer, {:start_line, conn_info}) when byte_size(buffer) < @max_line_buffer do
     case :erlang.decode_packet(:http_bin, buffer, []) do
       {:more, :undefined} ->
         {:more, {:start_line, conn_info}, buffer}
@@ -77,6 +79,9 @@ defmodule Ace.HTTP.Handler do
       {:ok, {:http_error, line}, rest} ->
         {:error, {:invalid_request_line, line}, rest}
     end
+  end
+  def process_buffer(buffer, {:start_line, conn_info}) when byte_size(buffer) >= 2048 do
+    {:error, :start_line_too_long, :no_recover}
   end
   def process_buffer(buffer, {:headers, request}) do
     case :erlang.decode_packet(:httph_bin, buffer, []) do

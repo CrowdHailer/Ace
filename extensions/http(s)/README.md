@@ -20,6 +20,8 @@ For instruction on developing applications see the Raxx documentation:
 
 When a the data sent over a socket cannot be cast to a request in time then the applications `handle_error/1` callback will be invoked.
 
+TODO - list possible errors
+
 ## Development
 
 ### Requirements

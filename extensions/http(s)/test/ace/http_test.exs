@@ -78,4 +78,24 @@ defmodule Ace.HTTPTest do
     assert_receive {:tcp, ^connection, response}, 1_000
     assert response == "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
+
+  def handle_error(:start_line_too_long) do
+    Raxx.Response.uri_too_long([{"connection", "close"}, {"content-length", "0"}])
+  end
+
+  test "test too long url ", %{port: port} do
+    path = for i <- 1..3000 do
+      "a"
+    end |> Enum.join("")
+    # |> IO.inspect
+    request = """
+    GET /#{path} HTTP/1.1
+    Host: www.raxx.com
+
+    """
+    {:ok, connection} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(connection, request)
+    assert_receive {:tcp, ^connection, response}, 1_000
+    assert response == "HTTP/1.1 414 URI Too Long\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
 end
