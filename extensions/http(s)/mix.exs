@@ -21,7 +21,7 @@ defmodule Ace.HTTP.Mixfile do
     [
       {:raxx, "~> 0.11.1"},
       {:http_status, "~> 0.2.0"},
-      {:ace, "~> 0.9.0"},
+      {:ace, "~> 0.9.1"},
       {:raxx_verify, "~> 0.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]

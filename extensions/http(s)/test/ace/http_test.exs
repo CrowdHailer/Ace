@@ -1,10 +1,19 @@
 defmodule Ace.HTTPTest do
   use ExUnit.Case, async: true
+  import ExUnit.CaptureLog, only: [capture_log: 1]
+  
   doctest Ace.HTTP
 
   setup config do
-    {:ok, endpoint} = Ace.HTTP.start_link({__MODULE__, config |> Map.put(:pid, self())}, port: 0)
-    {:ok, port} = Ace.HTTP.port(endpoint)
+    raxx_app = {__MODULE__, config |> Map.put(:pid, self())}
+    capture_log fn() ->
+      {:ok, endpoint} = Ace.HTTP.start_link(raxx_app, port: 0)
+      {:ok, port} = Ace.HTTP.port(endpoint)
+      send(self(), {:port, port})
+    end
+    port = receive do
+      {:port, port} -> port
+    end
     {:ok, %{port: port}}
   end
 
@@ -57,7 +66,7 @@ defmodule Ace.HTTPTest do
     assert_receive %{chunk: "content"}, 1000
   end
 
-  def handle_error({:invalid_request_line, data}) do
+  def handle_error({:invalid_request_line, _data}) do
     Raxx.Response.bad_request([{"connection", "close"}, {"content-length", "0"}])
   end
 
@@ -68,7 +77,7 @@ defmodule Ace.HTTPTest do
     assert response == "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
 
-  def handle_error({:invalid_header_line, line}) do
+  def handle_error({:invalid_header_line, _line}) do
     Raxx.Response.bad_request([{"connection", "close"}, {"content-length", "0"}])
   end
 
@@ -84,7 +93,7 @@ defmodule Ace.HTTPTest do
   end
 
   test "test too long url ", %{port: port} do
-    path = for i <- 1..3000 do
+    path = for _i <- 1..3000 do
       "a"
     end |> Enum.join("")
     # |> IO.inspect
