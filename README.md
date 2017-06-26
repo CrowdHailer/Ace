@@ -15,6 +15,15 @@ check openssl version, http://manpages.ubuntu.com/manpages/xenial/man1/version.1
 openssl version
 ```
 
+## Prior
+
+### Chatterbox
+- uses undocumented prim_inet.async_accept https://stackoverflow.com/questions/13187682/what-is-the-difference-between-gen-tcprecv-and-prim-inet-recv
+- uses GenFSM depreciated for GenStateM
+
+### Lucid
+- uses next protocol negotiation but chrome supports alpn only
+
 # HTTP/1.1 ONLY
 
 **Easy TCP and TLS(ssl) servers.**
