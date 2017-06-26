@@ -1,4 +1,22 @@
 # Ace
+
+# Ace Next
+
+Work on making a HTTP/2 server.
+
+- Building HTTP/2 directly in Ace project, will extract to Ace.HTTP depending on performance cost.
+- Will initially only support HTTP2/h2/tls until prototype is proved.
+
+HTTP/2 requires an recent feature to TLS, namely Application-Layer Protocol Negotiation ALPN. https://ma.ttias.be/day-google-chrome-disables-http2-nearly-everyone-may-31st-2016/. Vagrant boxes for ubuntu 14.04 have required version of openssl (1.0.2). However it would be worth testing on ubuntu 16.04 once password issue is sorted. Or to use docker. https://askubuntu.com/questions/832137/ubuntu-xenial64-box-password
+
+check openssl version, http://manpages.ubuntu.com/manpages/xenial/man1/version.1ssl.html
+
+```
+openssl version
+```
+
+# HTTP/1.1 ONLY
+
 **Easy TCP and TLS(ssl) servers.**
 
 - [Install from hex](https://hex.pm/packages/ace)

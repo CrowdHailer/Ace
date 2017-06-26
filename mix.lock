@@ -1,3 +1,10 @@
-%{"dialyxir": {:hex, :dialyxir, "0.5.0", "5bc543f9c28ecd51b99cc1a685a3c2a1a93216990347f259406a910cf048d1d7", [:mix], [], "hexpm"},
+%{"certifi": {:hex, :certifi, "0.7.0", "861a57f3808f7eb0c2d1802afeaae0fa5de813b0df0979153cbafcd853ababaf", [:rebar3], [], "hexpm"},
+  "connection": {:hex, :connection, "1.0.4", "a1cae72211f0eef17705aaededacac3eb30e6625b04a6117c1b2db6ace7d5976", [:mix], [], "hexpm"},
+  "dialyxir": {:hex, :dialyxir, "0.5.0", "5bc543f9c28ecd51b99cc1a685a3c2a1a93216990347f259406a910cf048d1d7", [:mix], [], "hexpm"},
   "earmark": {:hex, :earmark, "1.2.2", "f718159d6b65068e8daeef709ccddae5f7fdc770707d82e7d126f584cd925b74", [:mix], [], "hexpm"},
-  "ex_doc": {:hex, :ex_doc, "0.16.1", "b4b8a23602b4ce0e9a5a960a81260d1f7b29635b9652c67e95b0c2f7ccee5e81", [:mix], [{:earmark, "~> 1.1", [hex: :earmark, repo: "hexpm", optional: false]}], "hexpm"}}
+  "ex_doc": {:hex, :ex_doc, "0.16.1", "b4b8a23602b4ce0e9a5a960a81260d1f7b29635b9652c67e95b0c2f7ccee5e81", [:mix], [{:earmark, "~> 1.1", [hex: :earmark, repo: "hexpm", optional: false]}], "hexpm"},
+  "gen_stage": {:hex, :gen_stage, "0.12.0", "74ec6f84ea0e0e81aa26b745870495094de1c59bfdbd012ae3103208ea124623", [:mix], [], "hexpm"},
+  "gen_state_machine": {:hex, :gen_state_machine, "1.0.2", "7fb11ec9e77b90cc9bcc095436a3786592fb243d80ed35c1279dd84153207962", [:mix], [], "hexpm"},
+  "hpack": {:hex, :hpack, "1.0.3", "b27e5c6eca73d031db7597ffc15f805e93dc208cc6902aae30771df1e77dcc97", [:mix], [], "hexpm"},
+  "river": {:hex, :river, "0.0.4", "ed95e0da64b184dd0af4e2fc1c37bdd0f6b057624b1fbde379ff7f1fdb0af1d2", [:mix], [{:certifi, "~> 0.7.0", [hex: :certifi, repo: "hexpm", optional: false]}, {:connection, "~> 1.0.4", [hex: :connection, repo: "hexpm", optional: false]}, {:gen_stage, "~> 0.5", [hex: :gen_stage, repo: "hexpm", optional: false]}, {:gen_state_machine, "~> 1.0.2", [hex: :gen_state_machine, repo: "hexpm", optional: false]}, {:hpack, "~> 1.0.2", [hex: :hpack, repo: "hexpm", optional: false]}, {:ssl_verify_fun, "~> 1.0", [hex: :ssl_verify_fun, repo: "hexpm", optional: false]}], "hexpm"},
+  "ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.2", "01289cad67b280b7f8f7e87117966995fad19236367386be2a9d7716e92ce7ff", [:make, :mix, :rebar3], [], "hexpm"}}

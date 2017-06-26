@@ -21,6 +21,7 @@ defmodule Ace.Mixfile do
 
   defp deps do
     [
+      # {:river, "~> 0.0.4"},
       {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
