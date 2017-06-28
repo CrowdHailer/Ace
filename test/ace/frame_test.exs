@@ -1,6 +1,10 @@
 defmodule Ace.Frame do
-  def pop(binary = <<l::24, _::48, _::binary-size(l)>> <> rest) do
-    IO.inspect(l)
+  length = quote do: length
+  frame_match = quote do: <<unquote(length)::24, _::48, _::binary-size(unquote(length))>>
+
+  def pop(<<unquote(frame_match), rest::binary>>) do
+    IO.inspect(unquote(length))
+    IO.inspect(rest)
     # <<frame::binary-size(l + 9), rest::bits>> = binary
     # {frame, rest}
   end
@@ -20,7 +24,22 @@ defmodule Ace.Frame do
       }
     end
 
-    def parse_payload(payload, length, true) do
+    @type <<4>>
+    @reserved <<0::1>>
+
+    def parse(<<
+      length::24,
+      @type,
+      flags(),
+      @reserved,
+      stream_id(id), b::8, p::binary-size(length - b - 1), padding::binary-size(p)>>) do
+
+    end
+
+    def parse(<<length::24>> <> rest, nil) do
+      parse(rest, {length})
+    end
+    def parse(@type <> rest, state) do
 
     end
 
@@ -36,6 +55,11 @@ end
 defmodule Ace.FrameTest do
 
   use ExUnit.Case
+
+  test "matching" do
+    Ace.Frame.pop(<<0 :: 24, 4 :: 8, 0 :: 8, 0 :: 1, 0 :: 31>> <> "other")
+    |> IO.inspect
+  end
 
   @priority <<2>>
   @settings <<4>>
@@ -98,33 +122,41 @@ defmodule Ace.FrameTest do
     {{head, payload}, rest}
   end
 
+@tag :skip
   test "" do
     read_frame(<<0 :: 24, 4 :: 8, 0 :: 8, 0 :: 1, 0 :: 31>>)
     |> IO.inspect
   end
 
+@tag :skip
   test "firefox 1" do
     {{head, payload}, ""} = read_frame(<<0, 0, 18, 4, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 4, 0, 2, 0, 0, 0, 5, 0, 0,
   64, 0>>)
     parse_frame(head, payload)
   end
+  @tag :skip
   test "firefox 2" do
     {{head, payload}, ""} = read_frame(<<0, 0, 4, 8, 0, 0, 0, 0, 0, 0, 191, 0, 1>>)
     parse_frame(head, payload)
   end
+  @tag :skip
   test "firefox 3" do
     {{head, payload}, ""} = read_frame(<<0, 0, 5, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 200>>)
     parse_frame(head, payload)
   end
+  @tag :skip
   test "firefox 4" do
     <<0, 0, 5, 2, 0, 0, 0, 0, 5, 0, 0, 0, 0, 100>>
   end
+  @tag :skip
   test "firefox 5" do
     <<0, 0, 5, 2, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0>>
   end
+  @tag :skip
   test "firefox 6" do
     <<0, 0, 5, 2, 0, 0, 0, 0, 9, 0, 0, 0, 7, 0>>
   end
+  @tag :skip
   test "firefox 7" do
     <<0, 0, 5, 2, 0, 0, 0, 0, 11, 0, 0, 0, 3, 0>>
   end
