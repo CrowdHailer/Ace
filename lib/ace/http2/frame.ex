@@ -1,16 +1,4 @@
 defmodule Ace.HTTP2.Frame do
-  length = quote do: length
-  frame_match = quote do: <<unquote(length)::24, _::48, _::binary-size(unquote(length))>>
-
-  def pop(<<unquote(frame_match), rest::binary>>) do
-    IO.inspect(unquote(length))
-    IO.inspect(rest)
-    # <<frame::binary-size(l + 9), rest::bits>> = binary
-    # {frame, rest}
-  end
-  def parse do
-
-  end
   def read_next(<<header::bits-size(72), rest :: bits>>) do
     <<length::24, _::bits>> = header
     <<payload::binary-size(length), rest::bits>> = rest

@@ -21,23 +21,29 @@ defmodule Ace.HTTP2 do
   end
   def handle_info(:timeout, {:listen_socket, listen_socket}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
-    IO.puts("Server accepted")
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
+    :ssl.send(socket, <<0::24, 4::8, 0::8, 0::32>>)
     :ssl.setopts(socket, [active: :once])
     {:noreply, {:pending, %__MODULE__{socket: socket}}}
   end
   def handle_info({:ssl, _, @preface <> data}, {:pending, state}) do
     consume(data, state)
   end
+  def handle_info({:ssl, _, data}, state) do
+    consume(data, state)
+  end
 
   def consume(buffer, state) do
     {frame, unprocessed} = Ace.HTTP2.Frame.read_next(buffer) # + state.settings )
+    # IO.inspect(frame)
+    # IO.inspect(unprocessed)
     if frame do
       {outbound, state} = consume_frame(frame, state)
       :ok = :ssl.send(state.socket, outbound)
       consume(unprocessed, state)
     else
+      :ssl.setopts(state.socket, [active: :once])
       {:noreply, state}
     end
   end
@@ -45,6 +51,12 @@ defmodule Ace.HTTP2 do
   def consume_frame(<<l::24, 4::8, 0::8, 0::1, 0::31, payload::binary>>, state = %{settings: nil}) do
     new_settings = update_settings(payload)
     {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
+  end
+  def consume_frame(<<8::24, 6::8, 0::8, 0::32, data::64>>, settings) do
+    {[<<8::24, 6::8, 1::8, 0::32, data::64>>], settings}
+  end
+  def consume_frame(<<4::24, 8::8, 0::8, 0::32, data::32>>, settings) do
+    {[], settings}
   end
   def consume_frame(_, state = %{settings: nil}) do
     :invalid_first_frame
