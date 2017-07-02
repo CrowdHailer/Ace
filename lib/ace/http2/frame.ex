@@ -1,4 +1,4 @@
-defmodule Ace.Frame do
+defmodule Ace.HTTP2.Frame do
   length = quote do: length
   frame_match = quote do: <<unquote(length)::24, _::48, _::binary-size(unquote(length))>>
 

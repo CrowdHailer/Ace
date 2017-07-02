@@ -1,10 +1,9 @@
-
-defmodule Ace.FrameTest do
+defmodule Ace.HTTP2.FrameTest do
 
   use ExUnit.Case
 
   test "matching" do
-    Ace.Frame.pop(<<0 :: 24, 4 :: 8, 0 :: 8, 0 :: 1, 0 :: 31>> <> "other")
+    Ace.HTTP2.Frame.pop(<<0 :: 24, 4 :: 8, 0 :: 8, 0 :: 1, 0 :: 31>> <> "other")
     |> IO.inspect
   end
 

@@ -1,4 +1,4 @@
-defmodule Ace do
+defmodule Ace.HTTP2 do
   @preface "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
   @default_settings %{}
 
@@ -32,7 +32,7 @@ defmodule Ace do
   end
 
   def consume(buffer, state) do
-    {frame, unprocessed} = Ace.Frame.read_next(buffer) # + state.settings )
+    {frame, unprocessed} = Ace.HTTP2.Frame.read_next(buffer) # + state.settings )
     if frame do
       {outbound, state} = consume_frame(frame, state)
       :ok = :ssl.send(state.socket, outbound)
