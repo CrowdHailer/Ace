@@ -50,7 +50,7 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
     :ssl.send(connection, <<8::24, 6::8, 0::8, 0::32, 1_000::64>>)
-    assert {:ok, <<8::24, 6::8, 0::8, 1::32, 1_000::64>>} == :ssl.recv(connection, 9, 2_000)
+    assert {:ok, <<8::24, 6::8, 1::8, 0::32, 1_000::64>>} == :ssl.recv(connection, 0, 2_000)
   end
 
   test "send window update", %{client: connection} do
@@ -78,7 +78,16 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
 
-    :ssl.send(connection, <<4::24, 8::8, 0::8, 0::32, 1::32>>)
-    assert {:ok, <<8::24, 1::8, 0::8, 1::32, 1_000::64>>} == :ssl.recv(connection, 9, 2_000)
+    {:ok, table} = HPack.Table.start_link(1_000)
+    body = HPack.encode([{":method", "GET"}, {":scheme", "https"}, {":path", "/"}], table)
+
+    size = :erlang.iolist_size(body)
+
+    flags = <<0::5, 1::1, 0::1, 1::1>>
+    # Client initated streams must use odd stream identifiers
+    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
+    Process.sleep(2_000)
+    # 200 response with body "Hello, World!"
+    assert {:ok, <<0, 0, 1, 1, 4, 0, 0, 0, 1, 136, 0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
   end
 end

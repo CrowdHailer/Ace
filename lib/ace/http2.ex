@@ -7,8 +7,12 @@ defmodule Ace.HTTP2 do
   end
 
   defstruct [
+    # next: :preface, :settings, :continuation, :any
     settings: nil,
-    socket: nil
+    socket: nil,
+    decode_context: nil,
+    encode_context: nil,
+    streams: nil
   ]
 
   use GenServer
@@ -25,12 +29,20 @@ defmodule Ace.HTTP2 do
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
     :ssl.send(socket, <<0::24, 4::8, 0::8, 0::32>>)
     :ssl.setopts(socket, [active: :once])
-    {:noreply, {:pending, %__MODULE__{socket: socket}}}
+    {:ok, decode_context} = HPack.Table.start_link(1_000)
+    {:ok, encode_context} = HPack.Table.start_link(1_000)
+    initial_state = %__MODULE__{
+      socket: socket,
+      decode_context: decode_context,
+      encode_context: encode_context,
+      streams: %{}
+    }
+    {:noreply, {:pending, initial_state}}
   end
   def handle_info({:ssl, _, @preface <> data}, {:pending, state}) do
     consume(data, state)
   end
-  def handle_info({:ssl, _, data}, state) do
+  def handle_info({:ssl, _, data}, state = %__MODULE__{}) do
     consume(data, state)
   end
 
@@ -39,6 +51,7 @@ defmodule Ace.HTTP2 do
     # IO.inspect(frame)
     # IO.inspect(unprocessed)
     if frame do
+      # Could consume with only settings
       {outbound, state} = consume_frame(frame, state)
       :ok = :ssl.send(state.socket, outbound)
       consume(unprocessed, state)
@@ -48,22 +61,76 @@ defmodule Ace.HTTP2 do
     end
   end
 
+  # settings
   def consume_frame(<<l::24, 4::8, 0::8, 0::1, 0::31, payload::binary>>, state = %{settings: nil}) do
     new_settings = update_settings(payload)
     {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
   end
-  def consume_frame(<<8::24, 6::8, 0::8, 0::32, data::64>>, settings) do
-    {[<<8::24, 6::8, 1::8, 0::32, data::64>>], settings}
-  end
-  def consume_frame(<<4::24, 8::8, 0::8, 0::32, data::32>>, settings) do
-    {[], settings}
-  end
   def consume_frame(_, state = %{settings: nil}) do
     :invalid_first_frame
+  end
+  # ping
+  def consume_frame(<<8::24, 6::8, 0::8, 0::32, data::64>>, state) do
+    {[<<8::24, 6::8, 1::8, 0::32, data::64>>], state}
+  end
+  # Window update
+  def consume_frame(<<4::24, 8::8, 0::8, 0::32, data::32>>, state) do
+    {[], state}
+  end
+  # headers
+  defmodule Request do
+    defstruct [:method, :path, :scheme, :headers]
+  end
+  def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, data::binary>>, state) do
+    <<0::5, 1::1, 0::1, 1::1>> = flags
+    request = HPack.decode(data, state.decode_context)
+    |> Enum.reduce(%Request{}, &add_header/2)
+    {frames, streams} = dispatch(stream_id, request, state.streams)
+    # Note state must be binary
+    headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
+    headers_size = :erlang.iolist_size(headers_payload)
+    headers_flags = <<0::5, 1::1, 0::1, 0::1>>
+    header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
+    data_payload = "Hello, World!"
+    data_size = :erlang.iolist_size(data_payload)
+    data = <<data_size::24, 0::8, 1::8, 0::1, 1::31, data_payload::binary>>
+    state = %{state | streams: streams}
+    {[header, data], state}
   end
 
   def update_settings(new, old \\ @default_settings) do
     %{}
+  end
+
+  def add_header({":method", method}, request = %{method: nil}) do
+    %{request | method: method}
+  end
+  def add_header({":path", path}, request = %{path: nil}) do
+    %{request | path: path}
+  end
+  def add_header({":scheme", scheme}, request = %{scheme: nil}) do
+    %{request | scheme: scheme}
+  end
+
+  defmodule Stream do
+    def idle do
+      %{state: :config}
+    end
+
+    def dispatch(stream = %{state: state}, request) do
+      response = handle_request(request, state)
+      {response, stream}
+    end
+
+    def handle_request(%{method: "GET", path: "/"}, state) do
+      [%{status: 200}, "Hello world!", :end]
+    end
+  end
+  def dispatch(stream_id, request, streams) do
+    stream = Map.get(streams, stream_id, Stream.idle())
+    {response, stream} = Stream.dispatch(stream, request)
+    streams = Map.put(streams, stream_id, stream)
+    {response, streams}
   end
 
   #
