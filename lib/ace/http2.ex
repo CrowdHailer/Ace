@@ -82,20 +82,43 @@ defmodule Ace.HTTP2 do
     defstruct [:method, :path, :scheme, :headers]
   end
   def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, data::binary>>, state) do
-    <<0::5, 1::1, 0::1, 1::1>> = flags
-    request = HPack.decode(data, state.decode_context)
-    |> Enum.reduce(%Request{}, &add_header/2)
-    {frames, streams} = dispatch(stream_id, request, state.streams)
-    # Note state must be binary
-    headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
-    headers_size = :erlang.iolist_size(headers_payload)
-    headers_flags = <<0::5, 1::1, 0::1, 0::1>>
-    header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
-    data_payload = "Hello, World!"
-    data_size = :erlang.iolist_size(data_payload)
-    data = <<data_size::24, 0::8, 1::8, 0::1, 1::31, data_payload::binary>>
+    case flags do
+
+      <<0::5, 1::1, 0::1, 1::1>> ->
+        request = HPack.decode(data, state.decode_context)
+        |> Enum.reduce(%Request{}, &add_header/2)
+        {frames, streams} = dispatch(stream_id, request, state.streams)
+        # Note state must be binary
+        headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
+        headers_size = :erlang.iolist_size(headers_payload)
+        headers_flags = <<0::5, 1::1, 0::1, 0::1>>
+        header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
+        data_payload = "Hello, World!"
+        data_size = :erlang.iolist_size(data_payload)
+        data = <<data_size::24, 0::8, 1::8, 0::1, 1::31, data_payload::binary>>
+        state = %{state | streams: streams}
+        {[header, data], state}
+      <<0::5, 1::1, 0::1, 0::1>> ->
+        IO.inspect("needs data")
+        request = HPack.decode(data, state.decode_context)
+        |> Enum.reduce(%Request{}, &add_header/2)
+        {frames, streams} = dispatch(stream_id, request, state.streams)
+        {[], state}
+    end
+  end
+  def consume_frame(<<length::24, 0::8, flags::bits-size(8), 0::1, stream_id::31, payload::binary>>, state) do
+    <<_::4, padded_flag::1, _::2, end_data_flag::1>> = flags
+    data = if padded_flag == 1 do
+      <<pad_length, rest::binary>> = payload
+      data_length = length - pad_length - 1
+      <<data::binary-size(data_length), _zero_padding::binary-size(pad_length)>> = rest
+      data
+    else
+      payload
+    end
+    {frames, streams} = dispatch(stream_id, data, state.streams)
     state = %{state | streams: streams}
-    {[header, data], state}
+    {[], state}
   end
 
   def update_settings(new, old \\ @default_settings) do
@@ -117,14 +140,26 @@ defmodule Ace.HTTP2 do
       %{state: :config}
     end
 
-    def dispatch(stream = %{state: state}, request) do
+    def dispatch(stream = %{state: state}, request = %{method: _}) do
       response = handle_request(request, state)
+      {response, stream}
+    end
+    def dispatch(stream = %{state: state}, data) when is_binary(data) do
+      response = handle_data(data, state)
       {response, stream}
     end
 
     def handle_request(%{method: "GET", path: "/"}, state) do
       [%{status: 200}, "Hello world!", :end]
     end
+    def handle_request(%{method: "POST", path: "/"}, state) do
+      []
+    end
+    def handle_data(data, state) do
+      IO.inspect(data)
+      []
+    end
+
   end
   def dispatch(stream_id, request, streams) do
     stream = Map.get(streams, stream_id, Stream.idle())
