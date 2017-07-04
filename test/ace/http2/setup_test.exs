@@ -14,7 +14,7 @@ defmodule Ace.HTTP2SetupTest do
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
     {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, server} = Ace.HTTP2.start_link(listen_socket)
+    {:ok, server} = Ace.HTTP2.start_link(listen_socket, %{test_pid: self})
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:ok, connection} = :ssl.connect('localhost', port, [
       mode: :binary,
@@ -49,8 +49,9 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-    :ssl.send(connection, <<8::24, 6::8, 0::8, 0::32, 1_000::64>>)
-    assert {:ok, <<8::24, 6::8, 1::8, 0::32, 1_000::64>>} == :ssl.recv(connection, 0, 2_000)
+    assert <<8::24, 6::8, 0::8, 0::32, 1_000::64>> == ping_frame(<<1_000::64>>)
+    :ssl.send(connection, ping_frame(<<1_000::64>>))
+    assert {:ok, ping_frame(<<1_000::64>>, ack: true)} == :ssl.recv(connection, 0, 2_000)
   end
 
   test "send window update", %{client: connection} do
@@ -135,6 +136,12 @@ defmodule Ace.HTTP2SetupTest do
     data_frame = data_frame(1, "Upload", pad_length: 2, end_stream: true)
     :ssl.send(connection, data_frame)
     Process.sleep(2_000)
+  end
+
+  def ping_frame(opaque, opts \\ []) when byte_size(opaque) == 8 do
+    type = <<6>>
+    flags = if Keyword.get(opts, :ack, false), do: <<1>>, else: <<0>>
+    <<8::24, type::binary, flags::binary, 0::1, 0::31, opaque::binary>>
   end
 
   def data_frame(stream_id, data, opts) do

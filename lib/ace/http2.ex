@@ -12,18 +12,19 @@ defmodule Ace.HTTP2 do
     socket: nil,
     decode_context: nil,
     encode_context: nil,
-    streams: nil
+    streams: nil,
+    config: nil
   ]
 
   use GenServer
-  def start_link(listen_socket) do
-    GenServer.start_link(__MODULE__, listen_socket)
+  def start_link(listen_socket, config) do
+    GenServer.start_link(__MODULE__, {listen_socket, config})
   end
 
-  def init(listen_socket) do
-    {:ok, {:listen_socket, listen_socket}, 0}
+  def init({listen_socket, config}) do
+    {:ok, {:listen_socket, listen_socket, config}, 0}
   end
-  def handle_info(:timeout, {:listen_socket, listen_socket}) do
+  def handle_info(:timeout, {:listen_socket, listen_socket, config}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
@@ -35,7 +36,8 @@ defmodule Ace.HTTP2 do
       socket: socket,
       decode_context: decode_context,
       encode_context: encode_context,
-      streams: %{}
+      streams: %{},
+      config: config
     }
     {:noreply, {:pending, initial_state}}
   end
@@ -87,7 +89,7 @@ defmodule Ace.HTTP2 do
       <<0::5, 1::1, 0::1, 1::1>> ->
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
-        {frames, streams} = dispatch(stream_id, request, state.streams)
+        {frames, streams} = dispatch(stream_id, request, state.streams, state.config)
         # Note state must be binary
         headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
         headers_size = :erlang.iolist_size(headers_payload)
@@ -102,7 +104,7 @@ defmodule Ace.HTTP2 do
         IO.inspect("needs data")
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
-        {frames, streams} = dispatch(stream_id, request, state.streams)
+        {frames, streams} = dispatch(stream_id, request, state.streams, state.config)
         {[], state}
     end
   end
@@ -116,7 +118,7 @@ defmodule Ace.HTTP2 do
     else
       payload
     end
-    {frames, streams} = dispatch(stream_id, data, state.streams)
+    {frames, streams} = dispatch(stream_id, data, state.streams, state.config)
     state = %{state | streams: streams}
     {[], state}
   end
@@ -136,8 +138,8 @@ defmodule Ace.HTTP2 do
   end
 
   defmodule Stream do
-    def idle do
-      %{state: :config}
+    def idle(config) do
+      %{state: config}
     end
 
     def dispatch(stream = %{state: state}, request = %{method: _}) do
@@ -156,13 +158,13 @@ defmodule Ace.HTTP2 do
       []
     end
     def handle_data(data, state) do
-      IO.inspect(data)
+      IO.inspect(state)
       []
     end
 
   end
-  def dispatch(stream_id, request, streams) do
-    stream = Map.get(streams, stream_id, Stream.idle())
+  def dispatch(stream_id, request, streams, config) do
+    stream = Map.get(streams, stream_id, Stream.idle(config))
     {response, stream} = Stream.dispatch(stream, request)
     streams = Map.put(streams, stream_id, stream)
     {response, streams}
