@@ -1,3 +1,5 @@
+## For work on HTTP/2.0 support checkout branch [http2](https://github.com/CrowdHailer/Ace/tree/http2)
+
 # Ace
 **Easy TCP and TLS(ssl) servers.**
 
