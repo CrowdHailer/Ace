@@ -124,6 +124,7 @@ defmodule Ace.HTTP2 do
   end
 
   def update_settings(new, old \\ @default_settings) do
+    IO.inspect(new)
     %{}
   end
 

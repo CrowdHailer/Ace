@@ -25,6 +25,8 @@ defmodule Ace.HTTP2SetupTest do
     {:ok, %{client: connection}}
   end
 
+  # Stream.fresh
+
   test "server sends settings as soon as connected", %{client: connection} do
     assert {:ok, <<0::24, 4::8, 0::8, 0::32>>} == :ssl.recv(connection, 0)
   end
@@ -32,11 +34,52 @@ defmodule Ace.HTTP2SetupTest do
   test "empty settings are acked", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      <<0::24, 4::8, 0::8, 0::32>>,
+      settings_frame(),
     ]
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
+  end
+
+  test "sending settings", %{client: connection} do
+    payload = [
+      Ace.HTTP2.preface(),
+      settings_frame(header_table_size: 200),
+    ]
+    :ssl.send(connection, payload)
+    :ssl.recv(connection, 9)
+    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
+  end
+
+  defmodule Settings do
+    defstruct [
+      header_table_size: nil,
+      enable_push: nil,
+      max_concurrent_streams: nil,
+      initial_window_size: nil,
+      max_frame_size: nil,
+      max_header_list_size: nil
+    ]
+  end
+
+  def settings_frame(parameters \\ []) do
+    # struct(Settings, parameters) Can use required values
+    type = 4
+    flags = 0
+    stream_id = 0
+    payload = parameters_to_payload(parameters)
+    size = :erlang.iolist_size(payload)
+    <<size::24, type::8, flags::8, 0::1, stream_id::31, payload::binary>>
+  end
+
+  def parameters_to_payload(parameters, payload \\ [])
+  def parameters_to_payload([], payload) do
+    Enum.reverse(payload)
+    |> :erlang.iolist_to_binary
+  end
+  def parameters_to_payload([{:header_table_size, value} | rest], payload) do
+    payload = [<<1::16, value::32>> | payload]
+    parameters_to_payload(rest, payload)
   end
 
   # send short ping
