@@ -63,6 +63,9 @@ defmodule Ace.HTTP2 do
     end
   end
 
+  # def consume_frame(@settings, 0, flags, length, payload, %{next: :setup})
+  # def consume_frame(%Settings{ack: false, parameters: parameters}, state = %{next: setup})
+
   # settings
   def consume_frame(<<l::24, 4::8, 0::8, 0::1, 0::31, payload::binary>>, state = %{settings: nil}) do
     new_settings = update_settings(payload)
