@@ -60,6 +60,19 @@ defmodule Ace.HTTP2 do
     <<8::24, type::binary, flags::binary, 0::1, 0::31, identifier::binary>>
   end
 
+  def go_away_frame(:protocol_error) do
+    type = 7
+    last_stream_id = 1 # TODO
+    error_code = 1
+    debug_message = ""
+
+    payload = <<0::1, last_stream_id::31, error_code::32, debug_message::binary>>
+    size = :erlang.iolist_size(payload)
+
+    type = 7
+    <<size::24, type::8, 0::8, 0::1, 0::31, payload::binary>>
+  end
+
   defstruct [
     # next: :preface, :settings, :continuation, :any
     settings: nil,
@@ -133,9 +146,17 @@ defmodule Ace.HTTP2 do
     {frame, unprocessed} = Ace.HTTP2.Frame.read_next(buffer) # + state.settings )
     if frame do
       # Could consume with only settings
-      {outbound, state} = consume_frame(frame, state)
-      :ok = :ssl.send(state.socket, outbound)
-      consume(unprocessed, state)
+      case consume_frame(frame, state) do
+        {outbound, state} when is_list(outbound) ->
+          :ok = :ssl.send(state.socket, outbound)
+          consume(unprocessed, state)
+        {:error, :protocol_error} ->
+          outbound = go_away_frame(:protocol_error)
+          :ok = :ssl.send(state.socket, outbound)
+          # Despite being an error the connection has successfully dealt with the client and does not need to crash
+          {:stop, :normal, state}
+      end
+
     else
       :ssl.setopts(state.socket, [active: :once])
       {:noreply, state}
@@ -157,8 +178,15 @@ defmodule Ace.HTTP2 do
   def consume_frame(<<8::24, 6::8, 0::8, 0::32, data::64>>, state) do
     {[<<8::24, 6::8, 1::8, 0::32, data::64>>], state}
   end
+  def consume_frame(<<l::24, 6::8, 0::8, 0::32, data::binary-size(l)>>, state) do
+    {:error, :protocol_error}
+  end
   # Window update
   def consume_frame(<<4::24, 8::8, 0::8, 0::32, data::32>>, state) do
+    {[], state}
+  end
+  def consume_frame(<<_::24, 2::8, f::8, 0::1, stream_id::31, data::binary>>, state) do
+    IO.inspect("priority for stream #{stream_id}, #{data |> inspect}")
     {[], state}
   end
   # headers
@@ -168,12 +196,12 @@ defmodule Ace.HTTP2 do
   def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, data::binary>>, state) do
     case flags do
 
-      <<0::5, 1::1, 0::1, 1::1>> ->
+      <<_::5, 1::1, 0::1, 1::1>> ->
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
         state = dispatch(stream_id, request, state)
         {[], state}
-      <<0::5, 1::1, 0::1, 0::1>> ->
+      <<_::5, 1::1, 0::1, 0::1>> ->
         IO.inspect("needs data")
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
@@ -196,8 +224,25 @@ defmodule Ace.HTTP2 do
   end
 
   def update_settings(new, old \\ @default_settings) do
-    IO.inspect(new)
+    IO.inspect(new |> parse_settings)
     %{}
+  end
+
+  def parse_settings(binary, data \\ %{})
+  def parse_settings(<<>>, data) do
+    {:ok, data}
+  end
+  def parse_settings(<<1::16, value::32, rest::binary>>, data) do
+    data = Map.put(data, :header_table_size, value)
+    parse_settings(rest, data)
+  end
+  def parse_settings(<<4::16, value::32, rest::binary>>, data) do
+    data = Map.put(data, :initial_window_size, value)
+    parse_settings(rest, data)
+  end
+  def parse_settings(<<5::16, value::32, rest::binary>>, data) do
+    data = Map.put(data, :max_frame_size, value)
+    parse_settings(rest, data)
   end
 
   def add_header({":method", method}, request = %{method: nil}) do
