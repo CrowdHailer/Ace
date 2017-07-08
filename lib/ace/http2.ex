@@ -13,7 +13,8 @@ defmodule Ace.HTTP2 do
     decode_context: nil,
     encode_context: nil,
     streams: nil,
-    config: nil
+    config: nil,
+    stream_supervisor: nil
   ]
 
   use GenServer
@@ -32,12 +33,14 @@ defmodule Ace.HTTP2 do
     :ssl.setopts(socket, [active: :once])
     {:ok, decode_context} = HPack.Table.start_link(1_000)
     {:ok, encode_context} = HPack.Table.start_link(1_000)
+    {:ok, stream_supervisor} = Supervisor.start_link([], [strategy: :one_for_one])
     initial_state = %__MODULE__{
       socket: socket,
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
-      config: config
+      config: config,
+      stream_supervisor: stream_supervisor
     }
     {:noreply, {:pending, initial_state}}
   end
@@ -46,6 +49,19 @@ defmodule Ace.HTTP2 do
   end
   def handle_info({:ssl, _, data}, state = %__MODULE__{}) do
     consume(data, state)
+  end
+  def handle_info({:stream, stream_id, {:headers, headers}}, state) do
+    IO.inspect(headers)
+    # Note state must be binary
+    headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
+    headers_size = :erlang.iolist_size(headers_payload)
+    headers_flags = <<0::5, 1::1, 0::1, 0::1>>
+    header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
+    data_payload = "Hello, World!"
+    data_size = :erlang.iolist_size(data_payload)
+    data = <<data_size::24, 0::8, 1::8, 0::1, 1::31, data_payload::binary>>
+    :ok = :ssl.send(state.socket, [header, data])
+    {:noreply, state}
   end
 
   def consume(buffer, state) do
@@ -92,22 +108,14 @@ defmodule Ace.HTTP2 do
       <<0::5, 1::1, 0::1, 1::1>> ->
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
-        {frames, streams} = dispatch(stream_id, request, state.streams, state.config)
-        # Note state must be binary
-        headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
-        headers_size = :erlang.iolist_size(headers_payload)
-        headers_flags = <<0::5, 1::1, 0::1, 0::1>>
-        header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
-        data_payload = "Hello, World!"
-        data_size = :erlang.iolist_size(data_payload)
-        data = <<data_size::24, 0::8, 1::8, 0::1, 1::31, data_payload::binary>>
-        state = %{state | streams: streams}
-        {[header, data], state}
+        state = dispatch(stream_id, request, state)
+
+        {[], state}
       <<0::5, 1::1, 0::1, 0::1>> ->
         IO.inspect("needs data")
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
-        {frames, streams} = dispatch(stream_id, request, state.streams, state.config)
+        state = dispatch(stream_id, request, state)
         {[], state}
     end
   end
@@ -121,8 +129,8 @@ defmodule Ace.HTTP2 do
     else
       payload
     end
-    {frames, streams} = dispatch(stream_id, data, state.streams, state.config)
-    state = %{state | streams: streams}
+    IO.inspect(state)
+    state = dispatch(stream_id, data, state)
     {[], state}
   end
 
@@ -146,6 +154,12 @@ defmodule Ace.HTTP2 do
       %{state: config}
     end
 
+    use GenServer
+
+    def start_link(config) do
+      GenServer.start_link(__MODULE__, config)
+    end
+
     def dispatch(stream = %{state: state}, request = %{method: _}) do
       response = handle_request(request, state)
       {response, stream}
@@ -156,6 +170,7 @@ defmodule Ace.HTTP2 do
     end
 
     def handle_request(%{method: "GET", path: "/"}, state) do
+      IO.inspect(state)
       [%{status: 200}, "Hello world!", :end]
     end
     def handle_request(%{method: "POST", path: "/"}, state) do
@@ -167,12 +182,72 @@ defmodule Ace.HTTP2 do
     end
 
   end
-  def dispatch(stream_id, request, streams, config) do
-    stream = Map.get(streams, stream_id, Stream.idle(config))
-    {response, stream} = Stream.dispatch(stream, request)
-    streams = Map.put(streams, stream_id, stream)
-    {response, streams}
+
+  defmodule HomePage do
+    use GenServer
+
+    def start_link(connection, config) do
+      GenServer.start_link(__MODULE__, {connection, config})
+    end
+
+    # Maybe we want to use a GenServer.call when passing messages back to connection for back pressure.
+    # Need to send back a reference to the stream_id
+    def handle_info({:headers, request}, {connection, config}) do
+      IO.inspect(request)
+      # Connection.stream({pid, ref}, headers/data/push or update etc)
+
+      send_to_client(connection, {:headers, %{status: 200}})
+      {:noreply, {connection, config}}
+    end
+
+    def send_to_client({:conn, pid, id}, message) do
+      send(pid, {:stream, id, message})
+    end
   end
+
+  defmodule CreateAction do
+    use GenServer
+
+    def start_link(connection, config) do
+      GenServer.start_link(__MODULE__, {connection, config})
+    end
+
+  end
+  def dispatch(stream_id, headers = %{method: _}, state) do
+    stream = case Map.get(state.streams, stream_id) do
+      nil ->
+        handler = route(headers)
+        # handler = HomePage
+        stream_spec = stream_spec(stream_id, handler, state)
+        {:ok, pid} = Supervisor.start_child(state.stream_supervisor, stream_spec)
+        ref = Process.monitor(pid)
+        stream = {ref, pid}
+      {ref, pid} ->
+        {ref, pid}
+    end
+    {ref, pid} = stream
+    # Maybe send with same ref as used for reply
+    send(pid, {:headers, headers})
+    streams = Map.put(state.streams, stream_id, stream)
+    %{state | streams: streams}
+  end
+  def dispatch(stream_id, data, state) do
+    {:ok, {_ref, pid}} = Map.fetch(state.streams, stream_id)
+    send(pid, {:data, data})
+    state
+  end
+
+  def route(%{method: "GET", path: "/"}) do
+    HomePage
+  end
+  def route(%{method: "POST", path: "/"}) do
+    CreateAction
+  end
+
+  def stream_spec(id, handler, %{config: config}) do
+    Supervisor.Spec.worker(handler, [{:conn, self(), id}, config], [restart: :temporary, id: id])
+  end
+
 
   #
   # def ready do
