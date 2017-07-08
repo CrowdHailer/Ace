@@ -106,16 +106,27 @@ defmodule Ace.HTTP2 do
   end
   def handle_info({:stream, stream_id, {:headers, headers}}, state) do
     IO.inspect(headers)
-    # Note state must be binary
-    headers_payload = HPack.encode([{":status", "200"}], state.encode_context)
+    headers_payload = encode_response_headers(headers, state.encode_context)
     headers_size = :erlang.iolist_size(headers_payload)
     headers_flags = <<0::5, 1::1, 0::1, 0::1>>
     header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
-    data_payload = "Hello, World!"
-    data_size = :erlang.iolist_size(data_payload)
-    data = <<data_size::24, 0::8, 1::8, 0::1, 1::31, data_payload::binary>>
-    :ok = :ssl.send(state.socket, [header, data])
+    :ok = :ssl.send(state.socket, header)
     {:noreply, state}
+  end
+  def handle_info({:stream, stream_id, {:data, {data_payload, :end}}}, state) do
+    data = data_frame(stream_id, data_payload, end_stream: true)
+    :ok = :ssl.send(state.socket, data)
+    {:noreply, state}
+  end
+
+  def encode_response_headers(headers, context) do
+    headers = Enum.map(headers, fn
+      ({:status, status}) ->
+        {":status", "#{status}"}
+      (header) ->
+        header
+    end)
+    HPack.encode(headers, context)
   end
 
   def consume(buffer, state) do
@@ -161,7 +172,6 @@ defmodule Ace.HTTP2 do
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
         state = dispatch(stream_id, request, state)
-
         {[], state}
       <<0::5, 1::1, 0::1, 0::1>> ->
         IO.inspect("needs data")
@@ -181,7 +191,6 @@ defmodule Ace.HTTP2 do
     else
       payload
     end
-    IO.inspect(state)
     state = dispatch(stream_id, data, state)
     {[], state}
   end
@@ -214,13 +223,12 @@ defmodule Ace.HTTP2 do
       IO.inspect(request)
       # Connection.stream({pid, ref}, headers/data/push or update etc)
 
-      send_to_client(connection, {:headers, %{status: 200}})
+      Ace.HTTP2.send_to_client(connection, {:headers, %{status: 200}})
+      Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
       {:noreply, {connection, config}}
     end
 
-    def send_to_client({:conn, pid, id}, message) do
-      send(pid, {:stream, id, message})
-    end
+
   end
 
   defmodule CreateAction do
@@ -230,6 +238,22 @@ defmodule Ace.HTTP2 do
       GenServer.start_link(__MODULE__, {connection, config})
     end
 
+    def handle_info({:headers, request}, {connection, config}) do
+      IO.inspect(request)
+      {:noreply, {connection, config}}
+    end
+
+    def handle_info({:data, data}, {connection, config}) do
+      IO.inspect("data")
+      IO.inspect(data)
+      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 201, "content-length" => "0"}})
+      {:noreply, {connection, config}}
+    end
+
+  end
+
+  def send_to_client({:conn, pid, id}, message) do
+    send(pid, {:stream, id, message})
   end
   def dispatch(stream_id, headers = %{method: _}, state) do
     stream = case Map.get(state.streams, stream_id) do

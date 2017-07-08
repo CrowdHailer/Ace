@@ -102,7 +102,8 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
     Process.sleep(2_000)
     # 200 response with body "Hello, World!"
-    assert {:ok, <<0, 0, 1, 1, 4, 0, 0, 0, 1, 136, 0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
+    assert {:ok, <<0, 0, 1, 1, 4, 0, 0, 0, 1, 136>>} == :ssl.recv(connection, 0, 2_000)
+    assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
   end
 
   test "send post with data", %{client: connection} do
@@ -114,8 +115,9 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
 
-    {:ok, table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], table)
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
 
     size = :erlang.iolist_size(body)
 
@@ -126,7 +128,11 @@ defmodule Ace.HTTP2SetupTest do
     data_frame = Ace.HTTP2.data_frame(1, "Upload", end_stream: true)
     :ssl.send(connection, data_frame)
     Process.sleep(2_000)
-    # TODO test a 201 comes back
+    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
+    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
+    <<payload::binary-size(length), bin::binary>> = bin
+    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
+    assert bin == <<>>
   end
 
   test "send post with padded data", %{client: connection} do
@@ -138,8 +144,9 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
 
-    {:ok, table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], table)
+    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
 
     size = :erlang.iolist_size(body)
 
@@ -150,6 +157,11 @@ defmodule Ace.HTTP2SetupTest do
     data_frame = Ace.HTTP2.data_frame(1, "Upload", pad_length: 2, end_stream: true)
     :ssl.send(connection, data_frame)
     Process.sleep(2_000)
+    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
+    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
+    <<payload::binary-size(length), bin::binary>> = bin
+    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
+    assert bin == <<>>
   end
 
 end
