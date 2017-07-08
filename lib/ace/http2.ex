@@ -6,6 +6,60 @@ defmodule Ace.HTTP2 do
     @preface
   end
 
+  def data_frame(stream_id, data, opts) do
+    type = <<0>>
+    pad_length = Keyword.get(opts, :pad_length)
+    payload = case pad_length do
+      nil ->
+        data
+      pad_length when 0 <= pad_length and pad_length <= 255 ->
+        pad_bit_lenth = pad_length * 8
+        <<pad_length::8, data::binary, 0::size(pad_bit_lenth)>>
+    end
+    size = :erlang.iolist_size(payload)
+    padded_flag = if pad_length, do: 1, else: 0
+    end_stream_flag = if Keyword.get(opts, :end_stream), do: 1, else: 0
+    flags = <<0::4, padded_flag::1, 0::2, end_stream_flag::1>>
+    <<size::24, type::binary, flags::binary, 0::1, stream_id::31, payload::binary>>
+  end
+
+  defmodule Settings do
+    defstruct [
+      header_table_size: nil,
+      enable_push: nil,
+      max_concurrent_streams: nil,
+      initial_window_size: nil,
+      max_frame_size: nil,
+      max_header_list_size: nil
+    ]
+  end
+
+  def settings_frame(parameters \\ []) do
+    # struct(Settings, parameters) Can use required values
+    type = 4
+    flags = 0
+    stream_id = 0
+    payload = parameters_to_payload(parameters)
+    size = :erlang.iolist_size(payload)
+    <<size::24, type::8, flags::8, 0::1, stream_id::31, payload::binary>>
+  end
+
+  def parameters_to_payload(parameters, payload \\ [])
+  def parameters_to_payload([], payload) do
+    Enum.reverse(payload)
+    |> :erlang.iolist_to_binary
+  end
+  def parameters_to_payload([{:header_table_size, value} | rest], payload) do
+    payload = [<<1::16, value::32>> | payload]
+    parameters_to_payload(rest, payload)
+  end
+
+  def ping_frame(identifier, opts \\ []) when byte_size(identifier) == 8 do
+    type = <<6>>
+    flags = if Keyword.get(opts, :ack, false), do: <<1>>, else: <<0>>
+    <<8::24, type::binary, flags::binary, 0::1, 0::31, identifier::binary>>
+  end
+
   defstruct [
     # next: :preface, :settings, :continuation, :any
     settings: nil,
@@ -29,7 +83,7 @@ defmodule Ace.HTTP2 do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
-    :ssl.send(socket, <<0::24, 4::8, 0::8, 0::32>>)
+    :ssl.send(socket, settings_frame())
     :ssl.setopts(socket, [active: :once])
     {:ok, decode_context} = HPack.Table.start_link(1_000)
     {:ok, encode_context} = HPack.Table.start_link(1_000)
@@ -66,8 +120,6 @@ defmodule Ace.HTTP2 do
 
   def consume(buffer, state) do
     {frame, unprocessed} = Ace.HTTP2.Frame.read_next(buffer) # + state.settings )
-    # IO.inspect(frame)
-    # IO.inspect(unprocessed)
     if frame do
       # Could consume with only settings
       {outbound, state} = consume_frame(frame, state)
@@ -149,40 +201,6 @@ defmodule Ace.HTTP2 do
     %{request | scheme: scheme}
   end
 
-  defmodule Stream do
-    def idle(config) do
-      %{state: config}
-    end
-
-    use GenServer
-
-    def start_link(config) do
-      GenServer.start_link(__MODULE__, config)
-    end
-
-    def dispatch(stream = %{state: state}, request = %{method: _}) do
-      response = handle_request(request, state)
-      {response, stream}
-    end
-    def dispatch(stream = %{state: state}, data) when is_binary(data) do
-      response = handle_data(data, state)
-      {response, stream}
-    end
-
-    def handle_request(%{method: "GET", path: "/"}, state) do
-      IO.inspect(state)
-      [%{status: 200}, "Hello world!", :end]
-    end
-    def handle_request(%{method: "POST", path: "/"}, state) do
-      []
-    end
-    def handle_data(data, state) do
-      IO.inspect(state)
-      []
-    end
-
-  end
-
   defmodule HomePage do
     use GenServer
 
@@ -247,74 +265,4 @@ defmodule Ace.HTTP2 do
   def stream_spec(id, handler, %{config: config}) do
     Supervisor.Spec.worker(handler, [{:conn, self(), id}, config], [restart: :temporary, id: id])
   end
-
-
-  #
-  # def ready do
-  #   receive do
-  #     {:"$gen_server", from, {:accept, socket}} ->
-  #       :ssl.accept
-  #   end
-  # end
-  #
-  # def loop(state = %{socket: socket}) do
-  #
-  #   receive do
-  #     {ACE, frame} ->
-  #       {:ok, frames} = constrain_frame(frame, state.settings)
-  #       state = %{state | outbound: state.outbound ++ frames}
-  #     {:ssl, ^socket, data} ->
-  #       {buffer, state} = read_frames(buffer <> data, state)
-  #       loop(buffer, state)
-  #   end
-  # end
-  #
-  # def do_read_frames(buffer, state, socket) do
-  #   {pending, state} = read_frames(buffer, state)
-  #   expediate(pending, state, socket)
-  #   do_read_frames(buffer, state, socket)
-  # end
-  #
-  # def read_frames(buffer, state) do
-  #   case Frame.pop(data) do
-  #     {:ok, {nil, buffer}} ->
-  #       {buffer, state}
-  #     {:ok, {frame, buffer}} ->
-  #       {pending, state} = handle_frame(frame, state)
-  #       read_frames(buffer, state)
-  #   end
-  # end
-  #
-  #
-  # def handle_frame(new = %Settings{}, %{settings: nil}) do
-  #   update_settings(new, nil)
-  # end
-  # def handle_frame(_, %{settings: nil}) do
-  #   # Unexpected frame for startup
-  # end
-  #
-  # def handle_frame(frame = %Headers{fin: true}, state) do
-  #   # start_stream(state.stream_supervisor)
-  #   {:ok, pid} = start_link(Ace.Stream, :init, [[frame]])
-  #   streams = Map.put(state.streams, frame.stream_id, pid)
-  # end
-  # def handle_frame(frame = %Headers{fin: false}, state) do
-  #   {[], %{state | stream_head: [frame]}}
-  # end
-  # def handle_frame(frame = %Continuation{fin: true}, state) do
-  #   stream_head = state.
-  # end
-  # def handle_frame(frame = %Data{}, state) do
-  #   {:ok, pid} = fetch_stream(frame, state)
-  #   Stream.send_data(pid, frame)
-  # end
-  #
-  # def start_stream(head = {:GET, "/foo", _ip}) do
-  #   # start under dynamic supervisor
-  #   Ace.FooController.start_link(head)
-  #   {:ok, pid} = start_link(Ace.FooController, :init, [[frame]])
-  #
-  # end
-
-
 end
