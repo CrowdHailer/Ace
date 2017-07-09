@@ -98,8 +98,8 @@ defmodule Ace.HTTP2 do
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
     :ssl.send(socket, settings_frame())
     :ssl.setopts(socket, [active: :once])
-    {:ok, decode_context} = HPack.Table.start_link(1_000)
-    {:ok, encode_context} = HPack.Table.start_link(1_000)
+    {:ok, decode_context} = HPack.Table.start_link(65_536)
+    {:ok, encode_context} = HPack.Table.start_link(65_536)
     {:ok, stream_supervisor} = Supervisor.start_link([], [strategy: :one_for_one])
     initial_state = %__MODULE__{
       socket: socket,
@@ -194,15 +194,23 @@ defmodule Ace.HTTP2 do
     defstruct [:method, :path, :scheme, :headers]
   end
   def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, data::binary>>, state) do
+    <<_::1, _::1, priority::1, _::1, padded::1, end_headers::1, _::1, end_stream::1>> = flags
+    IO.inspect(priority)
+    IO.inspect(padded)
+    IO.inspect(end_headers)
+    IO.inspect(end_stream)
+
     case flags do
 
       <<_::5, 1::1, 0::1, 1::1>> ->
+        IO.inspect(data, limit: :infinity)
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
         state = dispatch(stream_id, request, state)
         {[], state}
       <<_::5, 1::1, 0::1, 0::1>> ->
         IO.inspect("needs data")
+        IO.inspect(data)
         request = HPack.decode(data, state.decode_context)
         |> Enum.reduce(%Request{}, &add_header/2)
         state = dispatch(stream_id, request, state)
