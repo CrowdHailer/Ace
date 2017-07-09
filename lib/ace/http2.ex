@@ -127,6 +127,7 @@ defmodule Ace.HTTP2 do
     {:noreply, state}
   end
   def handle_info({:stream, stream_id, {:data, {data_payload, :end}}}, state) do
+    IO.inspect(data_payload)
     data = data_frame(stream_id, data_payload, end_stream: true)
     :ok = :ssl.send(state.socket, data)
     {:noreply, state}
@@ -174,6 +175,10 @@ defmodule Ace.HTTP2 do
   def consume_frame(_, state = %{settings: nil}) do
     :invalid_first_frame
   end
+  # Consume settings ack make sure we are not in a state of settings nil
+  def consume_frame(<<0::24, 4::8, 1::8, 0::32>>, state = %{settings: %{}}) do
+    {[], state}
+  end
   # ping
   def consume_frame(<<8::24, 6::8, 0::8, 0::32, data::64>>, state) do
     {[<<8::24, 6::8, 1::8, 0::32, data::64>>], state}
@@ -183,6 +188,12 @@ defmodule Ace.HTTP2 do
   end
   # Window update
   def consume_frame(<<4::24, 8::8, 0::8, 0::32, data::32>>, state) do
+    IO.inspect("total window update")
+    {[], state}
+  end
+  # Window update
+  def consume_frame(<<4::24, 8::8, 0::8, 0::1, stream_id::31, data::32>>, state) do
+    IO.inspect("Stream window update")
     {[], state}
   end
   def consume_frame(<<_::24, 2::8, f::8, 0::1, stream_id::31, data::binary>>, state) do
@@ -240,18 +251,27 @@ defmodule Ace.HTTP2 do
       payload
     end
 
+    header_block_fragment = if priority == 1 do
+      <<0::1, stream_id::31, weight::8, header_block_fragment::binary>> = data
+      IO.inspect(stream_id)
+      IO.inspect(weight)
+      header_block_fragment
+    else
+      data
+    end
+
     case flags do
 
       <<_::5, 1::1, 0::1, 1::1>> ->
-        IO.inspect(data, limit: :infinity)
-        request = HPack.decode(data, state.decode_context)
+        IO.inspect(header_block_fragment, limit: :infinity)
+        request = HPack.decode(header_block_fragment, state.decode_context)
         |> Request.from_headers()
         state = dispatch(stream_id, request, state)
         {[], state}
       <<_::5, 1::1, 0::1, 0::1>> ->
         IO.inspect("needs data")
-        IO.inspect(data)
-        request = HPack.decode(data, state.decode_context)
+        IO.inspect(header_block_fragment)
+        request = HPack.decode(header_block_fragment, state.decode_context)
         |> Request.from_headers()
         state = dispatch(stream_id, request, state)
         {[], state}
@@ -290,8 +310,6 @@ defmodule Ace.HTTP2 do
     parse_settings(rest, data)
   end
 
-
-
   defmodule HomePage do
     use GenServer
 
@@ -305,7 +323,7 @@ defmodule Ace.HTTP2 do
       IO.inspect(request)
       # Connection.stream({pid, ref}, headers/data/push or update etc)
 
-      Ace.HTTP2.send_to_client(connection, {:headers, %{status: 200}})
+      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 200, "content-length" => "13"}})
       Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
       {:noreply, {connection, config}}
     end
