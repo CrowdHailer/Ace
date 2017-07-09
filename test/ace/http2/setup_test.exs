@@ -13,7 +13,7 @@ defmodule Ace.HTTP2SetupTest do
       reuseaddr: true,
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
-    {:ok, listen_socket} = :ssl.listen(8080, options)
+    {:ok, listen_socket} = :ssl.listen(0, options)
     {:ok, server} = Ace.HTTP2.start_link(listen_socket, %{test_pid: self})
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:ok, connection} = :ssl.connect('localhost', port, [
@@ -95,29 +95,6 @@ defmodule Ace.HTTP2SetupTest do
   end
 
 # Can't send a headers frame with stream id odd for server
-  test "send get request", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "GET"}, {":scheme", "https"}, {":path", "/"}], encode_table)
-
-    size = :erlang.iolist_size(body)
-
-    flags = <<0::5, 1::1, 0::1, 1::1>>
-    # Client initated streams must use odd stream identifiers
-    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
-    Process.sleep(2_000)
-    # 200 response with body "Hello, World!"
-    assert {:ok, <<0, 0, 1, 1, 4, 0, 0, 0, 1, 136>>} == :ssl.recv(connection, 0, 2_000)
-    assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
-  end
 
   test "send post with data", %{client: connection} do
     payload = [

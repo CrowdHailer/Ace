@@ -191,28 +191,68 @@ defmodule Ace.HTTP2 do
   end
   # headers
   defmodule Request do
-    defstruct [:method, :path, :scheme, :headers]
+    # @enforce_keys [:scheme, :authority, :method, :path, :headers]
+    defstruct [:scheme, :authority, :method, :path, :headers]
+
+    def to_headers(request = %__MODULE__{}) do
+      [
+        {":scheme", Atom.to_string(request.scheme)},
+        {":authority", request.authority},
+        {":method", Atom.to_string(request.method)},
+        {":path", request.path} |
+        Map.to_list(request.headers)
+      ]
+    end
+
+    def from_headers(headers) do
+      headers
+      |> Enum.reduce(%__MODULE__{}, &add_header/2)
+    end
+
+    def add_header({":method", method}, request = %{method: nil}) do
+      %{request | method: method}
+    end
+    def add_header({":path", path}, request = %{path: nil}) do
+      %{request | path: path}
+    end
+    def add_header({":scheme", scheme}, request = %{scheme: nil}) do
+      %{request | scheme: scheme}
+    end
+    def add_header({":authority", authority}, request = %{authority: nil}) do
+      %{request | authority: authority}
+    end
+    def add_header({key, value}, request = %{headers: headers}) do
+      # TODO test key does not begin with `:`
+      headers = Map.put(headers || %{}, key, value)
+      %{request | headers: headers}
+    end
   end
-  def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, data::binary>>, state) do
+  def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, payload::binary>>, state) do
     <<_::1, _::1, priority::1, _::1, padded::1, end_headers::1, _::1, end_stream::1>> = flags
     IO.inspect(priority)
     IO.inspect(padded)
     IO.inspect(end_headers)
     IO.inspect(end_stream)
 
+    data = if padded == 1 do
+      Ace.HTTP2.Frame.remove_padding(payload)
+    else
+      payload
+    end
+
     case flags do
 
       <<_::5, 1::1, 0::1, 1::1>> ->
         IO.inspect(data, limit: :infinity)
         request = HPack.decode(data, state.decode_context)
-        |> Enum.reduce(%Request{}, &add_header/2)
+        |> Request.from_headers()
         state = dispatch(stream_id, request, state)
         {[], state}
       <<_::5, 1::1, 0::1, 0::1>> ->
         IO.inspect("needs data")
         IO.inspect(data)
         request = HPack.decode(data, state.decode_context)
-        |> Enum.reduce(%Request{}, &add_header/2)
+        |> Request.from_headers()
         state = dispatch(stream_id, request, state)
         {[], state}
     end
@@ -220,10 +260,7 @@ defmodule Ace.HTTP2 do
   def consume_frame(<<length::24, 0::8, flags::bits-size(8), 0::1, stream_id::31, payload::binary>>, state) do
     <<_::4, padded_flag::1, _::2, end_data_flag::1>> = flags
     data = if padded_flag == 1 do
-      <<pad_length, rest::binary>> = payload
-      data_length = length - pad_length - 1
-      <<data::binary-size(data_length), _zero_padding::binary-size(pad_length)>> = rest
-      data
+      Ace.HTTP2.Frame.remove_padding(payload)
     else
       payload
     end
@@ -253,15 +290,7 @@ defmodule Ace.HTTP2 do
     parse_settings(rest, data)
   end
 
-  def add_header({":method", method}, request = %{method: nil}) do
-    %{request | method: method}
-  end
-  def add_header({":path", path}, request = %{path: nil}) do
-    %{request | path: path}
-  end
-  def add_header({":scheme", scheme}, request = %{scheme: nil}) do
-    %{request | scheme: scheme}
-  end
+
 
   defmodule HomePage do
     use GenServer
