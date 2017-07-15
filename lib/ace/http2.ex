@@ -91,19 +91,20 @@ defmodule Ace.HTTP2 do
     decode_context: nil,
     encode_context: nil,
     streams: nil,
+    router: nil,
     config: nil,
     stream_supervisor: nil
   ]
 
   use GenServer
-  def start_link(listen_socket, config) do
-    GenServer.start_link(__MODULE__, {listen_socket, config})
+  def start_link(listen_socket, app) do
+    GenServer.start_link(__MODULE__, {listen_socket, app})
   end
 
-  def init({listen_socket, config}) do
-    {:ok, {:listen_socket, listen_socket, config}, 0}
+  def init({listen_socket, app}) do
+    {:ok, {:listen_socket, listen_socket, app}, 0}
   end
-  def handle_info(:timeout, {:listen_socket, listen_socket, config}) do
+  def handle_info(:timeout, {:listen_socket, listen_socket, {router, config}}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
@@ -117,6 +118,7 @@ defmodule Ace.HTTP2 do
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
+      router: router,
       config: config,
       stream_supervisor: stream_supervisor
     }
@@ -319,55 +321,13 @@ defmodule Ace.HTTP2 do
     parse_settings(rest, data)
   end
 
-  defmodule HomePage do
-    use GenServer
-
-    def start_link(connection, config) do
-      GenServer.start_link(__MODULE__, {connection, config})
-    end
-
-    # Maybe we want to use a GenServer.call when passing messages back to connection for back pressure.
-    # Need to send back a reference to the stream_id
-    def handle_info({:headers, request}, {connection, config}) do
-      IO.inspect(request)
-      # Connection.stream({pid, ref}, headers/data/push or update etc)
-
-      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 200, "content-length" => "13"}})
-      Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
-      {:noreply, {connection, config}}
-    end
-
-
-  end
-
-  defmodule CreateAction do
-    use GenServer
-
-    def start_link(connection, config) do
-      GenServer.start_link(__MODULE__, {connection, config})
-    end
-
-    def handle_info({:headers, request}, {connection, config}) do
-      IO.inspect(request)
-      {:noreply, {connection, config}}
-    end
-
-    def handle_info({:data, data}, {connection, config}) do
-      IO.inspect("data")
-      IO.inspect(data)
-      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 201, "content-length" => "0"}})
-      {:noreply, {connection, config}}
-    end
-
-  end
-
   def send_to_client({:conn, pid, id}, message) do
     send(pid, {:stream, id, message})
   end
   def dispatch(stream_id, headers = %{method: _}, state) do
     stream = case Map.get(state.streams, stream_id) do
       nil ->
-        handler = route(headers)
+        handler = state.router.route(headers)
         # handler = HomePage
         stream_spec = stream_spec(stream_id, handler, state)
         {:ok, pid} = Supervisor.start_child(state.stream_supervisor, stream_spec)
@@ -386,13 +346,6 @@ defmodule Ace.HTTP2 do
     {:ok, {_ref, pid}} = Map.fetch(state.streams, stream_id)
     send(pid, {:data, data})
     state
-  end
-
-  def route(%{method: "GET", path: "/"}) do
-    HomePage
-  end
-  def route(%{method: "POST", path: "/"}) do
-    CreateAction
   end
 
   def stream_spec(id, handler, %{config: config}) do

@@ -14,7 +14,7 @@ defmodule Ace.HTTP2SetupTest do
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
     {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, server} = Ace.HTTP2.start_link(listen_socket, %{test_pid: self})
+    {:ok, server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self}})
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:ok, connection} = :ssl.connect('localhost', port, [
       mode: :binary,
@@ -23,6 +23,10 @@ defmodule Ace.HTTP2SetupTest do
       alpn_advertised_protocols: ["h2"]])
       :ssl.negotiated_protocol(connection)
     {:ok, %{client: connection}}
+  end
+
+  def route(_) do
+    __MODULE__
   end
 
   # Stream.fresh
@@ -96,62 +100,6 @@ defmodule Ace.HTTP2SetupTest do
 
 # Can't send a headers frame with stream id odd for server
 
-  test "send post with data", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
 
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
-
-    size = :erlang.iolist_size(body)
-
-    # <<_, _, priority, _, padded, end_headers, _, end_stream>>
-    flags = <<0::5, 1::1, 0::1, 0::1>>
-    # Client initated streams must use odd stream identifiers
-    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
-    data_frame = Ace.HTTP2.data_frame(1, "Upload", end_stream: true)
-    :ssl.send(connection, data_frame)
-    Process.sleep(2_000)
-    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
-    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
-    <<payload::binary-size(length), bin::binary>> = bin
-    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
-    assert bin == <<>>
-  end
-
-  test "send post with padded data", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
-
-    size = :erlang.iolist_size(body)
-
-    # <<_, _, priority, _, padded, end_headers, _, end_stream>>
-    flags = <<0::5, 1::1, 0::1, 0::1>>
-    # Client initated streams must use odd stream identifiers
-    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
-    data_frame = Ace.HTTP2.data_frame(1, "Upload", pad_length: 2, end_stream: true)
-    :ssl.send(connection, data_frame)
-    Process.sleep(2_000)
-    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
-    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
-    <<payload::binary-size(length), bin::binary>> = bin
-    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
-    assert bin == <<>>
-  end
 
 end

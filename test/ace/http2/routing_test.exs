@@ -14,7 +14,7 @@ defmodule Ace.HTTP2RoutingTest do
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
     {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, server} = Ace.HTTP2.start_link(listen_socket, %{test_pid: self})
+    {:ok, server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self}})
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:ok, connection} = :ssl.connect('localhost', port, [
       mode: :binary,
@@ -34,6 +34,55 @@ defmodule Ace.HTTP2RoutingTest do
   end
 
   alias Ace.HTTP2.Request
+
+  defmodule HomePage do
+    use GenServer
+
+    def start_link(connection, config) do
+      GenServer.start_link(__MODULE__, {connection, config})
+    end
+
+    # Maybe we want to use a GenServer.call when passing messages back to connection for back pressure.
+    # Need to send back a reference to the stream_id
+    def handle_info({:headers, request}, {connection, config}) do
+      IO.inspect(request)
+      # Connection.stream({pid, ref}, headers/data/push or update etc)
+
+      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 200, "content-length" => "13"}})
+      Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
+      {:noreply, {connection, config}}
+    end
+
+
+  end
+
+  defmodule CreateAction do
+    use GenServer
+
+    def start_link(connection, config) do
+      GenServer.start_link(__MODULE__, {connection, config})
+    end
+
+    def handle_info({:headers, request}, {connection, config}) do
+      IO.inspect(request)
+      {:noreply, {connection, config}}
+    end
+
+    def handle_info({:data, data}, {connection, config}) do
+      IO.inspect("data")
+      IO.inspect(data)
+      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 201, "content-length" => "0"}})
+      {:noreply, {connection, config}}
+    end
+
+  end
+
+  def route(%{method: "GET", path: "/"}) do
+    HomePage
+  end
+  def route(%{method: "POST", path: "/"}) do
+    CreateAction
+  end
 
   # Sending without required header is an error
   test "sending unpadded headers", %{client: connection} do
@@ -93,5 +142,49 @@ defmodule Ace.HTTP2RoutingTest do
     # TODO test headers
     assert {{1, _, 1, _}, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
     assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
+  end
+
+  test "send post with data", %{client: connection} do
+
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
+
+    size = :erlang.iolist_size(body)
+
+    # <<_, _, priority, _, padded, end_headers, _, end_stream>>
+    flags = <<0::5, 1::1, 0::1, 0::1>>
+    # Client initated streams must use odd stream identifiers
+    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
+    data_frame = Ace.HTTP2.data_frame(1, "Upload", end_stream: true)
+    :ssl.send(connection, data_frame)
+    Process.sleep(2_000)
+    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
+    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
+    <<payload::binary-size(length), bin::binary>> = bin
+    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
+    assert bin == <<>>
+  end
+
+  test "send post with padded data", %{client: connection} do
+
+    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
+
+    size = :erlang.iolist_size(body)
+
+    # <<_, _, priority, _, padded, end_headers, _, end_stream>>
+    flags = <<0::5, 1::1, 0::1, 0::1>>
+    # Client initated streams must use odd stream identifiers
+    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
+    data_frame = Ace.HTTP2.data_frame(1, "Upload", pad_length: 2, end_stream: true)
+    :ssl.send(connection, data_frame)
+    Process.sleep(2_000)
+    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
+    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
+    <<payload::binary-size(length), bin::binary>> = bin
+    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
+    assert bin == <<>>
   end
 end
