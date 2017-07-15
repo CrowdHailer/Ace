@@ -1,4 +1,4 @@
-defmodule Ace.HTTP2PingTest do
+defmodule Ace.HTTP2.PushPromiseTest do
   use ExUnit.Case
 
   setup do
@@ -38,24 +38,14 @@ defmodule Ace.HTTP2PingTest do
 
   alias Ace.HTTP2.Frame
 
-  test "ping will be acked", %{client: connection} do
-    identifier = <<1_000::64>>
-    ping_frame = Frame.Ping.new(identifier)
-    :ssl.send(connection, Frame.Ping.serialize(ping_frame))
-    assert {:ok, %Frame.Ping{ack: true, identifier: identifier}} == Support.read_next(connection)
+  test "sending a push promise from a client is a protocol error", %{client: connection} do
+    priority_frame = Frame.PushPromise.new(2, 1, "header_block_fragment")
+    |> IO.inspect
+    :ssl.send(connection, Frame.PushPromise.serialize(priority_frame) |> IO.inspect)
+    assert {:ok, %Frame.GoAway{debug: debug}} = Support.read_next(connection, 2_000)
+    assert "Clients cannot send push promises" = debug
   end
 
-  test "incorrect ping frame is a connection error", %{client: connection} do
-    malformed_frame = %Frame.Ping{identifier: <<1_000::80>>, ack: false}
-    :ssl.send(connection, Frame.Ping.serialize(malformed_frame))
-    # TODO check that last stream id is correct
-    expected_frame = Frame.GoAway.new(1, :frame_size_error)
-    payload = Frame.GoAway.payload(expected_frame)
-    assert {:ok, %Frame.GoAway{error: 6, debug: debug}} = Support.read_next(connection)
-    assert "Ping identifier must be 64 bits" == debug
-  end
 
-  # send acked ping
-  # send bad ping expecting stream_id > 0
 
 end

@@ -20,8 +20,11 @@ defmodule Ace.HTTP2.Frame do
 
   @data 0
   @headers 1
+  @priority 2
   @settings 4
+  @push_promise 5
   @ping 6
+  @go_away 7
   @window_update 8
 
   @doc """
@@ -46,8 +49,11 @@ defmodule Ace.HTTP2.Frame do
 
   def decode(frame = {@data, _, _, _}), do: __MODULE__.Data.decode(frame)
   def decode(frame = {@headers, _, _, _}), do: __MODULE__.Headers.decode(frame)
+  def decode(frame = {@priority, _, _, _}), do: __MODULE__.Priority.decode(frame)
   def decode(frame = {@settings, _, _, _}), do: __MODULE__.Settings.decode(frame)
+  def decode(frame = {@push_promise, _, _, _}), do: __MODULE__.PushPromise.decode(frame)
   def decode(frame = {@ping, _, _, _}), do: __MODULE__.Ping.decode(frame)
+  def decode(frame = {@go_away, _, _, _}), do: __MODULE__.GoAway.decode(frame)
   def decode(frame = {@window_update, _, _, _}), do: __MODULE__.WindowUpdate.decode(frame)
 
   def pad_data(data, optional_pad_length)

@@ -10,6 +10,12 @@ defmodule Ace.HTTP2 do
 
   *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
   """
+
+  alias Ace.HTTP2.{
+    Frame,
+    Request
+  }
+
   @preface "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
   @default_settings %{}
 
@@ -166,12 +172,6 @@ defmodule Ace.HTTP2 do
     end
   end
 
-  # def consume_frame(@settings, 0, flags, length, payload, %{next: :setup})
-  # def consume_frame(%Settings{ack: false, parameters: parameters}, state = %{next: setup})
-
-  alias Ace.HTTP2.Frame
-
-  # settings
   def consume_frame(settings = %Ace.HTTP2.Frame.Settings{}, state = %{settings: nil}) do
     new_settings = update_settings(settings)
     {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
@@ -186,54 +186,24 @@ defmodule Ace.HTTP2 do
   def consume_frame(%Frame.Ping{identifier: data, ack: false}, state) do
     {[<<8::24, 6::8, 1::8, 0::32, data::binary>>], state}
   end
-  # Window update
   def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state) do
     IO.inspect("total window update")
     {[], state}
   end
-  # Window update
   def consume_frame(%Frame.WindowUpdate{stream_id: _}, state) do
     IO.inspect("Stream window update")
     {[], state}
   end
-  # headers
-  defmodule Request do
-    # @enforce_keys [:scheme, :authority, :method, :path, :headers]
-    defstruct [:scheme, :authority, :method, :path, :headers]
-
-    def to_headers(request = %__MODULE__{}) do
-      [
-        {":scheme", Atom.to_string(request.scheme)},
-        {":authority", request.authority},
-        {":method", Atom.to_string(request.method)},
-        {":path", request.path} |
-        Map.to_list(request.headers)
-      ]
-    end
-
-    def from_headers(headers) do
-      headers
-      |> Enum.reduce(%__MODULE__{}, &add_header/2)
-    end
-
-    def add_header({":method", method}, request = %{method: nil}) do
-      %{request | method: method}
-    end
-    def add_header({":path", path}, request = %{path: nil}) do
-      %{request | path: path}
-    end
-    def add_header({":scheme", scheme}, request = %{scheme: nil}) do
-      %{request | scheme: scheme}
-    end
-    def add_header({":authority", authority}, request = %{authority: nil}) do
-      %{request | authority: authority}
-    end
-    def add_header({key, value}, request = %{headers: headers}) do
-      # TODO test key does not begin with `:`
-      headers = Map.put(headers || %{}, key, value)
-      %{request | headers: headers}
-    end
+  def consume_frame(frame = %Frame.Priority{}, state) do
+    IO.inspect("Ignoring priority frame")
+    IO.inspect(frame)
+    {[], state}
   end
+  def consume_frame(frame = %Frame.PushPromise{}, state) do
+    {:error, {:protocol_error, "Clients cannot send push promises"}}
+  end
+  # headers
+
   def consume_frame(frame = %Frame.Headers{}, state) do
     request = HPack.decode(frame.header_block_fragment, state.decode_context)
     |> Request.from_headers()
