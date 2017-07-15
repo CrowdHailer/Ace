@@ -22,6 +22,13 @@ defmodule Ace.HTTP2PingTest do
       active: :false,
       alpn_advertised_protocols: ["h2"]])
       :ssl.negotiated_protocol(connection)
+    payload = [
+      Ace.HTTP2.preface(),
+      Ace.HTTP2.settings_frame(),
+    ]
+    :ssl.send(connection, payload)
+    :ssl.recv(connection, 9)
+    assert {:ok, {4, <<1>>, 0, ""}} == read_next(connection)
     {:ok, %{client: connection}}
   end
 
@@ -32,29 +39,33 @@ defmodule Ace.HTTP2PingTest do
   alias Ace.HTTP2.Frame
 
   test "ping will be acked", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-    ping_frame = Frame.Ping.new(<<1_000::64>>)
+    identifier = <<1_000::64>>
+    ping_frame = Frame.Ping.new(identifier)
     :ssl.send(connection, Frame.Ping.serialize(ping_frame))
-    assert {:ok, Frame.Ping.serialize(Frame.Ping.ack(ping_frame))} == :ssl.recv(connection, 0, 2_000)
+    assert {:ok, {6, <<1>>, 0, identifier}} == read_next(connection)
   end
 
   test "incorrect ping frame is a connection error", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-    malformed_frame = <<10::24, 6::8, 0::8, 0::32, 1_000::80>>
-    :ssl.send(connection, malformed_frame)
-    assert {:ok, Ace.HTTP2.go_away_frame(:protocol_error)} == :ssl.recv(connection, 0, 2_000)
+    malformed_frame = %Frame.Ping{identifier: <<1_000::80>>, ack: false}
+    :ssl.send(connection, Frame.Ping.serialize(malformed_frame))
+    # TODO check that last stream id is correct
+    assert {:ok, {7, <<0>>, 0, Frame.GoAway.payload(1, :protocol_error)}} == read_next(connection)
+  end
+
+  # send acked ping
+  # send bad ping expecting stream_id > 0
+
+  def read_next(connection) do
+    case :ssl.recv(connection, 9) do
+      {:ok, <<length::24, type::8, flags::binary-size(1), 0::1, stream_id::31>>} ->
+        case length do
+          0 ->
+            {:ok, {type, flags, stream_id, ""}}
+          length ->
+            {:ok, payload} = :ssl.recv(connection, length)
+            {:ok, {type, flags, stream_id, payload}}
+        end
+    end
   end
 
 end
