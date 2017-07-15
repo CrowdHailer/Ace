@@ -58,7 +58,10 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, header_block_fragment::binary>>)
     Process.sleep(2_000)
     # 200 response with header_block_fragment "Hello, World!"
-    assert {:ok, <<0, 0, 1, 1, 4, 0, 0, 0, 1, 136>>} == :ssl.recv(connection, 0, 2_000)
+    assert {:ok, data} = :ssl.recv(connection, 0, 2_000)
+    # TODO test headers
+    assert {{1, _, 1, _}, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
+
     assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
   end
 
@@ -86,7 +89,9 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, payload::binary>>)
     Process.sleep(2_000)
     # 200 response with header_block_fragment "Hello, World!"
-    assert {:ok, <<0, 0, 1, 1, 4, 0, 0, 0, 1, 136>>} == :ssl.recv(connection, 0, 2_000)
+    assert {:ok, data} = :ssl.recv(connection, 0, 2_000)
+    # TODO test headers
+    assert {{1, _, 1, _}, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
     assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
   end
 end

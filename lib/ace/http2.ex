@@ -1,4 +1,15 @@
 defmodule Ace.HTTP2 do
+  @moduledoc """
+  **Hypertext Transfer Protocol Version 2 (HTTP/2)**
+
+  > HTTP/2 enables a more efficient use of network
+  > resources and a reduced perception of latency by introducing header
+  > field compression and allowing multiple concurrent exchanges on the
+  > same connection.  It also introduces unsolicited push of
+  > representations from servers to clients.
+
+  *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
+  """
   @preface "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
   @default_settings %{}
 
@@ -144,7 +155,7 @@ defmodule Ace.HTTP2 do
   end
 
   def consume(buffer, state) do
-    {frame, unprocessed} = Ace.HTTP2.Frame.read_next(buffer) # + state.settings )
+    {frame, unprocessed} = Ace.HTTP2.Frame.parse_from_buffer(buffer) # + state.settings )
     if frame do
       # Could consume with only settings
       case consume_frame(frame, state) do
@@ -168,36 +179,32 @@ defmodule Ace.HTTP2 do
   # def consume_frame(%Settings{ack: false, parameters: parameters}, state = %{next: setup})
 
   # settings
-  def consume_frame(<<l::24, 4::8, 0::8, 0::1, 0::31, payload::binary>>, state = %{settings: nil}) do
+  def consume_frame({4, <<0>>, 0, payload}, state = %{settings: nil}) do
     new_settings = update_settings(payload)
     {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
   end
-  def consume_frame(_, state = %{settings: nil}) do
-    :invalid_first_frame
-  end
+  # def consume_frame(_, state = %{settings: nil}) do
+  #   :invalid_first_frame
+  # end
   # Consume settings ack make sure we are not in a state of settings nil
-  def consume_frame(<<0::24, 4::8, 1::8, 0::32>>, state = %{settings: %{}}) do
+  def consume_frame({4, <<1>>, 0, ""}, state = %{settings: %{}}) do
     {[], state}
   end
   # ping
-  def consume_frame(<<8::24, 6::8, 0::8, 0::32, data::64>>, state) do
+  def consume_frame({6, <<0>>, 0, <<data::64>>}, state) do
     {[<<8::24, 6::8, 1::8, 0::32, data::64>>], state}
   end
-  def consume_frame(<<l::24, 6::8, 0::8, 0::32, data::binary-size(l)>>, state) do
+  def consume_frame({6, <<0>>, 0, _invalid_payload}, state) do
     {:error, :protocol_error}
   end
   # Window update
-  def consume_frame(<<4::24, 8::8, 0::8, 0::32, data::32>>, state) do
+  def consume_frame({8, <<0>>, 0, <<data::32>>}, state) do
     IO.inspect("total window update")
     {[], state}
   end
   # Window update
-  def consume_frame(<<4::24, 8::8, 0::8, 0::1, stream_id::31, data::32>>, state) do
+  def consume_frame({8, <<0>>, stream_id, <<data::32>>}, state) do
     IO.inspect("Stream window update")
-    {[], state}
-  end
-  def consume_frame(<<_::24, 2::8, f::8, 0::1, stream_id::31, data::binary>>, state) do
-    IO.inspect("priority for stream #{stream_id}, #{data |> inspect}")
     {[], state}
   end
   # headers
@@ -238,7 +245,7 @@ defmodule Ace.HTTP2 do
       %{request | headers: headers}
     end
   end
-  def consume_frame(<<_::24, 1::8, flags::bits-size(8), 0::1, stream_id::31, payload::binary>>, state) do
+  def consume_frame({1, flags, stream_id, payload}, state) do
     <<_::1, _::1, priority::1, _::1, padded::1, end_headers::1, _::1, end_stream::1>> = flags
     IO.inspect(priority)
     IO.inspect(padded)
@@ -277,7 +284,7 @@ defmodule Ace.HTTP2 do
         {[], state}
     end
   end
-  def consume_frame(<<length::24, 0::8, flags::bits-size(8), 0::1, stream_id::31, payload::binary>>, state) do
+  def consume_frame({0, flags, stream_id, payload}, state) do
     <<_::4, padded_flag::1, _::2, end_data_flag::1>> = flags
     data = if padded_flag == 1 do
       Ace.HTTP2.Frame.remove_padding(payload)

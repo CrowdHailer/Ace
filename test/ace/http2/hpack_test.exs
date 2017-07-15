@@ -1,6 +1,7 @@
 defmodule HTTP2.HPackTest do
   use ExUnit.Case
 
+  @tag :skip
   test "blah" do
     compressed = <<0, 0, 0, 11, 31, 130, 4, 129, 99, 65, 138, 160, 228, 29, 19, 157, 9, 184, 240,
     30, 7, 135, 122, 186, 208, 127, 102, 162, 129, 176, 218, 224, 83, 250, 252, 8,
