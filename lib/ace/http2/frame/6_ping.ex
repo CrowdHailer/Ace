@@ -5,12 +5,12 @@ defmodule Ace.HTTP2.Frame.Ping do
   @type_id 6
 
   # TODO informative error for bad ping identifier
-  def new(identifier) when bit_size(identifier) == 64 do
-    %__MODULE__{identifier: identifier, ack: false}
+  def new(identifier, ack \\ false) when bit_size(identifier) == 64 do
+    %__MODULE__{identifier: identifier, ack: ack}
   end
 
   def ack(%__MODULE__{identifier: identifier, ack: false}) do
-    %__MODULE__{identifier: identifier, ack: true}
+    new(identifier, true)
   end
 
   def decode({@type_id, flags, 0, identifier}) when bit_size(identifier) == 64 do
@@ -21,7 +21,7 @@ defmodule Ace.HTTP2.Frame.Ping do
         true
     end
 
-    {:ok, %__MODULE__{identifier: identifier, ack: ack}}
+    {:ok, new(identifier, ack) |> IO.inspect}
   end
   def decode({@type_id, _flags, 0, _identifier}) do
     {:error, {:frame_size_error, "Ping identifier must be 64 bits"}}

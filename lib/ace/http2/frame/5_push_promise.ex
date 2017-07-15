@@ -11,7 +11,7 @@ defmodule Ace.HTTP2.Frame.PushPromise do
   end
 
   def decode({5, flags, stream_id, header_block_fragment}) do
-    {:ok, %__MODULE__{stream_id: stream_id, promised_stream_id: 0, header_block_fragment: "TODO"}}
+    {:ok, new(stream_id, 0, "TODO")}
   end
 
   def serialize(frame) do

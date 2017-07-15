@@ -21,6 +21,7 @@ defmodule Ace.HTTP2.Frame do
   @data 0
   @headers 1
   @priority 2
+  @rst_stream 3
   @settings 4
   @push_promise 5
   @ping 6
@@ -50,6 +51,7 @@ defmodule Ace.HTTP2.Frame do
   def decode(frame = {@data, _, _, _}), do: __MODULE__.Data.decode(frame)
   def decode(frame = {@headers, _, _, _}), do: __MODULE__.Headers.decode(frame)
   def decode(frame = {@priority, _, _, _}), do: __MODULE__.Priority.decode(frame)
+  def decode(frame = {@rst_stream, _, _, _}), do: __MODULE__.RstStream.decode(frame)
   def decode(frame = {@settings, _, _, _}), do: __MODULE__.Settings.decode(frame)
   def decode(frame = {@push_promise, _, _, _}), do: __MODULE__.PushPromise.decode(frame)
   def decode(frame = {@ping, _, _, _}), do: __MODULE__.Ping.decode(frame)

@@ -7,7 +7,7 @@ defmodule Ace.HTTP2.Frame.GoAway do
   end
 
   def decode({7, <<0>>, 0, <<0::1, last_stream_id::31, error_code::32, debug::binary>>}) do
-    {:ok, %__MODULE__{error: error_code, last_stream_id: last_stream_id, debug: debug}}
+    {:ok, new(last_stream_id, error_code, debug)}
   end
 
   def serialize(frame) do

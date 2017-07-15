@@ -1,4 +1,4 @@
-defmodule Ace.HTTP2.PriorityTest do
+defmodule Ace.HTTP2.RstStreamTest do
   use ExUnit.Case
 
   setup do
@@ -38,13 +38,13 @@ defmodule Ace.HTTP2.PriorityTest do
 
   alias Ace.HTTP2.Frame
 
-  test "priority frame is logged", %{client: connection} do
-    priority_frame = Frame.Priority.new(0, 0, 0)
-    :ssl.send(connection, Frame.Priority.serialize(priority_frame) |> IO.inspect)
+  test "rst_stream frame is logged", %{client: connection} do
+    rst_stream_frame = Frame.RstStream.new(21, :internal_error)
+    :ssl.send(connection, Frame.RstStream.serialize(rst_stream_frame) |> IO.inspect)
     assert {:error, :timeout} = Support.read_next(connection, 2_000)
   end
 
-  # send incorrectly sized priority frame
+  # send incorrectly sized rst_stream frame
 
 
 end

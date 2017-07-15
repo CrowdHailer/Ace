@@ -202,6 +202,11 @@ defmodule Ace.HTTP2 do
   def consume_frame(frame = %Frame.PushPromise{}, state) do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
   end
+  def consume_frame(frame = %Frame.RstStream{}, state) do
+    IO.inspect("Ignoring rst_stream frame")
+    IO.inspect(frame)
+    {[], state}
+  end
   # headers
 
   def consume_frame(frame = %Frame.Headers{}, state) do
