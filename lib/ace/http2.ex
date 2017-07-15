@@ -294,6 +294,8 @@ defmodule Ace.HTTP2 do
   end
 
   def parse_settings(binary, data \\ %{})
+  # <<identifier::16, value::32, rest::bitstring>> = bin
+  # setting_parameter(identifier, value)
   def parse_settings(<<>>, data) do
     {:ok, data}
   end
