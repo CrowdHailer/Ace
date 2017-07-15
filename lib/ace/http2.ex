@@ -17,7 +17,7 @@ defmodule Ace.HTTP2 do
     @preface
   end
 
-  def data_frame(stream_id, data, opts) do
+  def data_frame(stream_id, data, opts \\ []) do
     type = <<0>>
     pad_length = Keyword.get(opts, :pad_length)
     payload = case pad_length do
@@ -50,32 +50,15 @@ defmodule Ace.HTTP2 do
     type = 4
     flags = 0
     stream_id = 0
-    payload = parameters_to_payload(parameters)
+    payload = Ace.HTTP2.Frame.Settings.parameters_to_payload(parameters)
     size = :erlang.iolist_size(payload)
     <<size::24, type::8, flags::8, 0::1, stream_id::31, payload::binary>>
   end
 
-  def parameters_to_payload(parameters, payload \\ [])
-  def parameters_to_payload([], payload) do
-    Enum.reverse(payload)
-    |> :erlang.iolist_to_binary
-  end
-  def parameters_to_payload([{:header_table_size, value} | rest], payload) do
-    payload = [<<1::16, value::32>> | payload]
-    parameters_to_payload(rest, payload)
-  end
-
-  def ping_frame(identifier, opts \\ []) when byte_size(identifier) == 8 do
-    type = <<6>>
-    flags = if Keyword.get(opts, :ack, false), do: <<1>>, else: <<0>>
-    <<8::24, type::binary, flags::binary, 0::1, 0::31, identifier::binary>>
-  end
-
-  def go_away_frame(:protocol_error) do
+  def go_away_frame(:protocol_error, debug_message \\ "") do
     type = 7
     last_stream_id = 1 # TODO
     error_code = 1
-    debug_message = ""
 
     payload = <<0::1, last_stream_id::31, error_code::32, debug_message::binary>>
     size = :erlang.iolist_size(payload)
@@ -169,6 +152,11 @@ defmodule Ace.HTTP2 do
           :ok = :ssl.send(state.socket, outbound)
           # Despite being an error the connection has successfully dealt with the client and does not need to crash
           {:stop, :normal, state}
+        {:error, {:protocol_error, debug}} ->
+          outbound = go_away_frame(:protocol_error, debug)
+          :ok = :ssl.send(state.socket, outbound)
+          # Despite being an error the connection has successfully dealt with the client and does not need to crash
+          {:stop, :normal, state}
       end
 
     else
@@ -185,9 +173,9 @@ defmodule Ace.HTTP2 do
     new_settings = update_settings(payload)
     {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
   end
-  # def consume_frame(_, state = %{settings: nil}) do
-  #   :invalid_first_frame
-  # end
+  def consume_frame(_, state = %{settings: nil}) do
+    {:error, {:protocol_error, "Did not receive settings frame"}}
+  end
   # Consume settings ack make sure we are not in a state of settings nil
   def consume_frame({4, <<1>>, 0, ""}, state = %{settings: %{}}) do
     {[], state}

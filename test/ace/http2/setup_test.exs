@@ -35,6 +35,19 @@ defmodule Ace.HTTP2SetupTest do
     assert {:ok, Ace.HTTP2.settings_frame()} == :ssl.recv(connection, 0)
   end
 
+  test "client must first send settings frame", %{client: connection} do
+    assert {:ok, Ace.HTTP2.settings_frame()} == :ssl.recv(connection, 0)
+    payload = [
+      Ace.HTTP2.preface(),
+      Ace.HTTP2.data_frame(1, "hi"),
+    ]
+    :ssl.send(connection, payload)
+    assert {:ok, data} = :ssl.recv(connection, 0)
+    {frame, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
+    assert {7, _, 0, <<_::32, _::32, debug::binary>>} = frame
+    IO.inspect(debug)
+  end
+
   test "empty settings are acked", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
@@ -53,34 +66,6 @@ defmodule Ace.HTTP2SetupTest do
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)
     assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-  end
-
-
-  # send short ping
-  test "ping will be acked", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-    assert <<8::24, 6::8, 0::8, 0::32, 1_000::64>> == Ace.HTTP2.ping_frame(<<1_000::64>>)
-    :ssl.send(connection, Ace.HTTP2.ping_frame(<<1_000::64>>))
-    assert {:ok, Ace.HTTP2.ping_frame(<<1_000::64>>, ack: true)} == :ssl.recv(connection, 0, 2_000)
-  end
-
-  test "incorrect ping frame is a connection error", %{client: connection} do
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
-    ]
-    :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
-    malformed_frame = <<10::24, 6::8, 0::8, 0::32, 1_000::80>>
-    :ssl.send(connection, malformed_frame)
-    assert {:ok, Ace.HTTP2.go_away_frame(:protocol_error)} == :ssl.recv(connection, 0, 2_000)
   end
 
   test "send window update", %{client: connection} do
