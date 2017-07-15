@@ -18,6 +18,12 @@ defmodule Ace.HTTP2.Frame do
   ```
   """
 
+  @data 0
+  @headers 1
+  @settings 4
+  @ping 6
+  @window_update 8
+
   @doc """
   Read the next available frame.
   """
@@ -37,6 +43,12 @@ defmodule Ace.HTTP2.Frame do
   def parse_from_buffer(buffer) when is_binary(buffer) do
     {nil, buffer}
   end
+
+  def decode(frame = {@data, _, _, _}), do: __MODULE__.Data.decode(frame)
+  def decode(frame = {@headers, _, _, _}), do: __MODULE__.Headers.decode(frame)
+  def decode(frame = {@settings, _, _, _}), do: __MODULE__.Settings.decode(frame)
+  def decode(frame = {@ping, _, _, _}), do: __MODULE__.Ping.decode(frame)
+  def decode(frame = {@window_update, _, _, _}), do: __MODULE__.WindowUpdate.decode(frame)
 
   def pad_data(data, optional_pad_length)
   def pad_data(data, nil) do

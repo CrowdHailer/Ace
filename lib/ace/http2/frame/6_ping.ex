@@ -13,6 +13,20 @@ defmodule Ace.HTTP2.Frame.Ping do
     %__MODULE__{identifier: identifier, ack: true}
   end
 
+  def decode({@type_id, flags, 0, identifier}) when bit_size(identifier) == 64 do
+    ack = case flags do
+      <<0>> ->
+        false
+      <<1>> ->
+        true
+    end
+
+    {:ok, %__MODULE__{identifier: identifier, ack: ack}}
+  end
+  def decode({@type_id, _flags, 0, _identifier}) do
+    {:error, {:frame_size_error, "Ping identifier must be 64 bits"}}
+  end
+
   def serialize(%__MODULE__{identifier: identifier, ack: ack}) do
     flags = if ack, do: <<1>>, else: <<0>>
     # DEBT should not need to calculate length

@@ -55,18 +55,6 @@ defmodule Ace.HTTP2 do
     <<size::24, type::8, flags::8, 0::1, stream_id::31, payload::binary>>
   end
 
-  def go_away_frame(:protocol_error, debug_message \\ "") do
-    type = 7
-    last_stream_id = 1 # TODO
-    error_code = 1
-
-    payload = <<0::1, last_stream_id::31, error_code::32, debug_message::binary>>
-    size = :erlang.iolist_size(payload)
-
-    type = 7
-    <<size::24, type::8, 0::8, 0::1, 0::31, payload::binary>>
-  end
-
   defstruct [
     # next: :preface, :settings, :continuation, :any
     settings: nil,
@@ -142,22 +130,35 @@ defmodule Ace.HTTP2 do
   def consume(buffer, state) do
     {frame, unprocessed} = Ace.HTTP2.Frame.parse_from_buffer(buffer) # + state.settings )
     if frame do
-      # Could consume with only settings
-      case consume_frame(frame, state) do
-        {outbound, state} when is_list(outbound) ->
-          :ok = :ssl.send(state.socket, outbound)
-          consume(unprocessed, state)
-        {:error, :protocol_error} ->
-          outbound = go_away_frame(:protocol_error)
-          :ok = :ssl.send(state.socket, outbound)
-          # Despite being an error the connection has successfully dealt with the client and does not need to crash
-          {:stop, :normal, state}
-        {:error, {:protocol_error, debug}} ->
-          outbound = go_away_frame(:protocol_error, debug)
+      case Ace.HTTP2.Frame.decode(frame) do
+        {:ok, frame} ->
+          IO.inspect(frame)
+          # Could consume with only settings
+          case consume_frame(frame, state) do
+            {outbound, state} when is_list(outbound) ->
+              :ok = :ssl.send(state.socket, outbound)
+              consume(unprocessed, state)
+            {:error, error} when is_atom(error) ->
+              frame = Ace.HTTP2.Frame.GoAway.new(0, error)
+              outbound = Ace.HTTP2.Frame.GoAway.serialize(frame)
+              :ok = :ssl.send(state.socket, outbound)
+              # Despite being an error the connection has successfully dealt with the client and does not need to crash
+              {:stop, :normal, state}
+            {:error, {error, debug}} ->
+              frame = Ace.HTTP2.Frame.GoAway.new(0, error, debug)
+              outbound = Ace.HTTP2.Frame.GoAway.serialize(frame)
+              :ok = :ssl.send(state.socket, outbound)
+              # Despite being an error the connection has successfully dealt with the client and does not need to crash
+              {:stop, :normal, state}
+          end
+        {:error, {error, debug}} ->
+          frame = Ace.HTTP2.Frame.GoAway.new(0, error, debug)
+          outbound = Ace.HTTP2.Frame.GoAway.serialize(frame)
           :ok = :ssl.send(state.socket, outbound)
           # Despite being an error the connection has successfully dealt with the client and does not need to crash
           {:stop, :normal, state}
       end
+
 
     else
       :ssl.setopts(state.socket, [active: :once])
@@ -168,32 +169,30 @@ defmodule Ace.HTTP2 do
   # def consume_frame(@settings, 0, flags, length, payload, %{next: :setup})
   # def consume_frame(%Settings{ack: false, parameters: parameters}, state = %{next: setup})
 
+  alias Ace.HTTP2.Frame
+
   # settings
-  def consume_frame({4, <<0>>, 0, payload}, state = %{settings: nil}) do
-    new_settings = update_settings(payload)
+  def consume_frame(settings = %Ace.HTTP2.Frame.Settings{}, state = %{settings: nil}) do
+    new_settings = update_settings(settings)
     {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
   end
   def consume_frame(_, state = %{settings: nil}) do
     {:error, {:protocol_error, "Did not receive settings frame"}}
   end
   # Consume settings ack make sure we are not in a state of settings nil
-  def consume_frame({4, <<1>>, 0, ""}, state = %{settings: %{}}) do
-    {[], state}
-  end
-  # ping
-  def consume_frame({6, <<0>>, 0, <<data::64>>}, state) do
-    {[<<8::24, 6::8, 1::8, 0::32, data::64>>], state}
-  end
-  def consume_frame({6, <<0>>, 0, _invalid_payload}, state) do
-    {:error, :protocol_error}
+  # def consume_frame({4, <<1>>, 0, ""}, state = %{settings: %{}}) do
+  #   {[], state}
+  # end
+  def consume_frame(%Frame.Ping{identifier: data, ack: false}, state) do
+    {[<<8::24, 6::8, 1::8, 0::32, data::binary>>], state}
   end
   # Window update
-  def consume_frame({8, <<0>>, 0, <<data::32>>}, state) do
+  def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state) do
     IO.inspect("total window update")
     {[], state}
   end
   # Window update
-  def consume_frame({8, <<0>>, stream_id, <<data::32>>}, state) do
+  def consume_frame(%Frame.WindowUpdate{stream_id: _}, state) do
     IO.inspect("Stream window update")
     {[], state}
   end
@@ -235,78 +234,20 @@ defmodule Ace.HTTP2 do
       %{request | headers: headers}
     end
   end
-  def consume_frame({1, flags, stream_id, payload}, state) do
-    <<_::1, _::1, priority::1, _::1, padded::1, end_headers::1, _::1, end_stream::1>> = flags
-    IO.inspect(priority)
-    IO.inspect(padded)
-    IO.inspect(end_headers)
-    IO.inspect(end_stream)
-
-    data = if padded == 1 do
-      Ace.HTTP2.Frame.remove_padding(payload)
-    else
-      payload
-    end
-
-    header_block_fragment = if priority == 1 do
-      <<0::1, stream_id::31, weight::8, header_block_fragment::binary>> = data
-      IO.inspect(stream_id)
-      IO.inspect(weight)
-      header_block_fragment
-    else
-      data
-    end
-
-    case flags do
-
-      <<_::5, 1::1, 0::1, 1::1>> ->
-        IO.inspect(header_block_fragment, limit: :infinity)
-        request = HPack.decode(header_block_fragment, state.decode_context)
-        |> Request.from_headers()
-        state = dispatch(stream_id, request, state)
-        {[], state}
-      <<_::5, 1::1, 0::1, 0::1>> ->
-        IO.inspect("needs data")
-        IO.inspect(header_block_fragment)
-        request = HPack.decode(header_block_fragment, state.decode_context)
-        |> Request.from_headers()
-        state = dispatch(stream_id, request, state)
-        {[], state}
-    end
+  def consume_frame(frame = %Frame.Headers{}, state) do
+    request = HPack.decode(frame.header_block_fragment, state.decode_context)
+    |> Request.from_headers()
+    state = dispatch(frame.stream_id, request, state)
+    {[], state}
   end
-  def consume_frame({0, flags, stream_id, payload}, state) do
-    <<_::4, padded_flag::1, _::2, end_data_flag::1>> = flags
-    data = if padded_flag == 1 do
-      Ace.HTTP2.Frame.remove_padding(payload)
-    else
-      payload
-    end
-    state = dispatch(stream_id, data, state)
+  def consume_frame(frame = %Frame.Data{}, state) do
+    state = dispatch(frame.stream_id, frame.data, state)
     {[], state}
   end
 
   def update_settings(new, old \\ @default_settings) do
-    IO.inspect(new |> parse_settings)
+    IO.inspect(new)
     %{}
-  end
-
-  def parse_settings(binary, data \\ %{})
-  # <<identifier::16, value::32, rest::bitstring>> = bin
-  # setting_parameter(identifier, value)
-  def parse_settings(<<>>, data) do
-    {:ok, data}
-  end
-  def parse_settings(<<1::16, value::32, rest::binary>>, data) do
-    data = Map.put(data, :header_table_size, value)
-    parse_settings(rest, data)
-  end
-  def parse_settings(<<4::16, value::32, rest::binary>>, data) do
-    data = Map.put(data, :initial_window_size, value)
-    parse_settings(rest, data)
-  end
-  def parse_settings(<<5::16, value::32, rest::binary>>, data) do
-    data = Map.put(data, :max_frame_size, value)
-    parse_settings(rest, data)
   end
 
   def send_to_client({:conn, pid, id}, message) do
