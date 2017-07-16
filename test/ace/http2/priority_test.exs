@@ -27,7 +27,7 @@ defmodule Ace.HTTP2.PriorityTest do
       Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
     assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
   end

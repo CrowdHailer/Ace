@@ -22,14 +22,14 @@ defmodule Ace.HTTP2RoutingTest do
       active: :false,
       alpn_advertised_protocols: ["h2"]]
     )
-    :ssl.negotiated_protocol(connection)
+    {:ok, "h2"} = :ssl.negotiated_protocol(connection)
     payload = [
       Ace.HTTP2.preface(),
       Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    assert {:ok, <<0::24, 4::8, 0::8, 0::32>>} == :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
   end
 
@@ -106,12 +106,10 @@ defmodule Ace.HTTP2RoutingTest do
     # Client initated streams must use odd stream identifiers
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, header_block_fragment::binary>>)
     Process.sleep(2_000)
-    # 200 response with header_block_fragment "Hello, World!"
-    assert {:ok, data} = :ssl.recv(connection, 0, 2_000)
-    # TODO test headers
-    assert {{1, _, 1, _}, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
+    # TODO test 200 response
+    assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
 
-    assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
+    assert {:ok, %{data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 
   test "sending padded headers", %{client: connection} do
@@ -137,11 +135,9 @@ defmodule Ace.HTTP2RoutingTest do
     # Client initated streams must use odd stream identifiers
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, payload::binary>>)
     Process.sleep(2_000)
-    # 200 response with header_block_fragment "Hello, World!"
-    assert {:ok, data} = :ssl.recv(connection, 0, 2_000)
-    # TODO test headers
-    assert {{1, _, 1, _}, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
-    assert {:ok, <<0, 0, 13, 0, 1, 0, 0, 0, 1, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33>>} == :ssl.recv(connection, 0, 2_000)
+    # TODO test 200 response header
+    assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
+    assert {:ok, %{data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 
   test "send post with data", %{client: connection} do
@@ -158,12 +154,8 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
     data_frame = Ace.HTTP2.Frame.Data.new(1, "Upload", true) |> Ace.HTTP2.Frame.Data.serialize()
     :ssl.send(connection, data_frame)
-    Process.sleep(2_000)
-    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
-    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
-    <<payload::binary-size(length), bin::binary>> = bin
-    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
-    assert bin == <<>>
+    assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
+    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
   end
 
   @tag :skip
@@ -181,11 +173,7 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
     data_frame = Ace.HTTP2.Frame.Data.new(1, "Upload", pad_length: 2, end_stream: true)
     :ssl.send(connection, data_frame)
-    Process.sleep(2_000)
-    {:ok, bin} =  :ssl.recv(connection, 0, 2_000)
-    <<length::24, 1::8, flags::size(8), 0::1, stream_id::31, bin::binary>> = bin
-    <<payload::binary-size(length), bin::binary>> = bin
-    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(payload, decode_table)
-    assert bin == <<>>
+    assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
+    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
   end
 end

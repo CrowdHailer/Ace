@@ -29,58 +29,57 @@ defmodule Ace.HTTP2SetupTest do
     __MODULE__
   end
 
+  alias Ace.HTTP2.{
+    Frame
+  }
   # Stream.fresh
 
   test "server sends settings as soon as connected", %{client: connection} do
-    assert {:ok, Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize()} == :ssl.recv(connection, 0)
+    assert {:ok, Frame.Settings.new()} == Support.read_next(connection)
   end
 
   test "client must first send settings frame", %{client: connection} do
-    assert {:ok, Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize()} == :ssl.recv(connection, 0)
+    assert {:ok, Frame.Settings.new()} == Support.read_next(connection)
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.Frame.Ping.new(<<0::64>>) |> Ace.HTTP2.Frame.Ping.serialize(),
+      Frame.Ping.new(<<0::64>>) |> Frame.Ping.serialize(),
     ]
     :ssl.send(connection, payload)
-    assert {:ok, data} = :ssl.recv(connection, 0)
-    {frame, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
-    assert {7, _, 0, <<_::32, _::32, debug::binary>>} = frame
-    IO.inspect(debug)
+    assert {:ok, %Frame.GoAway{debug: _}} = Support.read_next(connection)
   end
 
   test "empty settings are acked", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
+      Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, Frame.Settings.ack()} == Support.read_next(connection)
   end
 
   test "sending settings", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.Frame.Settings.new(header_table_size: 200) |> Ace.HTTP2.Frame.Settings.serialize(),
+      Frame.Settings.new(header_table_size: 200) |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, Frame.Settings.ack()} == Support.read_next(connection)
   end
 
   test "send window update", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
+      Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    :ssl.recv(connection, 9)
-    assert {:ok, <<0::24, 4::8, 1::8, 0::32>>} == :ssl.recv(connection, 9)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, Frame.Settings.ack()} == Support.read_next(connection)
 
     :ssl.send(connection, <<4::24, 8::8, 0::8, 0::32, 1::32>>)
     Process.sleep(2_000)
     # TODO send data down
-    # assert {:ok, <<8::24, 6::8, 0::8, 1::32, 1_000::64>>} == :ssl.recv(connection, 9, 2_000)
   end
 
 # Can't send a headers frame with stream id odd for server
