@@ -70,6 +70,7 @@ defmodule Ace.HTTP2 do
     consume(data, state)
   end
   def handle_info({:stream, stream_id, {:headers, headers}}, state) do
+    # accept list [frame/headers/data]
     IO.inspect(headers)
     headers_payload = encode_response_headers(headers, state.encode_context)
     headers_size = :erlang.iolist_size(headers_payload)
@@ -182,9 +183,8 @@ defmodule Ace.HTTP2 do
     IO.inspect(frame)
     {[], state}
   end
-  # headers
-
   def consume_frame(frame = %Frame.Headers{}, state) do
+    # TODO handle continuation
     request = HPack.decode(frame.header_block_fragment, state.decode_context)
     |> Request.from_headers()
     state = dispatch(frame.stream_id, request, state)
@@ -225,7 +225,7 @@ defmodule Ace.HTTP2 do
     streams = Map.put(state.streams, stream_id, stream)
     %{state | streams: streams}
   end
-  def dispatch(stream_id, data, state) do
+  def dispatch(stream_id, data, state) when is_binary(data) do
     {:ok, {_ref, pid}} = Map.fetch(state.streams, stream_id)
     send(pid, {:data, data})
     state

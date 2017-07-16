@@ -14,7 +14,7 @@ defmodule Ace.HTTP2RoutingTest do
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
     {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self}})
+    {:ok, server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self()}})
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:ok, connection} = :ssl.connect('localhost', port, [
       mode: :binary,
@@ -33,7 +33,10 @@ defmodule Ace.HTTP2RoutingTest do
     {:ok, %{client: connection}}
   end
 
-  alias Ace.HTTP2.Request
+  alias Ace.HTTP2.{
+    Request,
+    Response
+  }
 
   defmodule HomePage do
     use GenServer
@@ -48,9 +51,23 @@ defmodule Ace.HTTP2RoutingTest do
       IO.inspect(request)
       # Connection.stream({pid, ref}, headers/data/push or update etc)
 
+      # response = handle_request(request, Response.new(), config)
+      # {[parts], response} = Response.process(response)
+      # |> IO.inspect
+      # Send {":status" => "200"}
       Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 200, "content-length" => "13"}})
       Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
       {:noreply, {connection, config}}
+    end
+
+    def handle_request(request, response, config) do
+      IO.inspect(request)
+      IO.inspect(config)
+      response
+      |> Response.set_status(200) # TODO use atom
+      |> Response.put_header("content-length", "13")
+      |> Response.send_data("Hello, World!")
+      |> Response.finish()
     end
 
 
