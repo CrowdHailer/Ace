@@ -35,9 +35,12 @@ defmodule Ace.HTTP2RoutingTest do
 
     {:ok, table} = HPack.Table.start_link(1_000)
     header_block = Request.compress(request, table)
-    headers_frame = Frame.Headers.new(1, header_block, true, true)
+    <<hbf1::binary-size(8), hbf2::binary>> = header_block
+    headers_frame = Frame.Headers.new(1, hbf1, false, true)
+    continuation_frame = Frame.Continuation.new(1, hbf2, true)
 
     Support.send_frame(connection, headers_frame)
+    Support.send_frame(connection, continuation_frame)
     # TODO test 200 response
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
     {:ok, table} = HPack.Table.start_link(1_000)

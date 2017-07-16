@@ -25,6 +25,7 @@ defmodule Ace.HTTP2 do
 
   defstruct [
     # next: :preface, :settings, :continuation, :any
+    next: :any,
     settings: nil,
     socket: nil,
     decode_context: nil,
@@ -184,11 +185,26 @@ defmodule Ace.HTTP2 do
     {[], state}
   end
   def consume_frame(frame = %Frame.Headers{}, state) do
-    # TODO handle continuation
-    request = HPack.decode(frame.header_block_fragment, state.decode_context)
-    |> Request.from_headers()
-    state = dispatch(frame.stream_id, request, state)
-    {[], state}
+    # TODO pass through end stream flag
+    if frame.end_headers do
+      request = HPack.decode(frame.header_block_fragment, state.decode_context)
+      |> Request.from_headers()
+      state = dispatch(frame.stream_id, request, state)
+      {[], state}
+    else
+      {[], %{state | next: {:continuation, frame.stream_id, frame.header_block_fragment}}}
+    end
+  end
+  def consume_frame(frame = %Frame.Continuation{}, state = %{next: {:continuation, _stream_id, buffer}}) do
+    buffer = buffer <> frame.header_block_fragment
+    if frame.end_headers do
+      request = HPack.decode(buffer, state.decode_context)
+      |> Request.from_headers()
+      state = dispatch(frame.stream_id, request, state)
+      {[], state}
+    else
+      {[], %{state | next: {:continuation, frame.stream_id, buffer}}}
+    end
   end
   def consume_frame(frame = %Frame.Data{}, state) do
     state = dispatch(frame.stream_id, frame.data, state)

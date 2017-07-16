@@ -31,8 +31,8 @@ defmodule Ace.HTTP2.Frame.Headers do
     {:ok, %__MODULE__{
       stream_id: stream_id,
       header_block_fragment: header_block_fragment,
-      end_headers: end_headers,
-      end_stream: end_stream}}
+      end_headers: end_headers == 1,
+      end_stream: end_stream == 1}}
   end
 
   def serialize(frame) do
