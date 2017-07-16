@@ -1,104 +1,26 @@
 defmodule Ace.HTTP2RoutingTest do
   use ExUnit.Case
 
-  setup do
-    certfile =  Path.expand("../../ace/tls/cert.pem", __DIR__)
-    keyfile =  Path.expand("../../ace/tls/key.pem", __DIR__)
-    options = [
-      active: false,
-      mode: :binary,
-      packet: :raw,
-      certfile: certfile,
-      keyfile: keyfile,
-      reuseaddr: true,
-      alpn_preferred_protocols: ["h2", "http/1.1"]
-    ]
-    {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self()}})
-    {:ok, {_, port}} = :ssl.sockname(listen_socket)
-    {:ok, connection} = :ssl.connect('localhost', port, [
-      mode: :binary,
-      packet: :raw,
-      active: :false,
-      alpn_advertised_protocols: ["h2"]]
-    )
-    {:ok, "h2"} = :ssl.negotiated_protocol(connection)
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
-    ]
-    :ssl.send(connection, payload)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
-    {:ok, %{client: connection}}
-  end
-
   alias Ace.HTTP2.{
     Request,
-    Response
+    Response,
+    Frame
   }
 
-  defmodule HomePage do
-    use GenServer
+  def route(%{method: "GET", path: "/"}), do: HomePage
+  def route(%{method: "POST", path: "/"}), do: CreateAction
 
-    def start_link(connection, config) do
-      GenServer.start_link(__MODULE__, {connection, config})
-    end
-
-    # Maybe we want to use a GenServer.call when passing messages back to connection for back pressure.
-    # Need to send back a reference to the stream_id
-    def handle_info({:headers, request}, {connection, config}) do
-      IO.inspect(request)
-      # Connection.stream({pid, ref}, headers/data/push or update etc)
-
-      # response = handle_request(request, Response.new(), config)
-      # {[parts], response} = Response.process(response)
-      # |> IO.inspect
-      # Send {":status" => "200"}
-      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 200, "content-length" => "13"}})
-      Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
-      {:noreply, {connection, config}}
-    end
-
-    def handle_request(request, response, config) do
-      IO.inspect(request)
-      IO.inspect(config)
-      response
-      |> Response.set_status(200) # TODO use atom
-      |> Response.put_header("content-length", "13")
-      |> Response.send_data("Hello, World!")
-      |> Response.finish()
-    end
-
-
-  end
-
-  defmodule CreateAction do
-    use GenServer
-
-    def start_link(connection, config) do
-      GenServer.start_link(__MODULE__, {connection, config})
-    end
-
-    def handle_info({:headers, request}, {connection, config}) do
-      IO.inspect(request)
-      {:noreply, {connection, config}}
-    end
-
-    def handle_info({:data, data}, {connection, config}) do
-      IO.inspect("data")
-      IO.inspect(data)
-      Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 201, "content-length" => "0"}})
-      {:noreply, {connection, config}}
-    end
-
-  end
-
-  def route(%{method: "GET", path: "/"}) do
-    HomePage
-  end
-  def route(%{method: "POST", path: "/"}) do
-    CreateAction
+  setup do
+    {server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
+    connection = Support.open_connection(port)
+    payload = [
+      Ace.HTTP2.preface(),
+      Frame.Settings.new() |> Frame.Settings.serialize(),
+    ]
+    :ssl.send(connection, payload)
+    assert {:ok, %Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, %Frame.Settings{ack: true}} == Support.read_next(connection)
+    {:ok, %{client: connection}}
   end
 
   # Sending without required header is an error
@@ -111,21 +33,16 @@ defmodule Ace.HTTP2RoutingTest do
       headers: %{"content-length" => "0"}
     }
 
-    headers = Request.to_headers(request)
-    |> IO.inspect
     {:ok, table} = HPack.Table.start_link(1_000)
-    header_block_fragment = HPack.encode(headers, table)
-    |> IO.inspect
+    header_block = Request.compress(request, table)
+    headers_frame = Frame.Headers.new(1, header_block, true, true)
 
-    size = :erlang.iolist_size(header_block_fragment)
-
-    flags = <<0::5, 1::1, 0::1, 1::1>>
-    # Client initated streams must use odd stream identifiers
-    :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, header_block_fragment::binary>>)
-    Process.sleep(2_000)
+    Support.send_frame(connection, headers_frame)
     # TODO test 200 response
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
-
+    {:ok, table} = HPack.Table.start_link(1_000)
+    HPack.decode(hbf, table)
+    |> IO.inspect
     assert {:ok, %{data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 
@@ -144,7 +61,7 @@ defmodule Ace.HTTP2RoutingTest do
     header_block_fragment = HPack.encode(headers, table)
     |> IO.inspect
 
-    payload = Ace.HTTP2.Frame.pad_data(header_block_fragment, 2)
+    payload = Frame.pad_data(header_block_fragment, 2)
 
     size = :erlang.iolist_size(payload)
 
@@ -169,7 +86,7 @@ defmodule Ace.HTTP2RoutingTest do
     flags = <<0::5, 1::1, 0::1, 0::1>>
     # Client initated streams must use odd stream identifiers
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
-    data_frame = Ace.HTTP2.Frame.Data.new(1, "Upload", true) |> Ace.HTTP2.Frame.Data.serialize()
+    data_frame = Frame.Data.new(1, "Upload", true) |> Frame.Data.serialize()
     :ssl.send(connection, data_frame)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
     assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
@@ -188,7 +105,7 @@ defmodule Ace.HTTP2RoutingTest do
     flags = <<0::5, 1::1, 0::1, 0::1>>
     # Client initated streams must use odd stream identifiers
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
-    data_frame = Ace.HTTP2.Frame.Data.new(1, "Upload", pad_length: 2, end_stream: true)
+    data_frame = Frame.Data.new(1, "Upload", pad_length: 2, end_stream: true)
     :ssl.send(connection, data_frame)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
     assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
