@@ -58,6 +58,16 @@ defmodule Ace.HTTP2.Frame do
   def decode(frame = {@go_away, _, _, _}), do: __MODULE__.GoAway.decode(frame)
   def decode(frame = {@window_update, _, _, _}), do: __MODULE__.WindowUpdate.decode(frame)
 
+  def serialize(frame = %__MODULE__.Data{}), do: __MODULE__.Data.serialize(frame)
+  def serialize(frame = %__MODULE__.Headers{}), do: __MODULE__.Headers.serialize(frame)
+  def serialize(frame = %__MODULE__.Priority{}), do: __MODULE__.Priority.serialize(frame)
+  def serialize(frame = %__MODULE__.RstStream{}), do: __MODULE__.RstStream.serialize(frame)
+  def serialize(frame = %__MODULE__.Settings{}), do: __MODULE__.Settings.serialize(frame)
+  def serialize(frame = %__MODULE__.PushPromise{}), do: __MODULE__.PushPromise.serialize(frame)
+  def serialize(frame = %__MODULE__.Ping{}), do: __MODULE__.Ping.serialize(frame)
+  def serialize(frame = %__MODULE__.GoAway{}), do: __MODULE__.GoAway.serialize(frame)
+  def serialize(frame = %__MODULE__.WindowUpdate{}), do: __MODULE__.WindowUpdate.serialize(frame)
+
   def pad_data(data, optional_pad_length)
   def pad_data(data, nil) do
     data

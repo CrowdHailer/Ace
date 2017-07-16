@@ -23,44 +23,6 @@ defmodule Ace.HTTP2 do
     @preface
   end
 
-  def data_frame(stream_id, data, opts \\ []) do
-    type = <<0>>
-    pad_length = Keyword.get(opts, :pad_length)
-    payload = case pad_length do
-      nil ->
-        data
-      pad_length when 0 <= pad_length and pad_length <= 255 ->
-        pad_bit_lenth = pad_length * 8
-        <<pad_length::8, data::binary, 0::size(pad_bit_lenth)>>
-    end
-    size = :erlang.iolist_size(payload)
-    padded_flag = if pad_length, do: 1, else: 0
-    end_stream_flag = if Keyword.get(opts, :end_stream), do: 1, else: 0
-    flags = <<0::4, padded_flag::1, 0::2, end_stream_flag::1>>
-    <<size::24, type::binary, flags::binary, 0::1, stream_id::31, payload::binary>>
-  end
-
-  defmodule Settings do
-    defstruct [
-      header_table_size: nil,
-      enable_push: nil,
-      max_concurrent_streams: nil,
-      initial_window_size: nil,
-      max_frame_size: nil,
-      max_header_list_size: nil
-    ]
-  end
-
-  def settings_frame(parameters \\ []) do
-    # struct(Settings, parameters) Can use required values
-    type = 4
-    flags = 0
-    stream_id = 0
-    payload = Ace.HTTP2.Frame.Settings.parameters_to_payload(parameters)
-    size = :erlang.iolist_size(payload)
-    <<size::24, type::8, flags::8, 0::1, stream_id::31, payload::binary>>
-  end
-
   defstruct [
     # next: :preface, :settings, :continuation, :any
     settings: nil,
@@ -85,7 +47,7 @@ defmodule Ace.HTTP2 do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
-    :ssl.send(socket, settings_frame())
+    :ssl.send(socket, Frame.Settings.new() |> Frame.Settings.serialize())
     :ssl.setopts(socket, [active: :once])
     {:ok, decode_context} = HPack.Table.start_link(65_536)
     {:ok, encode_context} = HPack.Table.start_link(65_536)
@@ -117,9 +79,10 @@ defmodule Ace.HTTP2 do
     {:noreply, state}
   end
   def handle_info({:stream, stream_id, {:data, {data_payload, :end}}}, state) do
-    IO.inspect(data_payload)
-    data = data_frame(stream_id, data_payload, end_stream: true)
-    :ok = :ssl.send(state.socket, data)
+    frame = Frame.Data.new(stream_id, data_payload, true)
+    IO.inspect(frame)
+    outbound = Frame.Data.serialize(frame)
+    :ok = :ssl.send(state.socket, outbound)
     {:noreply, state}
   end
 
@@ -134,37 +97,37 @@ defmodule Ace.HTTP2 do
   end
 
   def consume(buffer, state) do
-    {frame, unprocessed} = Ace.HTTP2.Frame.parse_from_buffer(buffer) # + state.settings )
+    {frame, unprocessed} = Frame.parse_from_buffer(buffer) # + state.settings )
     if frame do
-      case Ace.HTTP2.Frame.decode(frame) do
+      case Frame.decode(frame) do
         {:ok, frame} ->
           IO.inspect(frame)
           # Could consume with only settings
           case consume_frame(frame, state) do
             {outbound, state} when is_list(outbound) ->
+              outbound = Enum.map(outbound, &Frame.serialize/1)
               :ok = :ssl.send(state.socket, outbound)
               consume(unprocessed, state)
             {:error, error} when is_atom(error) ->
-              frame = Ace.HTTP2.Frame.GoAway.new(0, error)
-              outbound = Ace.HTTP2.Frame.GoAway.serialize(frame)
+              frame = Frame.GoAway.new(0, error)
+              outbound = Frame.GoAway.serialize(frame)
               :ok = :ssl.send(state.socket, outbound)
               # Despite being an error the connection has successfully dealt with the client and does not need to crash
               {:stop, :normal, state}
             {:error, {error, debug}} ->
-              frame = Ace.HTTP2.Frame.GoAway.new(0, error, debug)
-              outbound = Ace.HTTP2.Frame.GoAway.serialize(frame)
+              frame = Frame.GoAway.new(0, error, debug)
+              outbound = Frame.GoAway.serialize(frame)
               :ok = :ssl.send(state.socket, outbound)
               # Despite being an error the connection has successfully dealt with the client and does not need to crash
               {:stop, :normal, state}
           end
         {:error, {error, debug}} ->
-          frame = Ace.HTTP2.Frame.GoAway.new(0, error, debug)
-          outbound = Ace.HTTP2.Frame.GoAway.serialize(frame)
+          frame = Frame.GoAway.new(0, error, debug)
+          outbound = Frame.GoAway.serialize(frame)
           :ok = :ssl.send(state.socket, outbound)
           # Despite being an error the connection has successfully dealt with the client and does not need to crash
           {:stop, :normal, state}
       end
-
 
     else
       :ssl.setopts(state.socket, [active: :once])
@@ -172,9 +135,13 @@ defmodule Ace.HTTP2 do
     end
   end
 
-  def consume_frame(settings = %Ace.HTTP2.Frame.Settings{}, state = %{settings: nil}) do
-    new_settings = update_settings(settings)
-    {[<<0::24, 4::8, 1::8, 0::32>>], %{state | settings: new_settings}}
+  def consume_frame(settings = %Frame.Settings{}, state = %{settings: nil}) do
+    case update_settings(settings, %{state | settings: @default_settings}) do
+      {:ok, new_state} ->
+        {[Frame.Settings.ack()], new_state}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
   def consume_frame(_, state = %{settings: nil}) do
     {:error, {:protocol_error, "Did not receive settings frame"}}
@@ -183,8 +150,8 @@ defmodule Ace.HTTP2 do
   # def consume_frame({4, <<1>>, 0, ""}, state = %{settings: %{}}) do
   #   {[], state}
   # end
-  def consume_frame(%Frame.Ping{identifier: data, ack: false}, state) do
-    {[<<8::24, 6::8, 1::8, 0::32, data::binary>>], state}
+  def consume_frame(frame = %Frame.Ping{}, state) do
+    {[Frame.Ping.ack(frame)], state}
   end
   def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state) do
     IO.inspect("total window update")
@@ -198,6 +165,14 @@ defmodule Ace.HTTP2 do
     IO.inspect("Ignoring priority frame")
     IO.inspect(frame)
     {[], state}
+  end
+  def consume_frame(settings = %Frame.Settings{}, state) do
+    case update_settings(settings, state) do
+      {:ok, new_state} ->
+        {[Frame.Settings.ack()], new_state}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
   def consume_frame(frame = %Frame.PushPromise{}, state) do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
@@ -220,9 +195,13 @@ defmodule Ace.HTTP2 do
     {[], state}
   end
 
-  def update_settings(new, old \\ @default_settings) do
-    IO.inspect(new)
-    %{}
+  def update_settings(new, state) do
+    case new.max_frame_size do
+      nil ->
+        {:ok, state}
+      x when x < 16_384 ->
+        {:error, {:protocol_error, "max_frame_size too small"}}
+    end
   end
 
   def send_to_client({:conn, pid, id}, message) do

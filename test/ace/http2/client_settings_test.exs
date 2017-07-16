@@ -1,6 +1,8 @@
 defmodule Ace.HTTP2ClientSettingsTest do
   use ExUnit.Case
 
+  alias Ace.HTTP2.Frame
+
   setup do
     certfile =  Path.expand("../../ace/tls/cert.pem", __DIR__)
     keyfile =  Path.expand("../../ace/tls/key.pem", __DIR__)
@@ -21,7 +23,14 @@ defmodule Ace.HTTP2ClientSettingsTest do
       packet: :raw,
       active: :false,
       alpn_advertised_protocols: ["h2"]])
-      :ssl.negotiated_protocol(connection)
+    payload = [
+      Ace.HTTP2.preface(),
+      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
+    ]
+    {:ok, "h2"} = :ssl.negotiated_protocol(connection)
+    :ssl.send(connection, payload)
+    assert {:ok, %Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, %Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
   end
 
@@ -30,15 +39,9 @@ defmodule Ace.HTTP2ClientSettingsTest do
   end
 
   test "setting the max frame size to less than 16,384 is a protocol error", %{client: connection} do
-    assert {:ok, Ace.HTTP2.settings_frame()} == :ssl.recv(connection, 0)
-    payload = [
-      Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(max_frame_size: 15000),
-    ]
-    :ssl.send(connection, payload)
-    assert {:ok, data} = :ssl.recv(connection, 0)
-    {frame, ""} = Ace.HTTP2.Frame.parse_from_buffer(data)
-    # assert {7, _, 0, <<_::32, _::32, debug::binary>>} = frame
-    # IO.inspect(debug)
+    buffer = Frame.Settings.new(max_frame_size: 15_000) |> Ace.HTTP2.Frame.Settings.serialize()
+    :ssl.send(connection, buffer)
+    assert {:ok, %{debug: message}} = Support.read_next(connection)
+    assert "max_frame_size too small" = message
   end
 end

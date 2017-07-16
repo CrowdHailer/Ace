@@ -32,14 +32,14 @@ defmodule Ace.HTTP2SetupTest do
   # Stream.fresh
 
   test "server sends settings as soon as connected", %{client: connection} do
-    assert {:ok, Ace.HTTP2.settings_frame()} == :ssl.recv(connection, 0)
+    assert {:ok, Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize()} == :ssl.recv(connection, 0)
   end
 
   test "client must first send settings frame", %{client: connection} do
-    assert {:ok, Ace.HTTP2.settings_frame()} == :ssl.recv(connection, 0)
+    assert {:ok, Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize()} == :ssl.recv(connection, 0)
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.data_frame(1, "hi"),
+      Ace.HTTP2.Frame.Ping.new(<<0::64>>) |> Ace.HTTP2.Frame.Ping.serialize(),
     ]
     :ssl.send(connection, payload)
     assert {:ok, data} = :ssl.recv(connection, 0)
@@ -51,7 +51,7 @@ defmodule Ace.HTTP2SetupTest do
   test "empty settings are acked", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
+      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)
@@ -61,7 +61,7 @@ defmodule Ace.HTTP2SetupTest do
   test "sending settings", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(header_table_size: 200),
+      Ace.HTTP2.Frame.Settings.new(header_table_size: 200) |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)
@@ -71,7 +71,7 @@ defmodule Ace.HTTP2SetupTest do
   test "send window update", %{client: connection} do
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
+      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)

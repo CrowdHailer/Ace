@@ -24,11 +24,11 @@ defmodule Ace.HTTP2.RstStreamTest do
       :ssl.negotiated_protocol(connection)
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.settings_frame(),
+      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
     :ssl.recv(connection, 9)
-    assert {:ok, {4, <<1>>, 0, ""}} == Support.read_next(connection)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
   end
 
