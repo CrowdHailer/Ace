@@ -26,6 +26,7 @@ defmodule Ace.HTTP2 do
   defstruct [
     # next: :preface, :settings, :continuation, :any
     next: :any,
+    buffer: "",
     settings: nil,
     socket: nil,
     decode_context: nil,
@@ -68,6 +69,8 @@ defmodule Ace.HTTP2 do
     consume(data, state)
   end
   def handle_info({:ssl, _, data}, state = %__MODULE__{}) do
+    data = state.buffer <> data
+    state = %{state | buffer: ""}
     consume(data, state)
   end
   def handle_info({:stream, stream_id, {:headers, headers}}, state) do
@@ -99,23 +102,32 @@ defmodule Ace.HTTP2 do
   end
 
   def consume(buffer, state) do
-    {frame, unprocessed} = Frame.parse_from_buffer(buffer) # + state.settings )
-    if frame do
-      case Frame.decode(frame) do
-        {:ok, frame} ->
-          IO.inspect(frame)
-          # Could consume with only settings
-          case consume_frame(frame, state) do
-            {outbound, state} when is_list(outbound) ->
-              outbound = Enum.map(outbound, &Frame.serialize/1)
-              :ok = :ssl.send(state.socket, outbound)
-              consume(unprocessed, state)
-            {:error, error} when is_atom(error) ->
-              frame = Frame.GoAway.new(0, error)
-              outbound = Frame.GoAway.serialize(frame)
-              :ok = :ssl.send(state.socket, outbound)
-              # Despite being an error the connection has successfully dealt with the client and does not need to crash
-              {:stop, :normal, state}
+    case Frame.parse_from_buffer(buffer, max_length: 16_384) do
+      {:ok, {frame, unprocessed}} ->
+        IO.inspect(frame)
+        if frame do
+          case Frame.decode(frame) do
+            {:ok, frame} ->
+              IO.inspect(frame)
+              # Could consume with only settings
+              case consume_frame(frame, state) do
+                {outbound, state} when is_list(outbound) ->
+                  outbound = Enum.map(outbound, &Frame.serialize/1)
+                  :ok = :ssl.send(state.socket, outbound)
+                  consume(unprocessed, state)
+                {:error, error} when is_atom(error) ->
+                  frame = Frame.GoAway.new(0, error)
+                  outbound = Frame.GoAway.serialize(frame)
+                  :ok = :ssl.send(state.socket, outbound)
+                  # Despite being an error the connection has successfully dealt with the client and does not need to crash
+                  {:stop, :normal, state}
+                {:error, {error, debug}} ->
+                  frame = Frame.GoAway.new(0, error, debug)
+                  outbound = Frame.GoAway.serialize(frame)
+                  :ok = :ssl.send(state.socket, outbound)
+                  # Despite being an error the connection has successfully dealt with the client and does not need to crash
+                  {:stop, :normal, state}
+              end
             {:error, {error, debug}} ->
               frame = Frame.GoAway.new(0, error, debug)
               outbound = Frame.GoAway.serialize(frame)
@@ -123,17 +135,18 @@ defmodule Ace.HTTP2 do
               # Despite being an error the connection has successfully dealt with the client and does not need to crash
               {:stop, :normal, state}
           end
-        {:error, {error, debug}} ->
-          frame = Frame.GoAway.new(0, error, debug)
-          outbound = Frame.GoAway.serialize(frame)
-          :ok = :ssl.send(state.socket, outbound)
-          # Despite being an error the connection has successfully dealt with the client and does not need to crash
-          {:stop, :normal, state}
-      end
 
-    else
-      :ssl.setopts(state.socket, [active: :once])
-      {:noreply, state}
+        else
+          state = %{state | buffer: unprocessed}
+          :ssl.setopts(state.socket, [active: :once])
+          {:noreply, state}
+        end
+      {:error, {error, debug}} ->
+        frame = Frame.GoAway.new(0, error, debug)
+        outbound = Frame.GoAway.serialize(frame)
+        :ok = :ssl.send(state.socket, outbound)
+        # Despite being an error the connection has successfully dealt with the client and does not need to crash
+        {:stop, :normal, state}
     end
   end
 

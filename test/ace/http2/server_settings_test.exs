@@ -1,6 +1,10 @@
 defmodule Ace.HTTP2.ServerSettingsTest do
   use ExUnit.Case
 
+  alias Ace.HTTP2.{
+    Frame
+  }
+
   setup do
     certfile =  Path.expand("../../ace/tls/cert.pem", __DIR__)
     keyfile =  Path.expand("../../ace/tls/key.pem", __DIR__)
@@ -24,11 +28,11 @@ defmodule Ace.HTTP2.ServerSettingsTest do
       :ssl.negotiated_protocol(connection)
     payload = [
       Ace.HTTP2.preface(),
-      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
+      Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
+    assert {:ok, %Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, %Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
   end
 
@@ -36,11 +40,18 @@ defmodule Ace.HTTP2.ServerSettingsTest do
     __MODULE__
   end
 
-  alias Ace.HTTP2.Frame
 
   # TODO diff given settings with defaults and only send changed
   # TODO start server with a max frame size and check it is sent to client and reflected in behaviour
-  test "max frame size cannot be", %{client: connection} do
+  test "when no server settings are chosen frame size is default", %{client: connection} do
+    bit_size = 16_385 * 8
+    frame = Frame.Data.new(1, <<0::size(bit_size)>>, false)
+
+    :ok = Support.send_frame(connection, frame)
+
+    assert {:ok, frame = %Frame.GoAway{}} = Support.read_next(connection)
+    assert "Frame greater than max allowed: (16384)" = frame.debug
+    assert :frame_size_error = frame.error
   end
 
   # send incorrectly sized rst_stream frame

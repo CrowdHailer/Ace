@@ -51,8 +51,9 @@ defmodule Ace.HTTP2PingTest do
     # TODO check that last stream id is correct
     expected_frame = Frame.GoAway.new(1, :frame_size_error)
     payload = Frame.GoAway.payload(expected_frame)
-    assert {:ok, %Frame.GoAway{error: 6, debug: debug}} = Support.read_next(connection)
-    assert "Ping identifier must be 64 bits" == debug
+    assert {:ok, frame = %Frame.GoAway{}} = Support.read_next(connection)
+    assert "Ping identifier must be 64 bits" == frame.debug
+    assert :frame_size_error == frame.error
   end
 
   # send acked ping
