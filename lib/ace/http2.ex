@@ -165,7 +165,6 @@ defmodule Ace.HTTP2 do
   end
   def consume_frame(frame = %Frame.Priority{}, state) do
     IO.inspect("Ignoring priority frame")
-    IO.inspect(frame)
     {[], state}
   end
   def consume_frame(settings = %Frame.Settings{}, state) do
@@ -181,7 +180,6 @@ defmodule Ace.HTTP2 do
   end
   def consume_frame(frame = %Frame.RstStream{}, state) do
     IO.inspect("Ignoring rst_stream frame")
-    IO.inspect(frame)
     {[], state}
   end
   def consume_frame(frame = %Frame.Headers{}, state) do
@@ -235,7 +233,7 @@ defmodule Ace.HTTP2 do
         rescue
           _exception in FunctionClauseError ->
             # TODO implement DefaultHandler
-            DefaultHandler
+            Ace.HTTP2.Stream.DefaultHandler
         end
         # handler = HomePage
         stream_spec = stream_spec(stream_id, handler, state)
