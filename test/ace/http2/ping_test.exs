@@ -2,26 +2,8 @@ defmodule Ace.HTTP2PingTest do
   use ExUnit.Case
 
   setup do
-    certfile =  Path.expand("../../ace/tls/cert.pem", __DIR__)
-    keyfile =  Path.expand("../../ace/tls/key.pem", __DIR__)
-    options = [
-      active: false,
-      mode: :binary,
-      packet: :raw,
-      certfile: certfile,
-      keyfile: keyfile,
-      reuseaddr: true,
-      alpn_preferred_protocols: ["h2", "http/1.1"]
-    ]
-    {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, _server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self()}})
-    {:ok, {_, port}} = :ssl.sockname(listen_socket)
-    {:ok, connection} = :ssl.connect('localhost', port, [
-      mode: :binary,
-      packet: :raw,
-      active: :false,
-      alpn_advertised_protocols: ["h2"]])
-      :ssl.negotiated_protocol(connection)
+    {_server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
+    connection = Support.open_connection(port)
     payload = [
       Ace.HTTP2.preface(),
       Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
@@ -48,9 +30,8 @@ defmodule Ace.HTTP2PingTest do
   test "incorrect ping frame is a connection error", %{client: connection} do
     malformed_frame = %Frame.Ping{identifier: <<1_000::80>>, ack: false}
     :ssl.send(connection, Frame.Ping.serialize(malformed_frame))
+    
     # TODO check that last stream id is correct
-    expected_frame = Frame.GoAway.new(1, :frame_size_error)
-    payload = Frame.GoAway.payload(expected_frame)
     assert {:ok, frame = %Frame.GoAway{}} = Support.read_next(connection)
     assert "Ping identifier must be 64 bits" == frame.debug
     assert :frame_size_error == frame.error

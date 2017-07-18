@@ -72,7 +72,7 @@ defmodule Ace.ServerTest do
 
   def handle_connect(
     _info,
-    %{test: :"test writing data on connect", pid: pid})
+    %{test: :"test writing data on connect", pid: _pid})
   do
     {:send, "WELCOME", :no_state}
   end

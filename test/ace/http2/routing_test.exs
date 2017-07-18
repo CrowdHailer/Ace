@@ -3,7 +3,6 @@ defmodule Ace.HTTP2RoutingTest do
 
   alias Ace.HTTP2.{
     Request,
-    Response,
     Frame
   }
 
@@ -11,7 +10,7 @@ defmodule Ace.HTTP2RoutingTest do
   def route(%{method: "POST", path: "/"}), do: CreateAction
 
   setup do
-    {server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
+    {_server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
     connection = Support.open_connection(port)
     payload = [
       Ace.HTTP2.preface(),
@@ -73,7 +72,7 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, payload::binary>>)
     Process.sleep(2_000)
     # TODO test 200 response header
-    assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
+    assert {:ok, %{header_block_fragment: _hbf}} = Support.read_next(connection, 2_000)
     assert {:ok, %{data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 
@@ -92,7 +91,7 @@ defmodule Ace.HTTP2RoutingTest do
     data_frame = Frame.Data.new(1, "Upload", true) |> Frame.Data.serialize()
     :ssl.send(connection, data_frame)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
-    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
+    assert [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
   end
 
   @tag :skip
@@ -111,6 +110,6 @@ defmodule Ace.HTTP2RoutingTest do
     data_frame = Frame.Data.new(1, "Upload", pad_length: 2, end_stream: true)
     :ssl.send(connection, data_frame)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
-    assert = [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
+    assert [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
   end
 end

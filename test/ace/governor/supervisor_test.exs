@@ -1,6 +1,5 @@
 defmodule Ace.Governor.SupervisorTest do
   use ExUnit.Case
-  import ExUnit.CaptureLog
 
   alias Ace.{Server, Governor, Connection}
 

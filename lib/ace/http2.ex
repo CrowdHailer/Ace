@@ -65,21 +65,29 @@ defmodule Ace.HTTP2 do
     }
     {:noreply, {:pending, initial_state}}
   end
-  def handle_info({:ssl, _, @preface <> data}, {:pending, state}) do
-    consume(data, state)
+  def handle_info({:ssl, connection, @preface <> data}, {:pending, state}) do
+    handle_info({:ssl, connection, data}, state)
   end
   def handle_info({:ssl, _, data}, state = %__MODULE__{}) do
     data = state.buffer <> data
     state = %{state | buffer: ""}
-    consume(data, state)
+    case consume(data, state) do
+      {:ok, state} ->
+        {:noreply, state}
+      {:error, {error, debug}} ->
+        frame = Frame.GoAway.new(0, error, debug)
+        outbound = Frame.GoAway.serialize(frame)
+        :ok = :ssl.send(state.socket, outbound)
+        # Despite being an error the connection has successfully dealt with the client and does not need to crash
+        {:stop, :normal, state}
+    end
   end
   def handle_info({:stream, stream_id, {:headers, headers}}, state) do
-    # accept list [frame/headers/data]
     IO.inspect(headers)
     headers_payload = encode_response_headers(headers, state.encode_context)
     headers_size = :erlang.iolist_size(headers_payload)
     headers_flags = <<0::5, 1::1, 0::1, 0::1>>
-    header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, 1::31, headers_payload::binary>>
+    header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, stream_id::31, headers_payload::binary>>
     :ok = :ssl.send(state.socket, header)
     {:noreply, state}
   end
@@ -103,50 +111,29 @@ defmodule Ace.HTTP2 do
 
   def consume(buffer, state) do
     case Frame.parse_from_buffer(buffer, max_length: 16_384) do
-      {:ok, {frame, unprocessed}} ->
-        IO.inspect(frame)
-        if frame do
-          case Frame.decode(frame) do
+      {:ok, {raw_frame, unprocessed}} ->
+        if raw_frame do
+          case Frame.decode(raw_frame) do
             {:ok, frame} ->
               IO.inspect(frame)
-              # Could consume with only settings
               case consume_frame(frame, state) do
                 {outbound, state} when is_list(outbound) ->
                   outbound = Enum.map(outbound, &Frame.serialize/1)
                   :ok = :ssl.send(state.socket, outbound)
                   consume(unprocessed, state)
-                {:error, error} when is_atom(error) ->
-                  frame = Frame.GoAway.new(0, error)
-                  outbound = Frame.GoAway.serialize(frame)
-                  :ok = :ssl.send(state.socket, outbound)
-                  # Despite being an error the connection has successfully dealt with the client and does not need to crash
-                  {:stop, :normal, state}
-                {:error, {error, debug}} ->
-                  frame = Frame.GoAway.new(0, error, debug)
-                  outbound = Frame.GoAway.serialize(frame)
-                  :ok = :ssl.send(state.socket, outbound)
-                  # Despite being an error the connection has successfully dealt with the client and does not need to crash
-                  {:stop, :normal, state}
+                {:error, reason} ->
+                  {:error, reason}
               end
-            {:error, {error, debug}} ->
-              frame = Frame.GoAway.new(0, error, debug)
-              outbound = Frame.GoAway.serialize(frame)
-              :ok = :ssl.send(state.socket, outbound)
-              # Despite being an error the connection has successfully dealt with the client and does not need to crash
-              {:stop, :normal, state}
+            {:error, reason} ->
+              {:error, reason}
           end
-
         else
           state = %{state | buffer: unprocessed}
           :ssl.setopts(state.socket, [active: :once])
-          {:noreply, state}
+          {:ok, state}
         end
-      {:error, {error, debug}} ->
-        frame = Frame.GoAway.new(0, error, debug)
-        outbound = Frame.GoAway.serialize(frame)
-        :ok = :ssl.send(state.socket, outbound)
-        # Despite being an error the connection has successfully dealt with the client and does not need to crash
-        {:stop, :normal, state}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -158,7 +145,7 @@ defmodule Ace.HTTP2 do
         {:error, reason}
     end
   end
-  def consume_frame(_, state = %{settings: nil}) do
+  def consume_frame(_, %{settings: nil}) do
     {:error, {:protocol_error, "Did not receive settings frame"}}
   end
   # Consume settings ack make sure we are not in a state of settings nil
@@ -189,7 +176,7 @@ defmodule Ace.HTTP2 do
         {:error, reason}
     end
   end
-  def consume_frame(frame = %Frame.PushPromise{}, state) do
+  def consume_frame(%Frame.PushPromise{}, _state) do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
   end
   def consume_frame(frame = %Frame.RstStream{}, state) do
@@ -244,9 +231,9 @@ defmodule Ace.HTTP2 do
       nil ->
         # DEBT try/catch assume always returns check with dialyzer
         handler = try do
-          handler = state.router.route(headers)
+          state.router.route(headers)
         rescue
-          e in FunctionClauseError ->
+          _exception in FunctionClauseError ->
             # TODO implement DefaultHandler
             DefaultHandler
         end
@@ -254,11 +241,11 @@ defmodule Ace.HTTP2 do
         stream_spec = stream_spec(stream_id, handler, state)
         {:ok, pid} = Supervisor.start_child(state.stream_supervisor, stream_spec)
         ref = Process.monitor(pid)
-        stream = {ref, pid}
+        {ref, pid}
       {ref, pid} ->
         {ref, pid}
     end
-    {ref, pid} = stream
+    {_ref, pid} = stream
     # Maybe send with same ref as used for reply
     send(pid, {:headers, headers})
     streams = Map.put(state.streams, stream_id, stream)
