@@ -230,6 +230,9 @@ defmodule Ace.HTTP2 do
         {:ok, state}
       x when x < 16_384 ->
         {:error, {:protocol_error, "max_frame_size too small"}}
+      new ->
+        IO.inspect("updating frame size (#{new})")
+        {:ok, state}
     end
   end
 
@@ -239,7 +242,14 @@ defmodule Ace.HTTP2 do
   def dispatch(stream_id, headers = %{method: _}, state) do
     stream = case Map.get(state.streams, stream_id) do
       nil ->
-        handler = state.router.route(headers)
+        # DEBT try/catch assume always returns check with dialyzer
+        handler = try do
+          handler = state.router.route(headers)
+        rescue
+          e in FunctionClauseError ->
+            # TODO implement DefaultHandler
+            DefaultHandler
+        end
         # handler = HomePage
         stream_spec = stream_spec(stream_id, handler, state)
         {:ok, pid} = Supervisor.start_child(state.stream_supervisor, stream_spec)

@@ -82,7 +82,7 @@ defmodule Support do
       reuseaddr: true,
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
-    {:ok, listen_socket} = :ssl.listen(0, options)
+    {:ok, listen_socket} = :ssl.listen(port, options)
     {:ok, server} = Ace.HTTP2.start_link(listen_socket, app)
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {server, port}
