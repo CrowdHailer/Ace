@@ -35,6 +35,7 @@ defmodule Ace.HTTP2 do
     router: nil,
     config: nil,
     stream_supervisor: nil
+    # accept_push always false for server but usable in client.
   ]
 
   use GenServer
@@ -82,31 +83,23 @@ defmodule Ace.HTTP2 do
         {:stop, :normal, state}
     end
   end
-  def handle_info({:stream, stream_id, {:headers, headers}}, state) do
-    IO.inspect(headers)
-    headers_payload = encode_response_headers(headers, state.encode_context)
-    headers_size = :erlang.iolist_size(headers_payload)
-    headers_flags = <<0::5, 1::1, 0::1, 0::1>>
-    header = <<headers_size::24, 1::8, headers_flags::binary, 0::1, stream_id::31, headers_payload::binary>>
-    :ok = :ssl.send(state.socket, header)
-    {:noreply, state}
-  end
-  def handle_info({:stream, stream_id, {:data, {data_payload, :end}}}, state) do
-    frame = Frame.Data.new(stream_id, data_payload, true)
-    IO.inspect(frame)
-    outbound = Frame.Data.serialize(frame)
+  def handle_info({{:stream, stream_id, _ref}, message}, state) do
+    {frames, state} = stream_set_dispatch(stream_id, message, state)
+    outbound = Enum.map(frames, &Frame.serialize/1)
     :ok = :ssl.send(state.socket, outbound)
     {:noreply, state}
   end
 
-  def encode_response_headers(headers, context) do
-    headers = Enum.map(headers, fn
-      ({:status, status}) ->
-        {":status", "#{status}"}
-      (header) ->
-        header
-    end)
-    HPack.encode(headers, context)
+  def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
+    # Map or array to map, best receive a list and response takes care of ordering
+    headers = for h <- headers, do: h
+    header_block = HPack.encode(headers, state.encode_context)
+    header_frame = Frame.Headers.new(id, header_block, true, end_stream)
+    {[header_frame], state}
+  end
+  def stream_set_dispatch(id, %{data: data, end_stream: end_stream}, state) do
+    data_frame = Frame.Data.new(id, data, end_stream)
+    {[data_frame], state}
   end
 
   def consume(buffer, state) do
@@ -188,20 +181,22 @@ defmodule Ace.HTTP2 do
   def consume_frame(frame = %Frame.Headers{}, state) do
     # TODO pass through end stream flag
     if frame.end_headers do
-      request = HPack.decode(frame.header_block_fragment, state.decode_context)
-      |> Request.from_headers()
-      state = dispatch(frame.stream_id, request, state)
+      headers = HPack.decode(frame.header_block_fragment, state.decode_context)
+      # preface bad name as could be trailers perhaps metadata
+      preface = %{headers: headers, end_stream: frame.end_stream}
+      state = dispatch(frame.stream_id, preface, state)
       {[], state}
     else
-      {[], %{state | next: {:continuation, frame.stream_id, frame.header_block_fragment}}}
+      {[], %{state | next: {:continuation, frame.stream_id, frame.header_block_fragment, frame.end_stream}}}
     end
   end
-  def consume_frame(frame = %Frame.Continuation{}, state = %{next: {:continuation, _stream_id, buffer}}) do
+  def consume_frame(frame = %Frame.Continuation{}, state = %{next: {:continuation, _stream_id, buffer, end_stream}}) do
     buffer = buffer <> frame.header_block_fragment
     if frame.end_headers do
-      request = HPack.decode(buffer, state.decode_context)
-      |> Request.from_headers()
-      state = dispatch(frame.stream_id, request, state)
+      headers = HPack.decode(buffer, state.decode_context)
+      # preface bad name as could be trailers perhaps metadata
+      preface = %{headers: headers, end_stream: end_stream}
+      state = dispatch(frame.stream_id, preface, state)
       {[], state}
     else
       {[], %{state | next: {:continuation, frame.stream_id, buffer}}}
@@ -214,7 +209,8 @@ defmodule Ace.HTTP2 do
     # control window of the maximum size (2^31-1) and can maintain this
     # window by sending a WINDOW_UPDATE frame when any data is received.
     # This effectively disables flow control for that receiver.
-    state = dispatch(frame.stream_id, frame.data, state)
+    data = %{data: frame.data, end_stream: frame.end_stream}
+    state = dispatch(frame.stream_id, data, state)
     {[Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)], state}
   end
 
@@ -230,41 +226,25 @@ defmodule Ace.HTTP2 do
     end
   end
 
-  def send_to_client({:conn, pid, id}, message) do
-    send(pid, {:stream, id, message})
-  end
-  def dispatch(stream_id, headers = %{method: _}, state) do
+  def dispatch(stream_id, message, state) do
     stream = case Map.get(state.streams, stream_id) do
       nil ->
-        # DEBT try/catch assume always returns check with dialyzer
-        handler = try do
-          state.router.route(headers)
-        rescue
-          _exception in FunctionClauseError ->
-            # TODO implement DefaultHandler
-            Ace.HTTP2.Stream.DefaultHandler
-        end
-        # handler = HomePage
-        stream_spec = stream_spec(stream_id, handler, state)
+        stream_spec = stream_spec(stream_id, Ace.HTTP2.StreamHandler, state)
         {:ok, pid} = Supervisor.start_child(state.stream_supervisor, stream_spec)
         ref = Process.monitor(pid)
         {ref, pid}
       {ref, pid} ->
         {ref, pid}
     end
-    {_ref, pid} = stream
+    {ref, pid} = stream
+    stream_ref = {:stream, self(), stream_id, ref}
     # Maybe send with same ref as used for reply
-    send(pid, {:headers, headers})
+    send(pid, {stream_ref, message})
     streams = Map.put(state.streams, stream_id, stream)
     %{state | streams: streams}
   end
-  def dispatch(stream_id, data, state) when is_binary(data) do
-    {:ok, {_ref, pid}} = Map.fetch(state.streams, stream_id)
-    send(pid, {:data, data})
-    state
-  end
 
-  def stream_spec(id, handler, %{config: config}) do
-    Supervisor.Spec.worker(handler, [{:conn, self(), id}, config], [restart: :temporary, id: id])
+  def stream_spec(id, handler, %{config: config, router: router}) do
+    Supervisor.Spec.worker(handler, [config, router], [restart: :temporary, id: id])
   end
 end

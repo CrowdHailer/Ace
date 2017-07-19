@@ -1,19 +1,32 @@
 defmodule HomePage do
-  use Ace.HTTP2.Stream
+  # use Ace.HTTP2.Stream
+  use GenServer
+  def start_link(config) do
+    GenServer.start_link(__MODULE__, config)
+  end
 
   # Maybe we want to use a GenServer.call when passing messages back to connection for back pressure.
   # Need to send back a reference to the stream_id
-  def handle_info({:headers, request}, {connection, config}) do
-    IO.inspect(request)
-    # Connection.stream({pid, ref}, headers/data/push or update etc)
+  def handle_info({stream = {:stream, _, _, _}, message}, config) do
+    IO.inspect(message)
 
-    # response = handle_request(request, Response.new(), config)
-    # {[parts], response} = Response.process(response)
-    # |> IO.inspect
-    # Send {":status" => "200"}
-    Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 200, "content-length" => "13"}})
-    Ace.HTTP2.send_to_client(connection, {:data, {"Hello, World!", :end}})
-    {:noreply, {connection, config}}
+    # HTTP headers or Stream Preface
+    headers = %{
+      ":status" => "200",
+      "content-length" => "13"
+    }
+    preface = %{
+      headers: headers,
+      end_stream: false
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+
+    data = %{
+      data: "Hello, World!",
+      end_stream: true
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, data)
+    {:noreply, config}
   end
 
   def handle_request(request, response, config) do
@@ -32,22 +45,22 @@ end
 defmodule CreateAction do
   use GenServer
 
-  def start_link(connection, config) do
-    GenServer.start_link(__MODULE__, {connection, config})
+  def handle_info({stream = {:stream, _, _, _}, message}, config) do
+    if message.end_stream do
+      headers = %{
+        ":status" => "201",
+        "content-length" => "0"
+      }
+      preface = %{
+        headers: headers,
+        end_stream: false
+      }
+      Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+      {:noreply, config}
+    else
+      {:noreply, config}
+    end
   end
-
-  def handle_info({:headers, request}, {connection, config}) do
-    IO.inspect(request)
-    {:noreply, {connection, config}}
-  end
-
-  def handle_info({:data, data}, {connection, config}) do
-    IO.inspect("data")
-    IO.inspect(data)
-    Ace.HTTP2.send_to_client(connection, {:headers, %{:status => 201, "content-length" => "0"}})
-    {:noreply, {connection, config}}
-  end
-
 end
 
 defmodule Support do
