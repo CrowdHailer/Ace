@@ -90,6 +90,8 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
     data_frame = Frame.Data.new(1, "Upload", true) |> Frame.Data.serialize()
     :ssl.send(connection, data_frame)
+    assert {:ok, %{stream_id: 0, increment: 65_535}} = Support.read_next(connection, 2_000)
+    assert {:ok, %{stream_id: _, increment: 65_535}} = Support.read_next(connection, 2_000)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
     assert [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
   end

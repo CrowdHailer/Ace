@@ -155,6 +155,9 @@ defmodule Ace.HTTP2 do
   def consume_frame(frame = %Frame.Ping{}, state) do
     {[Frame.Ping.ack(frame)], state}
   end
+  def consume_frame(%Frame.GoAway{error: :no_error}, _state) do
+    {:error, {:no_error, "Client closed connection"}}
+  end
   def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state) do
     IO.inspect("total window update")
     {[], state}
@@ -163,7 +166,7 @@ defmodule Ace.HTTP2 do
     IO.inspect("Stream window update")
     {[], state}
   end
-  def consume_frame(frame = %Frame.Priority{}, state) do
+  def consume_frame(%Frame.Priority{}, state) do
     IO.inspect("Ignoring priority frame")
     {[], state}
   end
@@ -178,7 +181,7 @@ defmodule Ace.HTTP2 do
   def consume_frame(%Frame.PushPromise{}, _state) do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
   end
-  def consume_frame(frame = %Frame.RstStream{}, state) do
+  def consume_frame(%Frame.RstStream{}, state) do
     IO.inspect("Ignoring rst_stream frame")
     {[], state}
   end
@@ -205,8 +208,14 @@ defmodule Ace.HTTP2 do
     end
   end
   def consume_frame(frame = %Frame.Data{}, state) do
+    # https://tools.ietf.org/html/rfc7540#section-5.2.2
+
+    # Deployments that do not require this capability can advertise a flow-
+    # control window of the maximum size (2^31-1) and can maintain this
+    # window by sending a WINDOW_UPDATE frame when any data is received.
+    # This effectively disables flow control for that receiver.
     state = dispatch(frame.stream_id, frame.data, state)
-    {[], state}
+    {[Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)], state}
   end
 
   def update_settings(new, state) do
