@@ -39,12 +39,12 @@ defmodule Ace.HTTP2 do
   ]
 
   use GenServer
-  def start_link(listen_socket, app) do
-    GenServer.start_link(__MODULE__, {listen_socket, app})
+  def start_link(listen_socket, stream_supervisor) do
+    GenServer.start_link(__MODULE__, {listen_socket, stream_supervisor})
   end
 
-  def init({listen_socket, app}) do
-    {:ok, {:listen_socket, listen_socket, app}, 0}
+  def init({listen_socket, stream_supervisor}) do
+    {:ok, {:listen_socket, listen_socket, stream_supervisor}, 0}
   end
   def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
@@ -171,7 +171,7 @@ defmodule Ace.HTTP2 do
   end
   def consume_frame(settings = %Frame.Settings{}, state) do
     if settings.ack do
-      {:ok, state}
+      {[], state}
     else
       case update_settings(settings, state) do
         {:ok, new_state} ->
