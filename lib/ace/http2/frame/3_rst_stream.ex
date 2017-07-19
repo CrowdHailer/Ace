@@ -7,8 +7,8 @@ defmodule Ace.HTTP2.Frame.RstStream do
   end
 
   def decode({3, <<0>>, stream_id, <<error_code::32>>}) do
-    # TODO change to error code
-    {:ok, new(stream_id, error_code)}
+    error = Ace.HTTP2.Frame.GoAway.error(error_code)
+    {:ok, new(stream_id, error)}
   end
 
   def serialize(frame) do

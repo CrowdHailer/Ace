@@ -2,15 +2,11 @@ defmodule Ace.HTTP2RoutingTest do
   use ExUnit.Case
 
   alias Ace.HTTP2.{
-    Request,
     Frame
   }
 
-  def route(%{method: "GET", path: "/"}), do: HomePage
-  def route(%{method: "POST", path: "/"}), do: CreateAction
-
   setup do
-    {_server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
+    {_server, port} = Support.start_server(self())
     connection = Support.open_connection(port)
     payload = [
       Ace.HTTP2.preface(),
@@ -24,22 +20,41 @@ defmodule Ace.HTTP2RoutingTest do
 
   # Sending without required header is an error
   test "sending unpadded headers", %{client: connection} do
-    request = %Request{
-      scheme: :https,
-      authority: "example.com",
-      method: :GET,
-      path: "/",
-      headers: %{"content-length" => "0"}
-    }
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"},
+      {"content-length", "0"}
+    ]
 
     {:ok, table} = HPack.Table.start_link(1_000)
-    header_block = Request.compress(request, table)
+    header_block = HPack.encode(headers, table)
     <<hbf1::binary-size(8), hbf2::binary>> = header_block
     headers_frame = Frame.Headers.new(1, hbf1, false, true)
     continuation_frame = Frame.Continuation.new(1, hbf2, true)
 
     Support.send_frame(connection, headers_frame)
     Support.send_frame(connection, continuation_frame)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {stream, _headers}
+    headers = %{
+      ":status" => "200",
+      "content-length" => "13"
+    }
+    preface = %{
+      headers: headers,
+      end_stream: false
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+    data = %{
+      data: "Hello, World!",
+      end_stream: true
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, data)
     # TODO test 200 response
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
     {:ok, table} = HPack.Table.start_link(1_000)
@@ -49,19 +64,16 @@ defmodule Ace.HTTP2RoutingTest do
   end
 
   test "sending padded headers", %{client: connection} do
-    request = %Request{
-      scheme: :https,
-      authority: "example.com",
-      method: :GET,
-      path: "/",
-      headers: %{"content-length" => "0"}
-    }
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"},
+      {"content-length", "0"}
+    ]
 
-    headers = Request.to_headers(request)
-    |> IO.inspect
     {:ok, table} = HPack.Table.start_link(1_000)
     header_block_fragment = HPack.encode(headers, table)
-    |> IO.inspect
 
     payload = Frame.pad_data(header_block_fragment, 2)
 
@@ -70,7 +82,24 @@ defmodule Ace.HTTP2RoutingTest do
     flags = <<0::4, 1::1, 1::1, 0::1, 1::1>>
     # Client initated streams must use odd stream identifiers
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, payload::binary>>)
-    Process.sleep(2_000)
+    assert_receive {:"$gen_call", from, {:start_child, []}}
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {stream, _headers}
+    headers = %{
+      ":status" => "200",
+      "content-length" => "13"
+    }
+    preface = %{
+      headers: headers,
+      end_stream: false
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+    data = %{
+      data: "Hello, World!",
+      end_stream: true
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, data)
     # TODO test 200 response header
     assert {:ok, %{header_block_fragment: _hbf}} = Support.read_next(connection, 2_000)
     assert {:ok, %{data: "Hello, World!"}} = Support.read_next(connection, 2_000)
@@ -90,6 +119,22 @@ defmodule Ace.HTTP2RoutingTest do
     :ssl.send(connection, <<size::24, 1::8, flags::binary, 0::1, 1::31, body::binary>>)
     data_frame = Frame.Data.new(1, "Upload", true) |> Frame.Data.serialize()
     :ssl.send(connection, data_frame)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {stream, _headers}
+    assert_receive {stream, _data}
+    headers = %{
+      ":status" => "201",
+      "content-length" => "0"
+    }
+    preface = %{
+      headers: headers,
+      end_stream: false
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+
     assert {:ok, %{stream_id: 0, increment: 65_535}} = Support.read_next(connection, 2_000)
     assert {:ok, %{stream_id: _, increment: 65_535}} = Support.read_next(connection, 2_000)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)

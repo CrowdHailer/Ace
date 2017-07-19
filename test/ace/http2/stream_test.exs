@@ -1,13 +1,120 @@
 defmodule Ace.HTTP2.StreamTest do
   use ExUnit.Case
 
-  @tag :skip
-  test "starting a stream as a worker" do
-    {:ok, pid} = Supervisor.start_link([], [strategy: :one_for_one])
-    Supervisor.start_child(pid, Supervisor.Spec.worker(Stream, [%{}, :config], [restart: :temporary, id: 1]))
-    |> IO.inspect
-    Supervisor.start_child(pid, Supervisor.Spec.worker(Stream, [%{}, :config], [restart: :temporary, id: 2]))
-    |> IO.inspect
-    Process.sleep(1_000)
+  alias Ace.HTTP2.{
+    Frame
+  }
+
+  setup do
+    {_server, port} = Support.start_server(self())
+    connection = Support.open_connection(port)
+    payload = [
+      Ace.HTTP2.preface(),
+      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
+    ]
+    :ssl.send(connection, payload)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
+    {:ok, %{client: connection}}
+  end
+
+  test "client cannot send on stream 0", %{client: connection} do
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"}
+    ]
+    header_block = HPack.encode(headers, encode_table)
+    headers_frame = Frame.Headers.new(2, header_block, true, true)
+    Support.send_frame(connection, headers_frame)
+    assert {:ok, %Frame.GoAway{debug: message}} = Support.read_next(connection, 2_000)
+    assert "Clients must start odd streams" = message
+    # assert {:ok, %Frame.RstStream{error: :stream_closed, stream_id: 1}} = Support.read_next(connection, 2_000)
+  end
+
+  test "client must start odd numbered streams", %{client: connection} do
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"}
+    ]
+    header_block = HPack.encode(headers, encode_table)
+    headers_frame = Frame.Headers.new(2, header_block, true, true)
+    Support.send_frame(connection, headers_frame)
+    assert {:ok, %Frame.GoAway{debug: message}} = Support.read_next(connection, 2_000)
+    assert "Clients must start odd streams" = message
+  end
+
+  test "cannot send more headers after frame with end stream", %{client: connection} do
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"}
+    ]
+    header_block = HPack.encode(headers, encode_table)
+    headers_frame = Frame.Headers.new(1, header_block, true, true)
+    Support.send_frame(connection, headers_frame)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}
+    GenServer.reply(from, {:ok, self()})
+
+    Support.send_frame(connection, headers_frame)
+    assert {:ok, %Frame.RstStream{error: :stream_closed, stream_id: 1}} = Support.read_next(connection, 2_000)
+  end
+
+  test "cannot send data after frame with end stream", %{client: connection} do
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"}
+    ]
+    header_block = HPack.encode(headers, encode_table)
+    headers_frame = Frame.Headers.new(1, header_block, true, true)
+    Support.send_frame(connection, headers_frame)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}
+    GenServer.reply(from, {:ok, self()})
+
+    data_frame = Frame.Data.new(1, "hi", true)
+    Support.send_frame(connection, data_frame)
+    assert {:ok, %Frame.RstStream{error: :stream_closed, stream_id: 1}} = Support.read_next(connection, 2_000)
+  end
+
+  test "cannot start a stream with data frame", %{client: connection} do
+    data_frame = Frame.Data.new(1, "hi", true)
+    Support.send_frame(connection, data_frame)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}
+    GenServer.reply(from, {:ok, self()})
+
+    assert {:ok, %Frame.GoAway{debug: message}} = Support.read_next(connection, 2_000)
+    assert "DATA frame received on a stream in idle state. (RFC7540 5.1)" = message
+  end
+
+  test "stream is reset if worker terminates", %{client: connection} do
+    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    headers = [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"}
+    ]
+    header_block = HPack.encode(headers, encode_table)
+    headers_frame = Frame.Headers.new(1, header_block, true, true)
+    Support.send_frame(connection, headers_frame)
+    receive do
+      {:"$gen_call", from, {:start_child, []}} ->
+        GenServer.reply(from, {:ok, spawn(fn() -> Process.sleep(1_000) end)})
+    end
+
+    assert {:ok, %Frame.RstStream{error: :internal_error, stream_id: 1}} = Support.read_next(connection, 2_000)
   end
 end

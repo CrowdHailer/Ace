@@ -11,9 +11,10 @@ defmodule Ace.HTTP2 do
   *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
   """
 
+  require Logger
   alias Ace.HTTP2.{
     Frame,
-    Request
+    Stream
   }
 
   @preface "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -26,14 +27,13 @@ defmodule Ace.HTTP2 do
   defstruct [
     # next: :preface, :settings, :continuation, :any
     next: :any,
+    peer: :server,
     buffer: "",
     settings: nil,
     socket: nil,
     decode_context: nil,
     encode_context: nil,
     streams: nil,
-    router: nil,
-    config: nil,
     stream_supervisor: nil
     # accept_push always false for server but usable in client.
   ]
@@ -46,7 +46,7 @@ defmodule Ace.HTTP2 do
   def init({listen_socket, app}) do
     {:ok, {:listen_socket, listen_socket, app}, 0}
   end
-  def handle_info(:timeout, {:listen_socket, listen_socket, {router, config}}) do
+  def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
@@ -54,14 +54,11 @@ defmodule Ace.HTTP2 do
     :ssl.setopts(socket, [active: :once])
     {:ok, decode_context} = HPack.Table.start_link(65_536)
     {:ok, encode_context} = HPack.Table.start_link(65_536)
-    {:ok, stream_supervisor} = Supervisor.start_link([], [strategy: :one_for_one])
     initial_state = %__MODULE__{
       socket: socket,
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
-      router: router,
-      config: config,
       stream_supervisor: stream_supervisor
     }
     {:noreply, {:pending, initial_state}}
@@ -89,6 +86,19 @@ defmodule Ace.HTTP2 do
     :ok = :ssl.send(state.socket, outbound)
     {:noreply, state}
   end
+  def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
+    {_id, stream} = Enum.find(state.streams, fn
+      ({_id, %{monitor: ^ref}}) ->
+        true
+      (_) -> false
+    end)
+    {outbound, stream} = Stream.terminate(stream, reason)
+    streams = Map.put(state.streams, stream.stream_id, stream)
+    state = %{state | streams: streams}
+    outbound = Enum.map(outbound, &Frame.serialize/1)
+    :ok = :ssl.send(state.socket, outbound)
+    {:noreply, state}
+  end
 
   def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
     # Map or array to map, best receive a list and response takes care of ordering
@@ -108,7 +118,7 @@ defmodule Ace.HTTP2 do
         if raw_frame do
           case Frame.decode(raw_frame) do
             {:ok, frame} ->
-              IO.inspect(frame)
+              Logger.debug(inspect(frame))
               case consume_frame(frame, state) do
                 {outbound, state} when is_list(outbound) ->
                   outbound = Enum.map(outbound, &Frame.serialize/1)
@@ -130,7 +140,7 @@ defmodule Ace.HTTP2 do
     end
   end
 
-  def consume_frame(settings = %Frame.Settings{}, state = %{settings: nil}) do
+  def consume_frame(settings = %Frame.Settings{ack: false}, state = %{settings: nil}) do
     case update_settings(settings, %{state | settings: @default_settings}) do
       {:ok, new_state} ->
         {[Frame.Settings.ack()], new_state}
@@ -141,10 +151,6 @@ defmodule Ace.HTTP2 do
   def consume_frame(_, %{settings: nil}) do
     {:error, {:protocol_error, "Did not receive settings frame"}}
   end
-  # Consume settings ack make sure we are not in a state of settings nil
-  # def consume_frame({4, <<1>>, 0, ""}, state = %{settings: %{}}) do
-  #   {[], state}
-  # end
   def consume_frame(frame = %Frame.Ping{}, state) do
     {[Frame.Ping.ack(frame)], state}
   end
@@ -164,11 +170,15 @@ defmodule Ace.HTTP2 do
     {[], state}
   end
   def consume_frame(settings = %Frame.Settings{}, state) do
-    case update_settings(settings, state) do
-      {:ok, new_state} ->
-        {[Frame.Settings.ack()], new_state}
-      {:error, reason} ->
-        {:error, reason}
+    if settings.ack do
+      {:ok, state}
+    else
+      case update_settings(settings, state) do
+        {:ok, new_state} ->
+          {[Frame.Settings.ack()], new_state}
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
   def consume_frame(%Frame.PushPromise{}, _state) do
@@ -184,8 +194,12 @@ defmodule Ace.HTTP2 do
       headers = HPack.decode(frame.header_block_fragment, state.decode_context)
       # preface bad name as could be trailers perhaps metadata
       preface = %{headers: headers, end_stream: frame.end_stream}
-      state = dispatch(frame.stream_id, preface, state)
-      {[], state}
+      case dispatch(frame.stream_id, preface, state) do
+        {:ok, {outbound, state}} ->
+          {outbound, state}
+        {:error, reason} ->
+          {:error, reason}
+      end
     else
       {[], %{state | next: {:continuation, frame.stream_id, frame.header_block_fragment, frame.end_stream}}}
     end
@@ -196,8 +210,13 @@ defmodule Ace.HTTP2 do
       headers = HPack.decode(buffer, state.decode_context)
       # preface bad name as could be trailers perhaps metadata
       preface = %{headers: headers, end_stream: end_stream}
-      state = dispatch(frame.stream_id, preface, state)
-      {[], state}
+      case dispatch(frame.stream_id, preface, state) do
+        {:ok, {outbound, state}} ->
+          {outbound, state}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     else
       {[], %{state | next: {:continuation, frame.stream_id, buffer}}}
     end
@@ -210,8 +229,12 @@ defmodule Ace.HTTP2 do
     # window by sending a WINDOW_UPDATE frame when any data is received.
     # This effectively disables flow control for that receiver.
     data = %{data: frame.data, end_stream: frame.end_stream}
-    state = dispatch(frame.stream_id, data, state)
-    {[Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)], state}
+    case dispatch(frame.stream_id, data, state) do
+      {:ok, {outbound, state}} ->
+        {outbound ++ [Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)], state}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def update_settings(new, state) do
@@ -227,24 +250,38 @@ defmodule Ace.HTTP2 do
   end
 
   def dispatch(stream_id, message, state) do
-    stream = case Map.get(state.streams, stream_id) do
-      nil ->
-        stream_spec = stream_spec(stream_id, Ace.HTTP2.StreamHandler, state)
-        {:ok, pid} = Supervisor.start_child(state.stream_supervisor, stream_spec)
-        ref = Process.monitor(pid)
-        {ref, pid}
-      {ref, pid} ->
-        {ref, pid}
+    # NOTE only evaluate creating new stream if one does not exist
+    # DEBT don't have stream rely on shape of connection state
+    case fetch_stream(state, stream_id) do
+      {:ok, stream} ->
+        case Stream.consume(stream, message) do
+          {:ok, {outbound, stream}} ->
+            streams = Map.put(state.streams, stream_id, stream)
+            {:ok, {outbound, %{state | streams: streams}}}
+          {:error, reason} ->
+            {:error, reason}
+        end
+      {:error, reason} ->
+        {:error, reason}
     end
-    {ref, pid} = stream
-    stream_ref = {:stream, self(), stream_id, ref}
-    # Maybe send with same ref as used for reply
-    send(pid, {stream_ref, message})
-    streams = Map.put(state.streams, stream_id, stream)
-    %{state | streams: streams}
   end
 
-  def stream_spec(id, handler, %{config: config, router: router}) do
-    Supervisor.Spec.worker(handler, [config, router], [restart: :temporary, id: id])
+  defp fetch_stream(state, stream_id) do
+    case Map.fetch(state.streams, stream_id) do
+      {:ok, stream} ->
+        {:ok, stream}
+      :error ->
+        new_stream(stream_id, state)
+    end
+  end
+
+  def new_stream(0, _) do
+    {:error, {:protocol_error, "Stream 0 reserved for connection"}}
+  end
+  def new_stream(stream_id, state) when rem(stream_id, 2) == 1 do
+    {:ok, Stream.idle(stream_id, state)}
+  end
+  def new_stream(_, _) do
+    {:error, {:protocol_error, "Clients must start odd streams"}}
   end
 end
