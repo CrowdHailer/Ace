@@ -1,6 +1,7 @@
+# TODO move to Ace.Request
 defmodule Ace.HTTP2.Request do
   # @enforce_keys [:scheme, :authority, :method, :path, :headers]
-  defstruct [:scheme, :authority, :method, :path, :headers]
+  defstruct [:scheme, :authority, :method, :path, :headers, :body]
 
   def to_headers(request = %__MODULE__{}) do
     [
@@ -37,7 +38,8 @@ defmodule Ace.HTTP2.Request do
   end
   def add_header({key, value}, request = %{headers: headers}) do
     # TODO test key does not begin with `:`
-    headers = Map.put(headers || %{}, key, value)
+    # headers = Map.put(headers || %{}, key, value)
+    headers = (headers || []) ++ [{key, value}]
     %{request | headers: headers}
   end
 end

@@ -44,7 +44,7 @@ defmodule Ace.HTTP2.Frame.Settings do
     length = :erlang.iolist_size(payload)
     <<length::24, type::8, flags::8, 0::1, stream_id::31, payload::binary>>
   end
-  def serialize(frame = %{ack: true}) do
+  def serialize(%{ack: true}) do
     type = 4
     <<0::24, type::8, 1::8, 0::1, 0::31>>
   end

@@ -1,14 +1,15 @@
 defmodule Ace.HTTP2.Stream.DefaultHandler do
 
-  def handle_info({:headers, request}, {connection, config}) do
-    Ace.HTTP2.send_to_client(connection, {
-      :headers,
-      %{:status => 404, "content-length" => "0"}
-    })
-    Ace.HTTP2.send_to_client(connection, {
-      :data,
-      {"", :end}
-    })
-    {:noreply, {connection, config}}
+  def handle_info({stream, _}, state) do
+    headers = %{
+      ":status" => "404",
+      "content-length" => "0"
+    }
+    preface = %{
+      headers: headers,
+      end_stream: true
+    }
+    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+    {:noreply, state}
   end
 end

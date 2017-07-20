@@ -1,3 +1,10 @@
+defmodule RaxxForwarder do
+  def handle_request(request, pid) do
+    {:ok, response} = GenServer.call(pid, request)
+    response
+  end
+end
+
 defmodule Support do
   def read_next(connection, timeout \\ :infinity) do
     case :ssl.recv(connection, 9, timeout) do

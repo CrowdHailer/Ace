@@ -10,7 +10,7 @@ defmodule Ace.HTTP2.Frame.PushPromise do
     }
   end
 
-  def decode({5, flags, stream_id, header_block_fragment}) do
+  def decode({5, _flags, stream_id, _header_block_fragment}) do
     {:ok, new(stream_id, 0, "TODO")}
   end
 
