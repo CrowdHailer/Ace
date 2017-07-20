@@ -41,7 +41,7 @@ defmodule Ace.GovernorTest do
     socket = {:tcp, socket}
 
     {:ok, governor} = Governor.start_link(socket, supervisor)
-    {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    {:ok, _client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     assert_receive {:EXIT, ^governor, {:undef, _}}
   end
 

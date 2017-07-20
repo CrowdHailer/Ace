@@ -3,13 +3,20 @@ defmodule Ace.Mixfile do
 
   def project do
     [app: :ace,
-    version: "0.9.1",
+    version: "0.10.0",
     elixir: "~> 1.4",
     build_embedded: Mix.env == :prod,
     start_permanent: Mix.env == :prod,
     deps: deps(),
     description: description(),
-    docs: [extras: ["README.md"], main: "readme"],
+    docs: [
+      main: "getting_started",
+      source_url: "https://github.com/crowdhailer/ace",
+      extras: [
+        "getting_started.md",
+        "README.md"
+      ],
+    ],
     package: package()]
   end
 
@@ -21,6 +28,8 @@ defmodule Ace.Mixfile do
 
   defp deps do
     [
+      {:hpack, "~> 1.0"},
+      {:raxx, "~> 0.11.1", optional: true},
       {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
@@ -28,9 +37,7 @@ defmodule Ace.Mixfile do
 
   defp description do
     """
-    Easy TCP and TLS(ssl) servers.
-
-    For a HTTP webserver see https://hex.pm/packages/ace_http.
+    HTTP/2 server for elixir
     """
   end
 
