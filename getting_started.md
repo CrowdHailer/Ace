@@ -38,25 +38,51 @@ Store certificates in a projects `priv` directory if they are to be distributed 
 
 ### Endpoint setup
 
-
 ```elixir
-defmodule MyApp do
-  def start(_, _) do
-    app = {MyApp.SimpleHandler, :noconfig}
-    certfile =  Path.expand("ace/tls/certificate.pem", __DIR__)
-    keyfile =  Path.expand("ace/tls/certfile_key.pem", __DIR__)
-    tls_options = [certfile: certfile, keyfile: keyfile]
-    Ace.HTTP2.Connection.start_link(app, port, tls: tls_options, connections: 100)
+defmodule MyApp.Application do
+  @moduledoc false
+
+  use Application
+
+  def start(_type, _args) do
+
+    certfile = Application.app_dir(:my_app, "/priv/cert.pem")
+    keyfile = Application.app_dir(:my_app, "/priv/key.pem")
+
+    Ace.HTTP2.start_link(
+      {MyApp.SimpleHandler, :config},
+      8443,
+      certfile: certfile,
+      keyfile: keyfile,
+      connections: 1_000
+    )
   end
 end
 ```
+
+##### Note
+
+`Ace.HTTP2.start_link/3` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
 
 ## Bidirectional streaming
 
 Process will receive data messages in the following format untill
 all data is sent from client
 
+*1*
+`{stream, %{headers: list(), end_stream: boolean()}}`
+
+*0 - n*
 `{stream, %{data: binary(), end_stream: boolean()}}`
+
+The worker can stream data to the client at any point using
+```elixir
+StreamHandler.send_to_client(stream, %{headers: headers(),  end_stream: boolean()})
+# OR
+StreamHandler.send_to_client(stream, %{data: binary(), end_stream: boolean()})
+```
+
+#### Example
 
 ```elixir
 defmodule MyApp.StreamHandler do

@@ -9,6 +9,9 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
     end
   end
 
+  def start_link({mod, config}) do
+    start_link(mod, config)
+  end
   def start_link(mod, config) do
     GenServer.start_link(__MODULE__, {:waiting, {mod, config}})
   end

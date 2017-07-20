@@ -40,10 +40,18 @@ defmodule Ace.HTTP2.Connection do
 
   use GenServer
   def start_link(listen_socket, stream_supervisor) do
+    IO.inspect("start server")
     GenServer.start_link(__MODULE__, {listen_socket, stream_supervisor})
   end
 
-  def init({listen_socket, stream_supervisor}) do
+  def init({listen_socket, {mod, conf}}) do
+    {:ok, stream_supervisor} = Supervisor.start_link(
+      [Supervisor.Spec.worker(mod, [conf], restart: :transient)],
+      strategy: :simple_one_for_one
+    )
+    init({listen_socket, stream_supervisor})
+  end
+  def init({listen_socket, stream_supervisor}) when is_pid(stream_supervisor) do
     {:ok, {:listen_socket, listen_socket, stream_supervisor}, 0}
   end
   def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor}) do

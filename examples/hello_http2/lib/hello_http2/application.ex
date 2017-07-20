@@ -4,33 +4,16 @@ defmodule HelloHTTP2.Application do
   use Application
 
   def start(_type, _args) do
-    import Supervisor.Spec, warn: false
 
     certfile = Application.app_dir(:hello_http2, "/priv/cert.pem")
     keyfile = Application.app_dir(:hello_http2, "/priv/key.pem")
 
-    options = [
-      active: false,
-      mode: :binary,
-      packet: :raw,
+    Ace.HTTP2.start_link(
+      {HelloHTTP2.WWW, :conf},
+      8443,
       certfile: certfile,
       keyfile: keyfile,
-      reuseaddr: true,
-      alpn_preferred_protocols: ["h2", "http/1.1"]
-    ]
-
-    {:ok, listen_socket} = :ssl.listen(8443, options)
-    children = [
-      worker(HelloHTTP2.WWW, [:conf], restart: :transient)
-    ]
-
-    {:ok, sup_pid} = Supervisor.start_link(children, strategy: :simple_one_for_one)
-
-    children = [
-      supervisor(Ace.HTTP2, [listen_socket, sup_pid])
-    ]
-
-    opts = [strategy: :one_for_one, name: HelloHTTP2.Supervisor]
-    Supervisor.start_link(children, opts)
+      connections: 3
+    )
   end
 end
