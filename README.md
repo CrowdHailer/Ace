@@ -1,5 +1,3 @@
-## For work on HTTP/2.0 support checkout branch [http2](https://github.com/CrowdHailer/Ace/tree/http2)
-
 # Ace
 
 **HTTP/2 server for elixir**
