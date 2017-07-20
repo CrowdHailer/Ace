@@ -6,28 +6,10 @@ defmodule Ace.HTTP2.ServerSettingsTest do
   }
 
   setup do
-    certfile =  Path.expand("../../ace/tls/cert.pem", __DIR__)
-    keyfile =  Path.expand("../../ace/tls/key.pem", __DIR__)
-    options = [
-      active: false,
-      mode: :binary,
-      packet: :raw,
-      certfile: certfile,
-      keyfile: keyfile,
-      reuseaddr: true,
-      alpn_preferred_protocols: ["h2", "http/1.1"]
-    ]
-    {:ok, listen_socket} = :ssl.listen(0, options)
-    {:ok, _server} = Ace.HTTP2.start_link(listen_socket, {__MODULE__, %{test_pid: self()}})
-    {:ok, {_, port}} = :ssl.sockname(listen_socket)
-    {:ok, connection} = :ssl.connect('localhost', port, [
-      mode: :binary,
-      packet: :raw,
-      active: :false,
-      alpn_advertised_protocols: ["h2"]])
-      :ssl.negotiated_protocol(connection)
+    {_server, port} = Support.start_server(self())
+    connection = Support.open_connection(port)
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)

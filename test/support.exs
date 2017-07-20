@@ -38,7 +38,7 @@ defmodule Support do
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
     {:ok, listen_socket} = :ssl.listen(port, options)
-    {:ok, server} = Ace.HTTP2.start_link(listen_socket, stream_supervisor)
+    {:ok, server} = Ace.HTTP2.Connection.start_link(listen_socket, stream_supervisor)
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {server, port}
   end

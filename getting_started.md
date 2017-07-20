@@ -46,7 +46,7 @@ defmodule MyApp do
     certfile =  Path.expand("ace/tls/certificate.pem", __DIR__)
     keyfile =  Path.expand("ace/tls/certfile_key.pem", __DIR__)
     tls_options = [certfile: certfile, keyfile: keyfile]
-    Ace.HTTP2.start_link(app, port, tls: tls_options, connections: 100)
+    Ace.HTTP2.Connection.start_link(app, port, tls: tls_options, connections: 100)
   end
 end
 ```

@@ -9,7 +9,7 @@ defmodule Ace.HTTP2RoutingTest do
     {_server, port} = Support.start_server(self())
     connection = Support.open_connection(port)
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)

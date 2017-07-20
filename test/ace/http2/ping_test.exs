@@ -5,7 +5,7 @@ defmodule Ace.HTTP2PingTest do
     {_server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
     connection = Support.open_connection(port)
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)

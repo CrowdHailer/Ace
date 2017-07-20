@@ -67,6 +67,10 @@ defmodule Ace.HTTP2.Frame.Settings do
     data = Map.put(data, :max_frame_size, value)
     parse_settings(rest, data)
   end
+  def parse_settings(<<_::16, _value::32, rest::binary>>, data) do
+    IO.inspect("TODO more settings")
+    parse_settings(rest, data)
+  end
 
   def setting_parameter(:header_table_size, value) do
     <<1::16, value::32>>

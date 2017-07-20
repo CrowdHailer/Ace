@@ -23,7 +23,7 @@ defmodule Ace.HTTP2SetupTest do
   test "client must first send settings frame", %{client: connection} do
     assert {:ok, Frame.Settings.new()} == Support.read_next(connection)
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Frame.Ping.new(<<0::64>>) |> Frame.Ping.serialize(),
     ]
     :ssl.send(connection, payload)
@@ -32,7 +32,7 @@ defmodule Ace.HTTP2SetupTest do
 
   test "empty settings are acked", %{client: connection} do
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
@@ -42,7 +42,7 @@ defmodule Ace.HTTP2SetupTest do
 
   test "sending settings", %{client: connection} do
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Frame.Settings.new(header_table_size: 200) |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
@@ -52,7 +52,7 @@ defmodule Ace.HTTP2SetupTest do
 
   test "send window update", %{client: connection} do
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)

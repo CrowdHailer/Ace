@@ -22,7 +22,8 @@ defmodule Ace.HTTP2.Frame.Headers do
 
     header_block_fragment = if priority == 1 do
       IO.inspect("Ignoring priority")
-      <<0::1, _d_stream_id::31, _weight::8, header_block_fragment::binary>> = data
+      <<exclusive::1, _d_stream_id::31, _weight::8, header_block_fragment::binary>> = data
+      IO.inspect(exclusive)
       header_block_fragment
     else
       data

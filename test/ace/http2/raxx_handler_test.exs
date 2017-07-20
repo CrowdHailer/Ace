@@ -1,4 +1,4 @@
-defmodule Ace.HTTP2.StreamTest do
+defmodule Ace.HTTP2.RaxxHandlerTest do
   use ExUnit.Case
 
   alias Ace.HTTP2.{
@@ -13,7 +13,7 @@ defmodule Ace.HTTP2.StreamTest do
     {_server, port} = Support.start_server(stream_supervisor)
     connection = Support.open_connection(port)
     payload = [
-      Ace.HTTP2.preface(),
+      Ace.HTTP2.Connection.preface(),
       Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)

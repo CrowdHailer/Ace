@@ -1,4 +1,4 @@
-defmodule Ace.HTTP2 do
+defmodule Ace.HTTP2.Connection do
   @moduledoc """
   **Hypertext Transfer Protocol Version 2 (HTTP/2)**
 
@@ -103,15 +103,8 @@ defmodule Ace.HTTP2 do
   def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
     # Map or array to map, best receive a list and response takes care of ordering
     headers = for h <- headers, do: h
-    IO.inspect(headers)
     header_block = HPack.encode(headers, state.encode_context)
-    IO.inspect(header_block)
-    HPack.decode(header_block, state.encode_context)
-    |> IO.inspect
     header_frame = Frame.Headers.new(id, header_block, true, end_stream)
-    |> IO.inspect
-    # Frame.decode(header_frame)
-    # |> IO.inspect
     {[header_frame], state}
   end
   def stream_set_dispatch(id, %{data: data, end_stream: end_stream}, state) do
