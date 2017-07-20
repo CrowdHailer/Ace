@@ -113,7 +113,7 @@ defmodule Ace.HTTP2.StreamTest do
     GenServer.reply(from, {:ok, Raxx.Response.forbidden()})
 
     assert {:ok, %Frame.Headers{end_stream: true, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
-    assert [{":state", "403"}] = HPack.decode(header_block, decode_table)
+    assert [{":status", "403"}] = HPack.decode(header_block, decode_table)
   end
 
   test "other headers are sent", %{client: connection} do
@@ -128,7 +128,7 @@ defmodule Ace.HTTP2.StreamTest do
     GenServer.reply(from, {:ok, Raxx.Response.ok([{"server", "Ace"}])})
 
     assert {:ok, %Frame.Headers{end_stream: true, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
-    assert [{":state", "200"}, {"server", "Ace"}] = HPack.decode(header_block, decode_table)
+    assert [{":status", "200"}, {"server", "Ace"}] = HPack.decode(header_block, decode_table)
 
   end
 
@@ -144,7 +144,7 @@ defmodule Ace.HTTP2.StreamTest do
     GenServer.reply(from, {:ok, Raxx.Response.ok("Hello, World!")})
 
     assert {:ok, %Frame.Headers{end_stream: false, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
-    assert [{":state", "200"}] = HPack.decode(header_block, decode_table)
+    assert [{":status", "200"}] = HPack.decode(header_block, decode_table)
     assert {:ok, %Frame.Data{end_stream: true, data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 

@@ -1,5 +1,13 @@
 defmodule Ace.HTTP2.Stream.RaxxHandler do
   use GenServer
+  defmacro __using__(_opts) do
+    quote do
+      use GenServer
+      def start_link(config) do
+        GenServer.start_link(unquote(__MODULE__), {:waiting, {__MODULE__, config}})
+      end
+    end
+  end
 
   def start_link(mod, config) do
     GenServer.start_link(__MODULE__, {:waiting, {mod, config}})
@@ -21,7 +29,7 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
   def handle_request(request, app, stream, true) do
     response = dispatch_request(request, app)
     # IO.inspect(response)
-    headers = [{":state", "#{response.status}"} | response.headers]
+    headers = [{":status", "#{response.status}"} | response.headers]
     preface = %{
       headers: headers,
       end_stream: response.body == ""

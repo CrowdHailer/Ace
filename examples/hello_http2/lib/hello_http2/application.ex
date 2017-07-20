@@ -21,7 +21,7 @@ defmodule HelloHTTP2.Application do
 
     {:ok, listen_socket} = :ssl.listen(8443, options)
     children = [
-      worker(HelloHTTP2.StreamHandler, [:conf], restart: :transient)
+      worker(HelloHTTP2.WWW, [:conf], restart: :transient)
     ]
 
     {:ok, sup_pid} = Supervisor.start_link(children, strategy: :simple_one_for_one)
