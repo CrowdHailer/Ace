@@ -8,7 +8,7 @@
 ## Features
 
 - Stream isolation; one process per stream
-- Bidirectional streaming; stream data too and from clients
+- Bidirectional streaming; stream data to and from clients
 - TLS(SSL) support via ALPN; data encrypted in transit
 - [Raxx](https://github.com/crowdhailer/raxx) interface; simplicitfy for request/response interactions
 
