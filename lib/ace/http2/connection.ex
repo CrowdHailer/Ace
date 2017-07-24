@@ -88,6 +88,9 @@ defmodule Ace.HTTP2.Connection do
         {:stop, :normal, state}
     end
   end
+  def handle_info({:ssl_closed, _socket}, state) do
+    {:stop, :normal, state}
+  end
   def handle_info({{:stream, stream_id, _ref}, message}, state) do
     {frames, state} = stream_set_dispatch(stream_id, message, state)
     outbound = Enum.map(frames, &Frame.serialize/1)

@@ -19,3 +19,17 @@
 - **[Getting started](getting_started.md)**
 
 *For TCP/TLS server see [previous version](https://github.com/CrowdHailer/Ace/tree/0.9.1).*
+
+## Testing
+
+Run [h2spec](https://github.com/summerwind/h2spec) against the example `hello_http2` application.
+
+1. Start the example app.
+  ```
+  cd examples/hello_http2
+  iex -S mix
+  ```
+2. Run h2spec from docker
+  ```
+  sudo docker run --net="host" summerwind/h2spec  --port 8443 -t -k
+  ```

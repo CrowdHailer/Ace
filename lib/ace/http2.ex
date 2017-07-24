@@ -35,6 +35,6 @@ defmodule Ace.HTTP2 do
     children = [
       worker(Ace.HTTP2.Connection, [listen_socket, app], restart: :transient)
     ]
-    supervise(children, strategy: :simple_one_for_one)
+    supervise(children, strategy: :simple_one_for_one, max_restarts: 1_000)
   end
 end
