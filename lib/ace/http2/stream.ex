@@ -41,6 +41,15 @@ defmodule Ace.HTTP2.Stream do
     forward(stream, message)
     {:ok, {[], stream}}
   end
+  def consume(stream = %{status: :open}, message = %{headers: _, end_stream: end_stream}) do
+    stream = if end_stream do
+      %{stream | status: :closed_remote}
+    else
+      stream
+    end
+    forward(stream, message)
+    {:ok, {[], stream}}
+  end
 
   def consume(stream = %{status: :closed_remote}, %{headers: _}) do
     rst_frame = Frame.RstStream.new(stream.stream_id, :stream_closed)

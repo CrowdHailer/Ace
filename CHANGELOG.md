@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [next]()
 
-## Added
+## Changed
+- Creating priority frame requires exclusive value
+
+## Fixed
 - Graceful handling of closed connections
+- Correctly keep state for multiple connection frames
+- Discard trailers sent to Raxx handler
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

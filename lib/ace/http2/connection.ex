@@ -229,7 +229,7 @@ defmodule Ace.HTTP2.Connection do
           {:error, reason}
       end
     else
-      {[], %{state | next: {:continuation, frame.stream_id, buffer}}}
+      {[], %{state | next: {:continuation, frame.stream_id, buffer, end_stream}}}
     end
   end
   def consume_frame(frame = %Frame.Data{}, state) do

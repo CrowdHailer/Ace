@@ -13,7 +13,7 @@ defmodule HelloHTTP2.Application do
       8443,
       certfile: certfile,
       keyfile: keyfile,
-      connections: 3
+      connections: 1_000
     )
   end
 end
