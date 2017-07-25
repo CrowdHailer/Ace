@@ -20,8 +20,12 @@ defmodule Ace.HTTP2.Frame.Settings do
   end
 
   def decode({4, <<_::7, 0::1>>, 0, payload}) do
-    {:ok, settings} = parse_settings(payload)
-    {:ok, new(settings)}
+    case parse_settings(payload) do
+      {:ok, settings} ->
+        {:ok, new(settings)}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
   def decode({4, <<_::7, 1::1>>, 0, ""}) do
     {:ok, %__MODULE__{ack: true}}
@@ -49,27 +53,53 @@ defmodule Ace.HTTP2.Frame.Settings do
     <<0::24, type::8, 1::8, 0::1, 0::31>>
   end
 
-  def parse_settings(binary, data \\ %{})
-  # <<identifier::16, value::32, rest::bitstring>> = bin
-  # setting_parameter(identifier, value)
-  def parse_settings(<<>>, data) do
-    {:ok, data}
+  def parse_settings(binary, settings \\ %{})
+  def parse_settings(<<>>, settings) do
+    {:ok, settings}
   end
-  def parse_settings(<<1::16, value::32, rest::binary>>, data) do
-    data = Map.put(data, :header_table_size, value)
-    parse_settings(rest, data)
+  def parse_settings(<<identifier::16, value::32, rest::binary>>, settings) do
+    case cast_setting(identifier, value) do
+      {:ok, {:unknown_setting, _value}} ->
+        {:ok, settings}
+      {:ok, {setting, value}} ->
+        settings = Map.put(settings, setting, value)
+        parse_settings(rest, settings)
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
-  def parse_settings(<<4::16, value::32, rest::binary>>, data) do
-    data = Map.put(data, :initial_window_size, value)
-    parse_settings(rest, data)
+  def cast_setting(1, value) do
+    {:ok, {:header_table_size, value}}
   end
-  def parse_settings(<<5::16, value::32, rest::binary>>, data) do
-    data = Map.put(data, :max_frame_size, value)
-    parse_settings(rest, data)
+  def cast_setting(2, 0) do
+    {:ok, {:enable_push, false}}
   end
-  def parse_settings(<<_::16, _value::32, rest::binary>>, data) do
-    IO.inspect("TODO more settings")
-    parse_settings(rest, data)
+  def cast_setting(2, 1) do
+    {:ok, {:enable_push, true}}
+  end
+  def cast_setting(2, _) do
+    {:error, {:protocol_error, "invalid value for enable_push setting"}}
+  end
+  def cast_setting(3, value) do
+    {:ok, {:max_concurrent_streams, value}}
+  end
+  def cast_setting(4, value) when value <= 2_147_483_647 do
+    {:ok, {:initial_window_size, value}}
+  end
+  def cast_setting(4, _value) do
+    {:error, {:protocol_error, "invalid value for initial_window_size setting"}}
+  end
+  def cast_setting(5, value) when value <= 16_777_215 do
+    {:ok, {:max_frame_size, value}}
+  end
+  def cast_setting(5, _value) do
+    {:error, {:protocol_error, "invalid value for max_frame_size setting"}}
+  end
+  def cast_setting(6, value) do
+    {:ok, {:max_header_list_size, value}}
+  end
+  def cast_setting(identifier, value) when identifier > 6 do
+    {:ok, {:unknown_setting, value}}
   end
 
   def setting_parameter(:header_table_size, value) do

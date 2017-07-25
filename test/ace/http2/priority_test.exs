@@ -21,7 +21,7 @@ defmodule Ace.HTTP2.PriorityTest do
   alias Ace.HTTP2.Frame
 
   test "priority frame is logged", %{client: connection} do
-    priority_frame = Frame.Priority.new(0, 0, 0, false)
+    priority_frame = Frame.Priority.new(1, 0, 0, false)
     :ssl.send(connection, Frame.Priority.serialize(priority_frame) |> IO.inspect)
     assert {:error, :timeout} = Support.read_next(connection, 2_000)
   end

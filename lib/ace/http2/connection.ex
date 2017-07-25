@@ -259,6 +259,7 @@ defmodule Ace.HTTP2.Connection do
     {:error, {:protocol_error, "Unexpected frame"}}
   end
 
+  # TODO handle all settings
   def update_settings(new, state) do
     case new.max_frame_size do
       nil ->
