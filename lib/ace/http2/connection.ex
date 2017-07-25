@@ -169,7 +169,7 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(frame = %Frame.Ping{ack: false}, state = %{next: :any}) do
     {[Frame.Ping.ack(frame)], state}
   end
-  def consume_frame(frame = %Frame.Ping{ack: true}, state = %{next: :any}) do
+  def consume_frame(%Frame.Ping{ack: true}, state = %{next: :any}) do
     {[], state}
   end
   def consume_frame(%Frame.GoAway{error: :no_error}, _state = %{next: :any}) do

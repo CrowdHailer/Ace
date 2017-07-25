@@ -6,14 +6,25 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [next]()
 
+## Added
+- Casting for accepted values for each known setting.
+
 ## Changed
-- Creating priority frame requires exclusive value
+- Creating priority frame requires exclusive value.
 
 ## Fixed
-- Graceful handling of closed connections
-- Correctly keep state for multiple connection frames
-- Discard trailers sent to Raxx handler
-- Frames of unknown type are discarded
+- Graceful handling of closed connections.
+- Correctly keep state for multiple connection frames.
+- Discard trailers sent to Raxx handler.
+- Frames of unknown type are discarded.
+- Ignores unknown flags for each frame type.
+- Ignores value of reserved bit in frame head.
+- Ensure only continuation frames can be sent after end_headers is false.
+- Return protocol error for invalid priority frame.
+- Return protocol error for invalid rst_stream frame.
+- Recognise reseting idle stream as a protocol error.
+- Decoding of acked ping frame.
+- Correct error codes for invalid window updates.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 
