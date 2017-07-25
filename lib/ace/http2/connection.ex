@@ -199,12 +199,15 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(%Frame.PushPromise{}, _state = %{next: :any}) do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
   end
-  def consume_frame(%Frame.RstStream{}, state = %{next: :any}) do
-    IO.inspect("Ignoring rst_stream frame")
-    {[], state}
+  def consume_frame(frame = %Frame.RstStream{}, state = %{next: :any}) do
+    case dispatch(frame.stream_id, :reset, state) do
+      {:ok, {outbound, state}} ->
+        {outbound, state}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
   def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
-    # TODO pass through end stream flag
     if frame.end_headers do
       headers = HPack.decode(frame.header_block_fragment, state.decode_context)
       # preface bad name as could be trailers perhaps metadata

@@ -28,6 +28,9 @@ defmodule Ace.HTTP2.Stream do
     forward(stream, message)
     {:ok, {[], %{stream | status: status}}}
   end
+  def consume(%{status: :idle}, :reset) do
+    {:error, {:protocol_error, "RstStream frame received on a stream in idle state. (RFC7540 5.1)"}}
+  end
   def consume(%{status: :idle}, %{data: _}) do
     {:error, {:protocol_error, "DATA frame received on a stream in idle state. (RFC7540 5.1)"}}
   end
