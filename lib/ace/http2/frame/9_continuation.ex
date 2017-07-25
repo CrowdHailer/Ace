@@ -10,11 +10,11 @@ defmodule Ace.HTTP2.Frame.Continuation do
     }
   end
 
-  def decode({9, flags, stream_id, hbf}) do
-    end_headers = case flags do
-      <<4>> ->
+  def decode({9, <<_::5, end_headers_flag::1, _::2>>, stream_id, hbf}) do
+    end_headers = case end_headers_flag do
+      1 ->
         true
-      <<0>> ->
+      0 ->
         false
     end
     {:ok, new(stream_id, hbf, end_headers)}

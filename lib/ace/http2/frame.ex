@@ -42,7 +42,7 @@ defmodule Ace.HTTP2.Frame do
       length::24,
       type::8,
       flags::bits-size(8),
-      0::1,
+      _::1,
       stream_id::31,
       payload::binary-size(length),
       rest::binary
@@ -65,6 +65,7 @@ defmodule Ace.HTTP2.Frame do
   def decode(frame = {@go_away, _, _, _}), do: __MODULE__.GoAway.decode(frame)
   def decode(frame = {@window_update, _, _, _}), do: __MODULE__.WindowUpdate.decode(frame)
   def decode(frame = {@continuation, _, _, _}), do: __MODULE__.Continuation.decode(frame)
+  def decode({type, _, _, _}), do: {:error, {:unknown_frame_type, type}}
 
   def serialize(frame = %__MODULE__.Data{}), do: __MODULE__.Data.serialize(frame)
   def serialize(frame = %__MODULE__.Headers{}), do: __MODULE__.Headers.serialize(frame)

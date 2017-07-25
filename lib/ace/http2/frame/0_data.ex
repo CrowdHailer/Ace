@@ -31,7 +31,7 @@ defmodule Ace.HTTP2.Frame.Data do
     {data, end_stream}
   end
 
-  def parse_flags(<<0::4, padded_flag::1, 0::2, end_stream_flag::1>>) do
+  def parse_flags(<<_::4, padded_flag::1, _::2, end_stream_flag::1>>) do
     %{
       end_stream: end_stream_flag == 1,
       padded: padded_flag == 1

@@ -6,7 +6,7 @@ defmodule Ace.HTTP2.Frame.GoAway do
     %__MODULE__{last_stream_id: last_stream_id, error: error, debug: debug}
   end
 
-  def decode({7, <<0>>, 0, <<0::1, last_stream_id::31, error_code::32, debug::binary>>}) do
+  def decode({7, _flags, 0, <<0::1, last_stream_id::31, error_code::32, debug::binary>>}) do
     error = error(error_code)
     {:ok, new(last_stream_id, error, debug)}
   end

@@ -138,6 +138,8 @@ defmodule Ace.HTTP2.Connection do
                 {:error, reason} ->
                   {:error, reason}
               end
+            {:error, {:unknown_frame_type, _type}} ->
+              consume(unprocessed, state)
             {:error, reason} ->
               {:error, reason}
           end

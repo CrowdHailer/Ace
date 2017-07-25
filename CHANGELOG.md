@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Graceful handling of closed connections
 - Correctly keep state for multiple connection frames
 - Discard trailers sent to Raxx handler
+- Frames of unknown type are discarded
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

@@ -13,15 +13,15 @@ defmodule Ace.HTTP2.Frame.Ping do
     new(identifier, true)
   end
 
-  def decode({@type_id, flags, 0, identifier}) when bit_size(identifier) == 64 do
-    ack = case flags do
-      <<0>> ->
+  def decode({@type_id, <<_::7, ack_flag::1>>, 0, identifier}) when bit_size(identifier) == 64 do
+    ack = case ack_flag do
+      0 ->
         false
-      <<1>> ->
+      1 ->
         true
     end
 
-    {:ok, new(identifier, ack) |> IO.inspect}
+    {:ok, new(identifier, ack)}
   end
   def decode({@type_id, _flags, 0, _identifier}) do
     {:error, {:frame_size_error, "Ping identifier must be 64 bits"}}

@@ -11,7 +11,7 @@ defmodule Ace.HTTP2.Frame.Priority do
     }
   end
 
-  def decode({2, <<0>>, stream_id, <<exclusive::1, stream_dependency::31, weight::8>>}) do
+  def decode({2, _flags, stream_id, <<exclusive::1, stream_dependency::31, weight::8>>}) do
     exclusive = exclusive == 1
     {:ok, new(stream_id, stream_dependency, weight, exclusive)}
   end

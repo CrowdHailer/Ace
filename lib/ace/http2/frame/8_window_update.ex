@@ -8,7 +8,7 @@ defmodule Ace.HTTP2.Frame.WindowUpdate do
     %__MODULE__{stream_id: stream_id, increment: increment}
   end
 
-  def decode({8, <<0>>, stream_id, <<0::1, increment::31>>}) do
+  def decode({8, _flags, stream_id, <<0::1, increment::31>>}) do
     {:ok, new(stream_id, increment)}
   end
 

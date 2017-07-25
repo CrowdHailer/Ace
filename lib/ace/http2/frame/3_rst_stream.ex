@@ -6,7 +6,7 @@ defmodule Ace.HTTP2.Frame.RstStream do
     %__MODULE__{stream_id: stream_id, error: error}
   end
 
-  def decode({3, <<0>>, stream_id, <<error_code::32>>}) do
+  def decode({3, _flags, stream_id, <<error_code::32>>}) do
     error = Ace.HTTP2.Frame.GoAway.error(error_code)
     {:ok, new(stream_id, error)}
   end

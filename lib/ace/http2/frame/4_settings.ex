@@ -19,11 +19,11 @@ defmodule Ace.HTTP2.Frame.Settings do
     %__MODULE__{ack: true}
   end
 
-  def decode({4, <<0>>, 0, payload}) do
+  def decode({4, <<_::7, 0::1>>, 0, payload}) do
     {:ok, settings} = parse_settings(payload)
     {:ok, new(settings)}
   end
-  def decode({4, <<1>>, 0, ""}) do
+  def decode({4, <<_::7, 1::1>>, 0, ""}) do
     {:ok, %__MODULE__{ack: true}}
   end
 
