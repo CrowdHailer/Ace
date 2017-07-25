@@ -26,6 +26,9 @@ defmodule Ace.HTTP2.Frame.Ping do
   def decode({@type_id, _flags, 0, _identifier}) do
     {:error, {:frame_size_error, "Ping identifier must be 64 bits"}}
   end
+  def decode({@type_id, _flags, _stream_id, _identifier}) do
+    {:error, {:protocol_error, "Ping must be for stream 0"}}
+  end
 
   def serialize(%__MODULE__{identifier: identifier, ack: ack}) do
     flags = if ack, do: <<1>>, else: <<0>>
