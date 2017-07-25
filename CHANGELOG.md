@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Recognise reseting idle stream as a protocol error.
 - Decoding of acked ping frame.
 - Correct error codes for invalid window updates.
+- Handle unknown error code from client.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

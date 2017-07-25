@@ -52,5 +52,6 @@ defmodule Ace.HTTP2.Frame.GoAway do
   def error(0xb), do: :enhance_your_calm
   def error(0xc), do: :inadequate_security
   def error(0xd), do: :http_1_1_required
+  def error(_), do: :unknown_error_code
 
 end
