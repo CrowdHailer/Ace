@@ -11,9 +11,15 @@ defmodule Ace.HTTP2.Frame.Priority do
     }
   end
 
-  def decode({2, _flags, stream_id, <<exclusive::1, stream_dependency::31, weight::8>>}) do
+  def decode({2, _flags, stream_id, <<exclusive::1, stream_dependency::31, weight::8>>}) when stream_id > 0 do
     exclusive = exclusive == 1
     {:ok, new(stream_id, stream_dependency, weight, exclusive)}
+  end
+  def decode({2, _flags, 0, <<_::40>>}) do
+    {:error, {:protocol_error, "Priority frame not valid on stream 0"}}
+  end
+  def decode({2, _flags, _stream_id, _payload}) do
+    {:error, {:protocol_error, "Priority frame invalid payload length"}}
   end
 
   def serialize(frame) do

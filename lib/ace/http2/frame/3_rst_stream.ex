@@ -6,9 +6,15 @@ defmodule Ace.HTTP2.Frame.RstStream do
     %__MODULE__{stream_id: stream_id, error: error}
   end
 
-  def decode({3, _flags, stream_id, <<error_code::32>>}) do
+  def decode({3, _flags, stream_id, <<error_code::32>>}) when stream_id > 0 do
     error = Ace.HTTP2.Frame.GoAway.error(error_code)
     {:ok, new(stream_id, error)}
+  end
+  def decode({3, _flags, 0, <<_::32>>}) do
+    {:error, {:protocol_error, "RstStream frame not valid on stream 0"}}
+  end
+  def decode({3, _flags, _stream_id, _payload}) do
+    {:error, {:protocol_error, "RstStream frame invalid payload length"}}
   end
 
   def serialize(frame) do
