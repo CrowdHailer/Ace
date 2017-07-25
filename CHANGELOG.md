@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Decoding of acked ping frame.
 - Correct error codes for invalid window updates.
 - Handle unknown error code from client.
+- Limit pseudo-headers to those defined in RFC7540.
+- All pseudo-headers must be sent before other headers.
+- Header keys must be lowercase.
+- Pseudo header values cannot be empty.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

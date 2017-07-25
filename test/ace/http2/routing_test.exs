@@ -109,7 +109,7 @@ defmodule Ace.HTTP2RoutingTest do
 
     {:ok, encode_table} = HPack.Table.start_link(1_000)
     {:ok, decode_table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
+    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}, {":authority", "example.com"}], encode_table)
 
     size = :erlang.iolist_size(body)
 
