@@ -33,9 +33,9 @@ defmodule Ace.HTTP2.Frame do
   Read the next available frame.
   """
   def parse_from_buffer(<<length::24, _::binary>>, max_length: max_length)
-  when length >= max_length
+  when length > max_length
   do
-    {:error, {:frame_size_error, "Frame greater than max allowed: (#{max_length})"}}
+    {:error, {:frame_size_error, "Frame greater than max allowed: (#{length} >= #{max_length})"}}
   end
   def parse_from_buffer(
     <<
@@ -47,7 +47,7 @@ defmodule Ace.HTTP2.Frame do
       payload::binary-size(length),
       rest::binary
     >>, max_length: max_length)
-    when length < max_length
+    when length <= max_length
   do
     {:ok, {{type, flags, stream_id, payload}, rest}}
   end

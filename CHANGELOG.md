@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - All pseudo-headers must be sent before other headers.
 - Header keys must be lowercase.
 - Pseudo header values cannot be empty.
+- Fix off by one error for maximum size of frames.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

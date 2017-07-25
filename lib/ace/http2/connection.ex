@@ -82,6 +82,7 @@ defmodule Ace.HTTP2.Connection do
       {:ok, state} ->
         {:noreply, state}
       {:error, {error, debug}} ->
+        Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(0, error, debug)
         outbound = Frame.GoAway.serialize(frame)
         :ok = :ssl.send(state.socket, outbound)
@@ -127,10 +128,11 @@ defmodule Ace.HTTP2.Connection do
   def consume(buffer, state) do
     case Frame.parse_from_buffer(buffer, max_length: 16_384) do
       {:ok, {raw_frame, unprocessed}} ->
+
         if raw_frame do
           case Frame.decode(raw_frame) do
             {:ok, frame} ->
-              Logger.debug(inspect(frame))
+              Logger.debug("UP: #{inspect(frame)}")
               case consume_frame(frame, state) do
                 {outbound, state} when is_list(outbound) ->
                   outbound = Enum.map(outbound, &Frame.serialize/1)
