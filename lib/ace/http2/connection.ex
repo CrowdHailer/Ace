@@ -25,7 +25,7 @@ defmodule Ace.HTTP2.Connection do
   end
 
   defstruct [
-    # next: :preface, :settings, :continuation, :any
+    # next: :preface, :handshake, :any, :continuation,
     next: :any,
     peer: :server,
     buffer: "",
@@ -72,6 +72,7 @@ defmodule Ace.HTTP2.Connection do
     {:noreply, {:pending, initial_state}}
   end
   def handle_info({:ssl, connection, @preface <> data}, {:pending, state}) do
+    state = %{state | next: :handshake}
     handle_info({:ssl, connection, data}, state)
   end
   def handle_info({:ssl, _, data}, state = %__MODULE__{}) do
@@ -153,36 +154,37 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
-  def consume_frame(settings = %Frame.Settings{ack: false}, state = %{settings: nil}) do
+  def consume_frame(settings = %Frame.Settings{ack: false}, state = %{settings: nil, next: :handshake}) do
     case update_settings(settings, %{state | settings: @default_settings}) do
       {:ok, new_state} ->
+        new_state = %{new_state | next: :any}
         {[Frame.Settings.ack()], new_state}
       {:error, reason} ->
         {:error, reason}
     end
   end
-  def consume_frame(_, %{settings: nil}) do
+  def consume_frame(_, %{settings: nil, next: :handshake}) do
     {:error, {:protocol_error, "Did not receive settings frame"}}
   end
-  def consume_frame(frame = %Frame.Ping{}, state) do
+  def consume_frame(frame = %Frame.Ping{}, state = %{next: :any}) do
     {[Frame.Ping.ack(frame)], state}
   end
-  def consume_frame(%Frame.GoAway{error: :no_error}, _state) do
+  def consume_frame(%Frame.GoAway{error: :no_error}, _state = %{next: :any}) do
     {:error, {:no_error, "Client closed connection"}}
   end
-  def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state) do
+  def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state = %{next: :any}) do
     IO.inspect("total window update")
     {[], state}
   end
-  def consume_frame(%Frame.WindowUpdate{stream_id: _}, state) do
+  def consume_frame(%Frame.WindowUpdate{stream_id: _}, state = %{next: :any}) do
     IO.inspect("Stream window update")
     {[], state}
   end
-  def consume_frame(%Frame.Priority{}, state) do
+  def consume_frame(%Frame.Priority{}, state = %{next: :any}) do
     IO.inspect("Ignoring priority frame")
     {[], state}
   end
-  def consume_frame(settings = %Frame.Settings{}, state) do
+  def consume_frame(settings = %Frame.Settings{}, state = %{next: :any}) do
     if settings.ack do
       {[], state}
     else
@@ -194,14 +196,14 @@ defmodule Ace.HTTP2.Connection do
       end
     end
   end
-  def consume_frame(%Frame.PushPromise{}, _state) do
+  def consume_frame(%Frame.PushPromise{}, _state = %{next: :any}) do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
   end
-  def consume_frame(%Frame.RstStream{}, state) do
+  def consume_frame(%Frame.RstStream{}, state = %{next: :any}) do
     IO.inspect("Ignoring rst_stream frame")
     {[], state}
   end
-  def consume_frame(frame = %Frame.Headers{}, state) do
+  def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
     # TODO pass through end stream flag
     if frame.end_headers do
       headers = HPack.decode(frame.header_block_fragment, state.decode_context)
@@ -225,8 +227,8 @@ defmodule Ace.HTTP2.Connection do
       preface = %{headers: headers, end_stream: end_stream}
       case dispatch(frame.stream_id, preface, state) do
         {:ok, {outbound, state}} ->
+          state = %{state | next: :any}
           {outbound, state}
-
         {:error, reason} ->
           {:error, reason}
       end
@@ -234,7 +236,7 @@ defmodule Ace.HTTP2.Connection do
       {[], %{state | next: {:continuation, frame.stream_id, buffer, end_stream}}}
     end
   end
-  def consume_frame(frame = %Frame.Data{}, state) do
+  def consume_frame(frame = %Frame.Data{}, state = %{next: :any}) do
     # https://tools.ietf.org/html/rfc7540#section-5.2.2
 
     # Deployments that do not require this capability can advertise a flow-
@@ -248,6 +250,10 @@ defmodule Ace.HTTP2.Connection do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+  def consume_frame(frame, %{next: next}) do
+    IO.inspect("expected next '#{inspect(next)}' got: #{inspect(frame)}")
+    {:error, {:protocol_error, "Unexpected frame"}}
   end
 
   def update_settings(new, state) do
