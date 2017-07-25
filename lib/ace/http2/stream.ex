@@ -150,6 +150,10 @@ defmodule Ace.HTTP2.Stream do
     end
 
   end
+  def consume(stream = %{status: :open}, {:window_update, _}) do
+    # TODO flow control
+    {:ok, {[], stream}}
+  end
   def consume(stream = %{status: :open}, :reset) do
     # TODO reset stream
     {:ok, {[], %{stream | status: :closed}}}
@@ -161,10 +165,18 @@ defmodule Ace.HTTP2.Stream do
   def consume(%{status: :closed_remote}, %{data: _}) do
     {:error, {:stream_closed, "Data received on closed stream"}}
   end
-  def consume(stream = %{status: :closed}, %{headers: _}) do
+  def consume(stream = %{status: :closed_remote}, {:window_update, _}) do
+    # TODO flow control
+    {:ok, {[], stream}}
+  end
+  def consume(stream = %{status: :closed_remote}, :reset) do
+    # TODO flow control
+    {:ok, {[], %{stream | status: :closed}}}
+  end
+  def consume(%{status: :closed}, %{headers: _}) do
     {:error, {:protocol_error, "headers received on closed stream"}}
   end
-  def consume(stream = %{status: :closed}, %{data: _}) do
+  def consume(%{status: :closed}, %{data: _}) do
     {:error, {:protocol_error, "Data received on closed stream"}}
   end
 
