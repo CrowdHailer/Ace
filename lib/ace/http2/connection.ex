@@ -141,8 +141,14 @@ defmodule Ace.HTTP2.Connection do
                 {:error, reason} ->
                   {:error, reason}
               end
-            {:error, {:unknown_frame_type, _type}} ->
-              consume(unprocessed, state)
+            {:error, {:unknown_frame_type, type}} ->
+              case state.next do
+                :any ->
+                  Logger.debug("Dropping unknown frame type (#{type})")
+                  consume(unprocessed, state)
+                {:continuation, _stream_id, _header_block_fragment, _end_stream} ->
+                  {:error, {:protocol_error, "Unknown frame interupted continuation"}}
+              end
             {:error, reason} ->
               {:error, reason}
           end
