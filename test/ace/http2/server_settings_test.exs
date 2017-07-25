@@ -32,7 +32,7 @@ defmodule Ace.HTTP2.ServerSettingsTest do
     :ok = Support.send_frame(connection, frame)
 
     assert {:ok, frame = %Frame.GoAway{}} = Support.read_next(connection)
-    assert "Frame greater than max allowed: (16384)" = frame.debug
+    assert "Frame greater than max allowed: (16385 >= 16384)" = frame.debug
     assert :frame_size_error = frame.error
   end
 

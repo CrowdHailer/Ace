@@ -181,9 +181,13 @@ defmodule Ace.HTTP2.Connection do
     IO.inspect("total window update")
     {[], state}
   end
-  def consume_frame(%Frame.WindowUpdate{stream_id: _}, state = %{next: :any}) do
-    IO.inspect("Stream window update")
-    {[], state}
+  def consume_frame(frame = %Frame.WindowUpdate{stream_id: _}, state = %{next: :any}) do
+    case dispatch(frame.stream_id, {:window_update, frame.increment}, state) do
+      {:ok, {outbound, state}} ->
+        {outbound, state}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
   def consume_frame(%Frame.Priority{}, state = %{next: :any}) do
     IO.inspect("Ignoring priority frame")

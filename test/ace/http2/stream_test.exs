@@ -65,7 +65,7 @@ defmodule Ace.HTTP2.StreamTest do
     GenServer.reply(from, {:ok, self()})
 
     Support.send_frame(connection, headers_frame)
-    assert {:ok, %Frame.RstStream{error: :stream_closed, stream_id: 1}} = Support.read_next(connection, 2_000)
+    assert {:ok, %Frame.GoAway{error: :stream_closed}} = Support.read_next(connection, 2_000)
   end
 
   test "cannot send data after frame with end stream", %{client: connection} do
@@ -85,7 +85,7 @@ defmodule Ace.HTTP2.StreamTest do
 
     data_frame = Frame.Data.new(1, "hi", true)
     Support.send_frame(connection, data_frame)
-    assert {:ok, %Frame.RstStream{error: :stream_closed, stream_id: 1}} = Support.read_next(connection, 2_000)
+    assert {:ok, %Frame.GoAway{error: :stream_closed}} = Support.read_next(connection, 2_000)
   end
 
   test "cannot start a stream with data frame", %{client: connection} do

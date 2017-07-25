@@ -121,6 +121,9 @@ defmodule Ace.HTTP2.Stream do
   def consume(%{status: :idle}, %{data: _}) do
     {:error, {:protocol_error, "DATA frame received on a stream in idle state. (RFC7540 5.1)"}}
   end
+  def consume(%{status: :idle}, {:window_update, _}) do
+    {:error, {:protocol_error, "WindowUpdate frame received on a stream in idle state. (RFC7540 5.1)"}}
+  end
 
   def consume(stream = %{status: :open}, message = %{data: _, end_stream: end_stream}) do
     stream = if end_stream do
@@ -149,16 +152,20 @@ defmodule Ace.HTTP2.Stream do
   end
   def consume(stream = %{status: :open}, :reset) do
     # TODO reset stream
-    {:ok, {[], stream}}
+    {:ok, {[], %{stream | status: :closed}}}
   end
 
-  def consume(stream = %{status: :closed_remote}, %{headers: _}) do
-    rst_frame = Frame.RstStream.new(stream.stream_id, :stream_closed)
-    {:ok, {[rst_frame], %{stream | status: :closed}}}
+  def consume(%{status: :closed_remote}, %{headers: _}) do
+    {:error, {:stream_closed, "Headers received on closed stream"}}
   end
-  def consume(stream = %{status: :closed_remote}, %{data: _}) do
-    rst_frame = Frame.RstStream.new(stream.stream_id, :stream_closed)
-    {:ok, {[rst_frame], %{stream | status: :closed}}}
+  def consume(%{status: :closed_remote}, %{data: _}) do
+    {:error, {:stream_closed, "Data received on closed stream"}}
+  end
+  def consume(stream = %{status: :closed}, %{headers: _}) do
+    {:error, {:protocol_error, "headers received on closed stream"}}
+  end
+  def consume(stream = %{status: :closed}, %{data: _}) do
+    {:error, {:protocol_error, "Data received on closed stream"}}
   end
 
   def terminate(stream = %{status: :closed}, :normal) do
