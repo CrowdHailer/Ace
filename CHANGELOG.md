@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Forbid unknown frames to be present in a continuation stream.
 - Treat incorrect content length as protocol error.
 - Trailing header block must end the stream.
+- Protocol error if starting new stream with lower stream_id.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

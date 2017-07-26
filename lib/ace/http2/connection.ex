@@ -34,7 +34,8 @@ defmodule Ace.HTTP2.Connection do
     decode_context: nil,
     encode_context: nil,
     streams: nil,
-    stream_supervisor: nil
+    stream_supervisor: nil,
+    client_stream_id: 0
     # accept_push always false for server but usable in client.
   ]
 
@@ -283,7 +284,7 @@ defmodule Ace.HTTP2.Connection do
         case Stream.consume(stream, message) do
           {:ok, {outbound, stream}} ->
             streams = Map.put(state.streams, stream_id, stream)
-            {:ok, {outbound, %{state | streams: streams}}}
+            {:ok, {outbound, %{state | streams: streams, client_stream_id: max(stream.stream_id, state.client_stream_id)}}}
           {:error, reason} ->
             {:error, reason}
         end
@@ -323,7 +324,11 @@ defmodule Ace.HTTP2.Connection do
     {:error, {:protocol_error, "Stream 0 reserved for connection"}}
   end
   def new_stream(stream_id, state) when rem(stream_id, 2) == 1 do
-    {:ok, Stream.idle(stream_id, state)}
+    if stream_id > state.client_stream_id do
+      {:ok, Stream.idle(stream_id, state)}
+    else
+      {:error, {:protocol_error, "New streams must always have a higher stream id"}}
+    end
   end
   def new_stream(_, _) do
     {:error, {:protocol_error, "Clients must start odd streams"}}
