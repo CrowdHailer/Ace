@@ -21,7 +21,7 @@ defmodule Ace.HTTP2.Request do
 
   def from_headers(headers) do
     headers
-    |> Enum.reduce(%__MODULE__{}, &add_header/2)
+    |> Enum.reduce(%__MODULE__{headers: []}, &add_header/2)
   end
 
   def add_header({":method", method}, request = %{method: nil}) do
@@ -39,7 +39,7 @@ defmodule Ace.HTTP2.Request do
   def add_header({key, value}, request = %{headers: headers}) do
     # TODO test key does not begin with `:`
     # headers = Map.put(headers || %{}, key, value)
-    headers = (headers || []) ++ [{key, value}]
+    headers = headers ++ [{key, value}]
     %{request | headers: headers}
   end
 end

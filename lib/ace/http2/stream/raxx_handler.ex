@@ -34,23 +34,40 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
     {:noreply, {request, app}}
   end
   def handle_request(request, app, stream, true) do
-    response = dispatch_request(request, app)
-    # IO.inspect(response)
-    headers = [{":status", "#{response.status}"} | response.headers]
-    preface = %{
-      headers: headers,
-      end_stream: response.body == ""
-    }
-    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
-    if response.body != "" do
-      data = %{
-        data: response.body,
-        end_stream: true
-      }
-      Ace.HTTP2.StreamHandler.send_to_client(stream, data)
+    length = :erlang.iolist_size(request.body)
+    content_length = case :proplists.get_value("content-length", request.headers) do
+      :undefined ->
+        :undefined
+      content_length ->
+        # DEBT add to h2spec a test which sends correct content length.
+        # This is currently tested in raxx_test `optional headers are added to request`
+        {content_length, ""} = Integer.parse(content_length)
+        content_length
     end
 
-    {:noreply, {request, app}}
+    # DEBT allow content_length for empty body,
+    # Needs h2spec
+    if content_length == :undefined || content_length == length do
+      response = dispatch_request(request, app)
+      headers = [{":status", "#{response.status}"} | response.headers]
+      preface = %{
+        headers: headers,
+        end_stream: response.body == ""
+      }
+      Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+      if response.body != "" do
+        data = %{
+          data: response.body,
+          end_stream: true
+        }
+        Ace.HTTP2.StreamHandler.send_to_client(stream, data)
+      end
+
+      {:noreply, {request, app}}
+    else
+      Ace.HTTP2.StreamHandler.send_to_client(stream, %Ace.HTTP2.Stream.Reset{error: :protocol_error})
+      {:stop, :normal, {request, app}}
+    end
   end
 
   def dispatch_request(request, {mod, config}) do

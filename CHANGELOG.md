@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Fix off by one error for maximum size of frames.
 - Return protocol error for header or data sent after a stream reset.
 - Forbid unknown frames to be present in a continuation stream.
+- Treat incorrect content length as protocol error.
+- Trailing header block must end the stream.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

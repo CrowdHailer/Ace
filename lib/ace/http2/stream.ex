@@ -138,13 +138,14 @@ defmodule Ace.HTTP2.Stream do
     case read_headers(headers) do
       {:ok, _trailers} ->
         # TODO send trailers
-        stream = if end_stream do
-          %{stream | status: :closed_remote}
+        if end_stream do
+          stream = %{stream | status: :closed_remote}
+          forward(stream, message)
+          {:ok, {[], stream}}
         else
-          stream
+          # DEBT could be stream error
+          {:error, {:protocol_error, "Trailers must end a stream"}}
         end
-        forward(stream, message)
-        {:ok, {[], stream}}
       {:error, reason} ->
         {:error, reason}
     end

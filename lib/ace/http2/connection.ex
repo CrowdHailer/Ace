@@ -113,18 +113,6 @@ defmodule Ace.HTTP2.Connection do
     {:noreply, state}
   end
 
-  def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
-    # Map or array to map, best receive a list and response takes care of ordering
-    headers = for h <- headers, do: h
-    header_block = HPack.encode(headers, state.encode_context)
-    header_frame = Frame.Headers.new(id, header_block, true, end_stream)
-    {[header_frame], state}
-  end
-  def stream_set_dispatch(id, %{data: data, end_stream: end_stream}, state) do
-    data_frame = Frame.Data.new(id, data, end_stream)
-    {[data_frame], state}
-  end
-
   def consume(buffer, state) do
     case Frame.parse_from_buffer(buffer, max_length: 16_384) do
       {:ok, {raw_frame, unprocessed}} ->
@@ -302,6 +290,24 @@ defmodule Ace.HTTP2.Connection do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
+    # Map or array to map, best receive a list and response takes care of ordering
+    headers = for h <- headers, do: h
+    header_block = HPack.encode(headers, state.encode_context)
+    header_frame = Frame.Headers.new(id, header_block, true, end_stream)
+    {[header_frame], state}
+  end
+  def stream_set_dispatch(id, %{data: data, end_stream: end_stream}, state) do
+    data_frame = Frame.Data.new(id, data, end_stream)
+    {[data_frame], state}
+  end
+  def stream_set_dispatch(stream_id, %Ace.HTTP2.Stream.Reset{error: reason}, state) do
+    # DEBT does not check if stream idle or already closed
+    # stream = fetch_stream(state, stream_id)
+    rst_frame = Frame.RstStream.new(stream_id, reason)
+    {[rst_frame], state}
   end
 
   defp fetch_stream(state, stream_id) do
