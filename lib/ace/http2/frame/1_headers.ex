@@ -20,20 +20,29 @@ defmodule Ace.HTTP2.Frame.Headers do
       payload
     end
 
-    header_block_fragment = if priority == 1 do
-      IO.inspect("Ignoring priority")
-      <<exclusive::1, _d_stream_id::31, _weight::8, header_block_fragment::binary>> = data
-      IO.inspect(exclusive)
-      header_block_fragment
+    if priority == 1 do
+      <<_exclusive::1, d_stream_id::31, _weight::8, header_block_fragment::binary>> = data
+      if stream_id == d_stream_id do
+        {:error, {:protocol_error, "Headers frame can not be dependent on own stream"}}
+      else
+        IO.inspect("Ignoring priority")
+        {:ok, header_block_fragment}
+      end
     else
-      data
+      {:ok, data}
+    end
+    |> case  do
+      {:ok, header_block_fragment} ->
+        {:ok, %__MODULE__{
+          stream_id: stream_id,
+          header_block_fragment: header_block_fragment,
+          end_headers: end_headers == 1,
+          end_stream: end_stream == 1
+        }}
+      {:error, reason} ->
+        {:error, reason}
     end
 
-    {:ok, %__MODULE__{
-      stream_id: stream_id,
-      header_block_fragment: header_block_fragment,
-      end_headers: end_headers == 1,
-      end_stream: end_stream == 1}}
   end
 
   def serialize(frame) do

@@ -13,7 +13,11 @@ defmodule Ace.HTTP2.Frame.Priority do
 
   def decode({2, _flags, stream_id, <<exclusive::1, stream_dependency::31, weight::8>>}) when stream_id > 0 do
     exclusive = exclusive == 1
-    {:ok, new(stream_id, stream_dependency, weight, exclusive)}
+    if stream_id == stream_dependency do
+      {:error, {:protocol_error, "Priority frame can not be dependent on own stream"}}
+    else
+      {:ok, new(stream_id, stream_dependency, weight, exclusive)}
+    end
   end
   def decode({2, _flags, 0, <<_::40>>}) do
     {:error, {:protocol_error, "Priority frame not valid on stream 0"}}
