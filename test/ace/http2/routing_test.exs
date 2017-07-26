@@ -28,8 +28,8 @@ defmodule Ace.HTTP2RoutingTest do
       {"content-length", "0"}
     ]
 
-    {:ok, table} = HPack.Table.start_link(1_000)
-    header_block = HPack.encode(headers, table)
+    encode_context = :hpack.new_context(1_000)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     <<hbf1::binary-size(8), hbf2::binary>> = header_block
     headers_frame = Frame.Headers.new(1, hbf1, false, true)
     continuation_frame = Frame.Continuation.new(1, hbf2, true)
@@ -57,8 +57,8 @@ defmodule Ace.HTTP2RoutingTest do
     Ace.HTTP2.StreamHandler.send_to_client(stream, data)
     # TODO test 200 response
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
-    {:ok, table} = HPack.Table.start_link(1_000)
-    HPack.decode(hbf, table)
+    decode_context = :hpack.new_context(1_000)
+    :hpack.decode(hbf, decode_context)
     |> IO.inspect
     assert {:ok, %{data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
@@ -72,8 +72,8 @@ defmodule Ace.HTTP2RoutingTest do
       {"content-length", "0"}
     ]
 
-    {:ok, table} = HPack.Table.start_link(1_000)
-    header_block_fragment = HPack.encode(headers, table)
+    encode_context = :hpack.new_context(1_000)
+    {:ok, {header_block_fragment, encode_context}} = :hpack.encode(headers, encode_context)
 
     payload = Frame.pad_data(header_block_fragment, 2)
 
@@ -107,9 +107,9 @@ defmodule Ace.HTTP2RoutingTest do
 
   test "send post with data", %{client: connection} do
 
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}, {":authority", "example.com"}], encode_table)
+    encode_context = :hpack.new_context(1_000)
+    decode_context = :hpack.new_context(1_000)
+    {:ok, {body, encode_context}} = :hpack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}, {":authority", "example.com"}], encode_context)
 
     size = :erlang.iolist_size(body)
 
@@ -138,15 +138,15 @@ defmodule Ace.HTTP2RoutingTest do
     assert {:ok, %{stream_id: 0, increment: 65_535}} = Support.read_next(connection, 2_000)
     assert {:ok, %{stream_id: _, increment: 65_535}} = Support.read_next(connection, 2_000)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
-    assert [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
+    assert {:ok, {[{":status", "201"}, {"content-length", "0"}], _decode_context}} = :hpack.decode(hbf, decode_context)
   end
 
   @tag :skip
   test "send post with padded data", %{client: connection} do
 
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    body = HPack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_table)
+    decode_context = :hpack.new_context(1_000)
+    encode_context = :hpack.new_context(1_000)
+    {:ok, {body, encode_context}} = :hpack.encode([{":method", "POST"}, {":scheme", "https"}, {":path", "/"}], encode_context)
 
     size = :erlang.iolist_size(body)
 
@@ -157,6 +157,6 @@ defmodule Ace.HTTP2RoutingTest do
     data_frame = Frame.Data.new(1, "Upload", pad_length: 2, end_stream: true)
     :ssl.send(connection, data_frame)
     assert {:ok, %{header_block_fragment: hbf}} = Support.read_next(connection, 2_000)
-    assert [{":status", "201"}, {"content-length", "0"}] == HPack.decode(hbf, decode_table)
+    assert {:ok, {[{":status", "201"}, {"content-length", "0"}], _decode_context}} = :hpack.decode(hbf, decode_context)
   end
 end

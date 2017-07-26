@@ -13,10 +13,10 @@ defmodule Ace.HTTP2.Request do
     ]
   end
 
-  def compress(request, table) do
-    headers = to_headers(request)
-    HPack.encode(headers, table)
-  end
+  # def compress(request, table) do
+  #   headers = to_headers(request)
+  #   HPack.encode(headers, table)
+  # end
 
 
   def from_headers(headers) do

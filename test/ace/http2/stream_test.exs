@@ -19,14 +19,14 @@ defmodule Ace.HTTP2.StreamTest do
   end
 
   test "client cannot send on stream 0", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = [
       {":scheme", "https"},
       {":authority", "example.com"},
       {":method", "GET"},
       {":path", "/"}
     ]
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(2, header_block, true, true)
     Support.send_frame(connection, headers_frame)
     assert {:ok, %Frame.GoAway{debug: message}} = Support.read_next(connection, 2_000)
@@ -35,14 +35,14 @@ defmodule Ace.HTTP2.StreamTest do
   end
 
   test "client must start odd numbered streams", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = [
       {":scheme", "https"},
       {":authority", "example.com"},
       {":method", "GET"},
       {":path", "/"}
     ]
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(2, header_block, true, true)
     Support.send_frame(connection, headers_frame)
     assert {:ok, %Frame.GoAway{debug: message}} = Support.read_next(connection, 2_000)
@@ -50,14 +50,14 @@ defmodule Ace.HTTP2.StreamTest do
   end
 
   test "cannot send more headers after frame with end stream", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = [
       {":scheme", "https"},
       {":authority", "example.com"},
       {":method", "GET"},
       {":path", "/"}
     ]
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -69,14 +69,14 @@ defmodule Ace.HTTP2.StreamTest do
   end
 
   test "cannot send data after frame with end stream", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = [
       {":scheme", "https"},
       {":authority", "example.com"},
       {":method", "GET"},
       {":path", "/"}
     ]
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -100,14 +100,14 @@ defmodule Ace.HTTP2.StreamTest do
   end
 
   test "stream is reset if worker terminates", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = [
       {":scheme", "https"},
       {":authority", "example.com"},
       {":method", "GET"},
       {":path", "/"}
     ]
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
     receive do

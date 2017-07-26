@@ -14,8 +14,8 @@ defmodule HTTP2.HPackTest do
     244, 90, 190, 251, 64, 5, 219, 80, 141, 155, 217, 171, 250, 82, 66, 203, 64,
     210, 95, 165, 35, 179, 64, 146, 182, 185, 172, 28, 133, 88, 213, 32, 164, 182,
     194, 173, 97, 123, 90, 84, 37, 31, 129, 15>>
-    {:ok, table} = HPack.Table.start_link(1_000)
-    HPack.decode(compressed, table)
+    decode_context = :hpack.new_context(1_000)
+    :hpack.decode(compressed, decode_context)
     |> IO.inspect
   end
 end

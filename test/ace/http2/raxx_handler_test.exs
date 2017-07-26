@@ -23,9 +23,9 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   end
 
   test "required headers are translated", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -39,9 +39,9 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
 
   # DEBT do we validate content-length? No firefox does not for responses
   test "data is added to body", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, false)
     Support.send_frame(connection, headers_frame)
 
@@ -53,9 +53,9 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   end
 
   test "data from multiple frames is added to body", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, false)
     Support.send_frame(connection, headers_frame)
 
@@ -70,14 +70,14 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   end
 
   test "path data is processed", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = [
       {":scheme", "https"},
       {":authority", "example.com"},
       {":method", "GET"},
       {":path", "/foo/bar?a=value&b[c]=nested%20value"}
     ]
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -87,9 +87,9 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   end
 
   test "optional headers are added to request", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = home_page_headers([{"content-length", "0"}, {"accept", "*/*"}])
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -102,10 +102,10 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   end
 
   test "response status is set", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
+    decode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -113,14 +113,14 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     GenServer.reply(from, {:ok, Raxx.Response.forbidden()})
 
     assert {:ok, %Frame.Headers{end_stream: true, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
-    assert [{":status", "403"}] = HPack.decode(header_block, decode_table)
+    assert {:ok, {[{":status", "403"}], _decode_context}} = :hpack.decode(header_block, decode_context)
   end
 
   test "other headers are sent", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
+    decode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -128,15 +128,15 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     GenServer.reply(from, {:ok, Raxx.Response.ok([{"server", "Ace"}])})
 
     assert {:ok, %Frame.Headers{end_stream: true, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
-    assert [{":status", "200"}, {"server", "Ace"}] = HPack.decode(header_block, decode_table)
+    assert {:ok, {[{":status", "200"}, {"server", "Ace"}], _decode_context}} = :hpack.decode(header_block, decode_context)
 
   end
 
   test "response body is sent", %{client: connection} do
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
-    {:ok, decode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
+    decode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -144,7 +144,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     GenServer.reply(from, {:ok, Raxx.Response.ok("Hello, World!")})
 
     assert {:ok, %Frame.Headers{end_stream: false, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
-    assert [{":status", "200"}] = HPack.decode(header_block, decode_table)
+    assert {:ok, {[{":status", "200"}], _decode_context}} = :hpack.decode(header_block, decode_context)
     assert {:ok, %Frame.Data{end_stream: true, data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 

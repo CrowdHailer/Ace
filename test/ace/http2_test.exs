@@ -33,9 +33,9 @@ defmodule Ace.HTTP2Test do
     assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
     assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
 
-    {:ok, encode_table} = HPack.Table.start_link(1_000)
+    encode_context = :hpack.new_context(1_000)
     headers = home_page_headers()
-    header_block = HPack.encode(headers, encode_table)
+    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
     assert {:ok, %Frame.Headers{}} = Support.read_next(connection)

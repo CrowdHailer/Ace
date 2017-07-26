@@ -1,4 +1,4 @@
-%{"hpack": {:hex, :hpack, "1.0.3", "b27e5c6eca73d031db7597ffc15f805e93dc208cc6902aae30771df1e77dcc97", [:mix], [], "hexpm"},
+%{"hpack": {:hex, :hpack_erl, "0.2.3", "17670f83ff984ae6cd74b1c456edde906d27ff013740ee4d9efaa4f1bf999633", [:rebar3], [], "hexpm"},
   "http_status": {:hex, :http_status, "0.2.1", "74fa942b5874966a25088162e5297ad52dd5e6a29b88ad4a73953aa55e58e3bb", [:mix], [], "hexpm"},
   "mime": {:hex, :mime, "1.1.0", "01c1d6f4083d8aa5c7b8c246ade95139620ef8effb009edde934e0ec3b28090a", [:mix], [], "hexpm"},
   "plug": {:hex, :plug, "1.4.0", "e81227c15eb166d2065efe42c902a16c15258002a709246d5fb2453bfb6c0a7d", [:mix], [{:cowboy, "~> 1.0.1 or ~> 1.1", [hex: :cowboy, repo: "hexpm", optional: true]}, {:mime, "~> 1.0", [hex: :mime, repo: "hexpm", optional: false]}], "hexpm"},
