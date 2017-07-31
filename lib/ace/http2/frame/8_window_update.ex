@@ -4,11 +4,11 @@ defmodule Ace.HTTP2.Frame.WindowUpdate do
 
   @max_increment (:math.pow(2, 31) - 1)
 
-  def new(stream_id, increment) when increment < @max_increment do
+  def new(stream_id, increment) when increment <= @max_increment do
     %__MODULE__{stream_id: stream_id, increment: increment}
   end
 
-  def decode({8, _flags, stream_id, <<0::1, increment::31>>}) when 0 < increment and increment < @max_increment do
+  def decode({8, _flags, stream_id, <<0::1, increment::31>>}) when 0 < increment and increment <= @max_increment do
     {:ok, new(stream_id, increment)}
   end
   def decode({8, _flags, _stream_id, <<0::1, increment::31>>}) when increment > @max_increment do

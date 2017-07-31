@@ -4,7 +4,7 @@ defmodule Ace.HTTP2.Stream do
     Frame
   }
 
-  @enforce_keys [:stream_id, :status, :worker, :monitor]
+  @enforce_keys [:stream_id, :status, :worker, :monitor, :outbound_window]
   defstruct @enforce_keys
 
   def idle(stream_id, state) do
@@ -14,7 +14,8 @@ defmodule Ace.HTTP2.Stream do
       stream_id: stream_id,
       status: :idle,
       worker: worker,
-      monitor: monitor
+      monitor: monitor,
+      outbound_window: state.initial_window_size
     }
   end
 
@@ -151,9 +152,8 @@ defmodule Ace.HTTP2.Stream do
     end
 
   end
-  def consume(stream = %{status: :open}, {:window_update, _}) do
-    # TODO flow control
-    {:ok, {[], stream}}
+  def consume(stream = %{status: :open}, {:window_update, increment}) do
+    increase_window(stream, increment)
   end
   def consume(stream = %{status: :open}, :reset) do
     # TODO reset stream
@@ -166,9 +166,8 @@ defmodule Ace.HTTP2.Stream do
   def consume(%{status: :closed_remote}, %{data: _}) do
     {:error, {:stream_closed, "Data received on closed stream"}}
   end
-  def consume(stream = %{status: :closed_remote}, {:window_update, _}) do
-    # TODO flow control
-    {:ok, {[], stream}}
+  def consume(stream = %{status: :closed_remote}, {:window_update, increment}) do
+    increase_window(stream, increment)
   end
   def consume(stream = %{status: :closed_remote}, :reset) do
     # TODO flow control
@@ -188,6 +187,17 @@ defmodule Ace.HTTP2.Stream do
   def terminate(stream, _reason) do
     rst_frame = Frame.RstStream.new(stream.stream_id, :internal_error)
     {[rst_frame], %{stream | status: :closed, worker: nil, monitor: nil}}
+  end
+
+  defp increase_window(stream, increment) do
+    new_window = stream.outbound_window + increment
+    if new_window <= 2_147_483_647 do
+      {:ok, {[], %{stream | outbound_window: new_window}}}
+    else
+      rst_frame = Frame.RstStream.new(stream.stream_id, :flow_control_error)
+      # TODO test stream was reset by error
+      {:ok, {[rst_frame], stream}}
+    end
   end
 
   defp forward(stream, message) do

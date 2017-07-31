@@ -36,6 +36,8 @@ defmodule Ace.HTTP2.Connection do
     socket: nil,
     decode_context: nil,
     encode_context: nil,
+    initial_window_size: nil,
+    outbound_window: nil,
     streams: nil,
     stream_supervisor: nil,
     client_stream_id: 0
@@ -68,6 +70,10 @@ defmodule Ace.HTTP2.Connection do
     encode_context = HPack.new_context(65_536)
     initial_state = %__MODULE__{
       socket: socket,
+      # TODO test outbound windoe with HTTPbin
+      outbound_window: 65_535,
+      # DEBT set when handshaking settings
+      initial_window_size: 65_535,
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
@@ -89,6 +95,7 @@ defmodule Ace.HTTP2.Connection do
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(0, error, debug)
         outbound = Frame.GoAway.serialize(frame)
+        |> IO.inspect
         :ok = :ssl.send(state.socket, outbound)
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
         {:stop, :normal, state}
@@ -175,9 +182,14 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(%Frame.GoAway{error: :no_error}, _state = %{next: :any}) do
     {:error, {:no_error, "Client closed connection"}}
   end
-  def consume_frame(%Frame.WindowUpdate{stream_id: 0}, state = %{next: :any}) do
-    IO.inspect("total window update")
-    {[], state}
+  def consume_frame(frame = %Frame.WindowUpdate{stream_id: 0}, state = %{next: :any}) do
+    new_window = state.outbound_window + frame.increment
+    # 2^31 - 1
+    if new_window <= 2_147_483_647 do
+      {[], %{state | outbound_window: new_window}}
+    else
+      {:error, {:flow_control_error, "Total window size exceeded max allowed"}}
+    end
   end
   def consume_frame(frame = %Frame.WindowUpdate{stream_id: _}, state = %{next: :any}) do
     case dispatch(frame.stream_id, {:window_update, frame.increment}, state) do
@@ -270,15 +282,25 @@ defmodule Ace.HTTP2.Connection do
 
   # TODO handle all settings
   def update_settings(new, state) do
-    case new.max_frame_size do
-      nil ->
-        {:ok, state}
-      x when x < 16_384 ->
-        {:error, {:protocol_error, "max_frame_size too small"}}
-      new ->
-        IO.inspect("updating frame size (#{new})")
-        {:ok, state}
-    end
+    new_state = state
+    |> update_initial_window_size(new.initial_window_size)
+    # case new.max_frame_size do
+    #   nil ->
+    #   x when x < 16_384 ->
+    #     {:error, {:protocol_error, "max_frame_size too small"}}
+    #   new ->
+    #     IO.inspect("updating frame size (#{new})")
+    #     {:ok, state}
+    # end
+    # |> IO.inspect
+    {:ok, new_state}
+  end
+
+  defp update_initial_window_size(state, nil) do
+    state
+  end
+  defp update_initial_window_size(state, initial_window_size) do
+    %{state| initial_window_size: initial_window_size}
   end
 
   def dispatch(stream_id, message, state) do
@@ -292,6 +314,7 @@ defmodule Ace.HTTP2.Connection do
             {:ok, {outbound, %{state | streams: streams, client_stream_id: max(stream.stream_id, state.client_stream_id)}}}
           {:error, reason} ->
             {:error, reason}
+            |> IO.inspect
         end
       {:error, reason} ->
         {:error, reason}
@@ -306,9 +329,19 @@ defmodule Ace.HTTP2.Connection do
     header_frame = Frame.Headers.new(id, header_block, true, end_stream)
     {[header_frame], state}
   end
-  def stream_set_dispatch(id, %{data: data, end_stream: end_stream}, state) do
-    data_frame = Frame.Data.new(id, data, end_stream)
-    {[data_frame], state}
+  def stream_set_dispatch(stream_id, %{data: data, end_stream: end_stream}, state) do
+    # outbound_window = state.outbound_window
+    # {to_send, buffer} = String.split(data, )
+    # remaining_window =
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    stream_window = stream.outbound_window
+    {to_send, buffer} = String.split_at(data, stream_window)
+    # TODO h2spec sends second byte on window update
+    remaining_stream_window = stream_window - :erlang.iolist_size(to_send)
+    stream = %{stream | outbound_window: remaining_stream_window}
+    streams = %{state.streams | stream_id => stream}
+    data_frame = Frame.Data.new(stream_id, to_send, end_stream)
+    {[data_frame], %{state | streams: streams}}
   end
   def stream_set_dispatch(stream_id, %Ace.HTTP2.Stream.Reset{error: reason}, state) do
     # DEBT does not check if stream idle or already closed

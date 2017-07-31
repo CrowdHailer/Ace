@@ -24,6 +24,6 @@ defmodule Ace.HTTP2ClientSettingsTest do
     buffer = Frame.Settings.new(max_frame_size: 15_000) |> Ace.HTTP2.Frame.Settings.serialize()
     :ssl.send(connection, buffer)
     assert {:ok, %{debug: message}} = Support.read_next(connection)
-    assert "max_frame_size too small" = message
+    assert "invalid value for max_frame_size setting" = message
   end
 end

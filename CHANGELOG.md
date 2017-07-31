@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Treat incorrect content length as protocol error.
 - Trailing header block must end the stream.
 - Protocol error if starting new stream with lower stream_id.
+- Disallow flow control windows from exceeding maximum value.
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 

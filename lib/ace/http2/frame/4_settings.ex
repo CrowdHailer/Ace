@@ -83,13 +83,14 @@ defmodule Ace.HTTP2.Frame.Settings do
   def cast_setting(3, value) do
     {:ok, {:max_concurrent_streams, value}}
   end
+  # DEBT is minumum 0 or 1
   def cast_setting(4, value) when value <= 2_147_483_647 do
     {:ok, {:initial_window_size, value}}
   end
   def cast_setting(4, _value) do
     {:error, {:protocol_error, "invalid value for initial_window_size setting"}}
   end
-  def cast_setting(5, value) when value <= 16_777_215 do
+  def cast_setting(5, value) when 16_384 <= value and value <= 16_777_215 do
     {:ok, {:max_frame_size, value}}
   end
   def cast_setting(5, _value) do
