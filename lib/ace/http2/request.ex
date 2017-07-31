@@ -13,12 +13,6 @@ defmodule Ace.HTTP2.Request do
     ]
   end
 
-  # def compress(request, table) do
-  #   headers = to_headers(request)
-  #   HPack.encode(headers, table)
-  # end
-
-
   def from_headers(headers) do
     headers
     |> Enum.reduce(%__MODULE__{headers: []}, &add_header/2)

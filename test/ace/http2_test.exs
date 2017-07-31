@@ -1,6 +1,9 @@
 defmodule Ace.HTTP2Test do
   use ExUnit.Case
 
+  alias Ace.{
+    HPack
+  }
   alias Ace.HTTP2.{
     Frame
   }
@@ -33,9 +36,9 @@ defmodule Ace.HTTP2Test do
     assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
     assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
 
-    encode_context = :hpack.new_context(1_000)
+    encode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = :hpack.encode(headers, encode_context)
+    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
     assert {:ok, %Frame.Headers{}} = Support.read_next(connection)

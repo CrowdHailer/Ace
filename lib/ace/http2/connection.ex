@@ -12,6 +12,9 @@ defmodule Ace.HTTP2.Connection do
   """
 
   require Logger
+  alias Ace.{
+    HPack
+  }
   alias Ace.HTTP2.{
     Frame,
     Stream
@@ -61,8 +64,8 @@ defmodule Ace.HTTP2.Connection do
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
     :ssl.send(socket, Frame.Settings.new() |> Frame.Settings.serialize())
     :ssl.setopts(socket, [active: :once])
-    decode_context = :hpack.new_context(65_536)
-    encode_context = :hpack.new_context(65_536)
+    decode_context = HPack.new_context(65_536)
+    encode_context = HPack.new_context(65_536)
     initial_state = %__MODULE__{
       socket: socket,
       decode_context: decode_context,
@@ -213,7 +216,7 @@ defmodule Ace.HTTP2.Connection do
   end
   def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
     if frame.end_headers do
-      {:ok, {headers, new_decode_context}} = :hpack.decode(frame.header_block_fragment, state.decode_context)
+      {:ok, {headers, new_decode_context}} = HPack.decode(frame.header_block_fragment, state.decode_context)
       # preface bad name as could be trailers perhaps metadata
       preface = %{headers: headers, end_stream: frame.end_stream}
       state = %{state | decode_context: new_decode_context}
@@ -230,7 +233,7 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(frame = %Frame.Continuation{}, state = %{next: {:continuation, _stream_id, buffer, end_stream}}) do
     buffer = buffer <> frame.header_block_fragment
     if frame.end_headers do
-      {:ok, {headers, new_decode_context}} = :hpack.decode(buffer, state.decode_context)
+      {:ok, {headers, new_decode_context}} = HPack.decode(buffer, state.decode_context)
       # preface bad name as could be trailers perhaps metadata
       state = %{state | decode_context: new_decode_context}
       preface = %{headers: headers, end_stream: end_stream}
@@ -298,7 +301,7 @@ defmodule Ace.HTTP2.Connection do
   def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
     # Map or array to map, best receive a list and response takes care of ordering
     headers = for h <- headers, do: h
-    {:ok, {header_block, new_encode_context}} = :hpack.encode(headers, state.encode_context)
+    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
     state = %{state | encode_context: new_encode_context}
     header_frame = Frame.Headers.new(id, header_block, true, end_stream)
     {[header_frame], state}
