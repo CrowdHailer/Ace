@@ -1,7 +1,7 @@
 defmodule Ace.HTTPTest do
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog, only: [capture_log: 1]
-  
+
   doctest Ace.HTTP
 
   setup config do
@@ -142,5 +142,4 @@ defmodule Ace.HTTPTest do
     assert response == "HTTP/1.1 413 Payload Too Large\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
 
-  # TODO test slow client attack
 end

@@ -18,7 +18,7 @@ defmodule Ace.HTTP2.Frame.RstStream do
   end
 
   def serialize(frame) do
-    # TODO move to general errors
+    # DEBT move to general errors
     payload = <<Ace.HTTP2.Frame.GoAway.error_code(frame.error)::32>>
     <<4::24, 3::8, 0::8, 0::1, frame.stream_id::31, payload::binary>>
   end

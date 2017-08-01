@@ -70,7 +70,6 @@ defmodule Ace.HTTP2.Connection do
     encode_context = HPack.new_context(65_536)
     initial_state = %__MODULE__{
       socket: socket,
-      # TODO test outbound windoe with HTTPbin
       outbound_window: 65_535,
       # DEBT set when handshaking settings
       initial_window_size: 65_535,
@@ -187,6 +186,7 @@ defmodule Ace.HTTP2.Connection do
     # 2^31 - 1
     if new_window <= 2_147_483_647 do
       {[], %{state | outbound_window: new_window}}
+      transmit_available(%{state | outbound_window: new_window})
     else
       {:error, {:flow_control_error, "Total window size exceeded max allowed"}}
     end
@@ -303,6 +303,36 @@ defmodule Ace.HTTP2.Connection do
     %{state| initial_window_size: initial_window_size}
   end
 
+  def transmit_available(state) do
+    {remaining_window, data_frames, streams} = Enum.reduce(state.streams, {state.outbound_window, [], state.streams}, fn
+      ({_stream_id, _stream}, {0, data_frames, streams}) ->
+        {0, data_frames, streams}
+      ({stream_id, stream}, {connection_window, data_frames, streams}) ->
+        available_window = min(stream.outbound_window, connection_window)
+        {to_send, buffer} = case stream.buffer do
+          <<to_send::binary-size(available_window), buffer::binary>> ->
+            {to_send, buffer}
+          to_send ->
+            {to_send, ""}
+        end
+        case to_send do
+          "" ->
+            {connection_window, data_frames, streams}
+          _ ->
+            window_used = :erlang.iolist_size(to_send)
+            remaining_stream_window = stream.outbound_window - window_used
+            stream = %{stream | outbound_window: remaining_stream_window, buffer: buffer}
+            streams = %{streams | stream_id => stream}
+            end_stream = (stream.status == :closed || stream.status == :closed_local) && (buffer == "")
+            data_frame = Frame.Data.new(stream_id, to_send, end_stream)
+            remaining_connection_window = connection_window - window_used
+
+            {remaining_connection_window, data_frames ++ [data_frame], streams}
+        end
+    end)
+    {data_frames, %{state | outbound_window: remaining_window, streams: streams}}
+  end
+
   def dispatch(stream_id, message, state) do
     # NOTE only evaluate creating new stream if one does not exist
     # DEBT don't have stream rely on shape of connection state
@@ -330,18 +360,40 @@ defmodule Ace.HTTP2.Connection do
     {[header_frame], state}
   end
   def stream_set_dispatch(stream_id, %{data: data, end_stream: end_stream}, state) do
-    # outbound_window = state.outbound_window
-    # {to_send, buffer} = String.split(data, )
-    # remaining_window =
     {:ok, stream} = Map.fetch(state.streams, stream_id)
-    stream_window = stream.outbound_window
-    {to_send, buffer} = String.split_at(data, stream_window)
-    # TODO h2spec sends second byte on window update
-    remaining_stream_window = stream_window - :erlang.iolist_size(to_send)
-    stream = %{stream | outbound_window: remaining_stream_window}
-    streams = %{state.streams | stream_id => stream}
-    data_frame = Frame.Data.new(stream_id, to_send, end_stream)
-    {[data_frame], %{state | streams: streams}}
+    if stream.status == :closed || stream.status == :closed_local do
+      Logger.info("Data lost because stream already closed")
+      # DEBT expose through backpressure
+      {[], state}
+    else
+      connection_window = state.outbound_window
+      stream_window = stream.outbound_window
+      available_window = min(stream_window, connection_window)
+      {to_send, buffer} = case data do
+        <<to_send::binary-size(available_window), buffer::binary>> ->
+          {to_send, buffer}
+        to_send ->
+          {to_send, ""}
+      end
+
+      true = :erlang.is_binary(to_send)
+      window_used = :erlang.iolist_size(to_send)
+      remaining_stream_window = stream_window - window_used
+      stream = %{stream | outbound_window: remaining_stream_window, buffer: buffer}
+      stream = case {stream.status, end_stream} do
+        {:closed_remote, true} ->
+          %{stream | status: :closed}
+        {:open, true} ->
+          %{stream | status: :closed_local}
+        {_, false} ->
+          stream
+      end
+      streams = %{state.streams | stream_id => stream}
+      # TODO only end stream if buffer empty and data ends stream
+      data_frame = Frame.Data.new(stream_id, to_send, end_stream && (buffer == ""))
+      remaining_connection_window = connection_window - window_used
+      {[data_frame], %{state | streams: streams, outbound_window: remaining_connection_window}}
+    end
   end
   def stream_set_dispatch(stream_id, %Ace.HTTP2.Stream.Reset{error: reason}, state) do
     # DEBT does not check if stream idle or already closed

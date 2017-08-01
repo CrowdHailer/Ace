@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Added
 - Casting for accepted values for each known setting.
+- Flow control for outbound data.
 
 ## Changed
 - Creating priority frame requires exclusive value.

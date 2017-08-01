@@ -128,7 +128,6 @@ defmodule Ace.HTTP.Handler do
             end
           false ->
             reason = {:body_too_large, length}
-            # TODO exceptions to include what to do next
             {:error, reason, :close}
         end
     end

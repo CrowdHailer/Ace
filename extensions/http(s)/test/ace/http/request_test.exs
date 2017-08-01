@@ -21,13 +21,13 @@ defmodule Ace.HTTP.RequestTest do
     assert_receive %{path: []}
   end
 
-  # TODO move to general request case
+  # DEBT move to general request case
   test "request shows correct nested query", %{port: port} do
     {:ok, _resp} = HTTPoison.get("localhost:#{port}/?foo[]=a+b&foo[]=a%21")
     assert_receive %{query: %{"foo" => ["a b", "a!"]}}
   end
 
-  # TODO move to general request case
+  # DEBT move to general request case
   test "post simple form encoding", %{port: port} do
     {:ok, _resp} = HTTPoison.post("localhost:#{port}", {:form, [{"string", "foo"}, {"number", 3}]})
     assert_receive request = %Raxx.Request{}
@@ -37,7 +37,7 @@ defmodule Ace.HTTP.RequestTest do
     assert %{"number" => "3", "string" => "foo"} == form
   end
 
-  # TODO move to general request case
+  # DEBT move to general request case
   test "post multipart form with file", %{port: port} do
     body = {:multipart, [{"plain", "string"}, {:file, "test/hello.txt"}]}
     {:ok, _resp} = HTTPoison.post("localhost:#{port}", body)

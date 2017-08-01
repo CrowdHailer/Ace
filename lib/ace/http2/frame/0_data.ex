@@ -11,7 +11,7 @@ defmodule Ace.HTTP2.Frame.Data do
     {:ok, new(stream_id, data, end_stream)}
   end
 
-  # TODO handle padding
+  # DEBT handle padding
   def serialize(frame) do
     length = :erlang.iolist_size(frame.data)
     end_stream_flag = if frame.end_stream, do: 1, else: 0

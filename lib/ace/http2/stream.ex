@@ -4,7 +4,7 @@ defmodule Ace.HTTP2.Stream do
     Frame
   }
 
-  @enforce_keys [:stream_id, :status, :worker, :monitor, :outbound_window]
+  @enforce_keys [:stream_id, :status, :worker, :monitor, :outbound_window, :buffer]
   defstruct @enforce_keys
 
   def idle(stream_id, state) do
@@ -15,7 +15,8 @@ defmodule Ace.HTTP2.Stream do
       status: :idle,
       worker: worker,
       monitor: monitor,
-      outbound_window: state.initial_window_size
+      outbound_window: state.initial_window_size,
+      buffer: "",
     }
   end
 
@@ -104,7 +105,7 @@ defmodule Ace.HTTP2.Stream do
   def consume(stream = %{status: :idle}, message = %{headers: headers, end_stream: end_stream}) do
     case build_request(headers) do
       {:ok, _request} ->
-        # TODO send request
+        # DEBT send Ace.Request not headers
         status = if end_stream do
           :closed_remote
         else
@@ -178,6 +179,9 @@ defmodule Ace.HTTP2.Stream do
   end
   def consume(%{status: :closed}, %{data: _}) do
     {:error, {:protocol_error, "Data received on closed stream"}}
+  end
+  def consume(stream = %{status: :closed}, :reset) do
+    {:ok, {[], stream}}
   end
 
   def terminate(stream = %{status: :closed}, :normal) do

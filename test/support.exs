@@ -53,4 +53,13 @@ defmodule Support do
     {:ok, "h2"} = :ssl.negotiated_protocol(connection)
     connection
   end
+
+  def home_page_headers(rest \\ []) do
+    [
+      {":scheme", "https"},
+      {":authority", "example.com"},
+      {":method", "GET"},
+      {":path", "/"}
+    ] ++ rest
+  end
 end
