@@ -4,20 +4,35 @@ defmodule Ace.HTTP2.Stream do
     Frame
   }
 
-  @enforce_keys [:stream_id, :status, :worker, :monitor, :outbound_window, :buffer]
+  @enforce_keys [
+    :id,
+    :status,
+    :worker,
+    :monitor,
+    :initial_window_size,
+    :sent,
+    :incremented,
+    :buffer
+  ]
   defstruct @enforce_keys
 
   def idle(stream_id, state) do
     {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
     monitor = Process.monitor(worker)
     %__MODULE__{
-      stream_id: stream_id,
+      id: stream_id,
       status: :idle,
       worker: worker,
       monitor: monitor,
-      outbound_window: state.initial_window_size,
+      initial_window_size: state.initial_window_size,
+      sent: 0,
+      incremented: 0,
       buffer: "",
     }
+  end
+
+  def outbound_window(stream) do
+    (stream.incremented + stream.initial_window_size) - stream.sent
   end
 
   def build_request(raw, required \\ {:scheme, :authority, :method, :path})
@@ -183,29 +198,32 @@ defmodule Ace.HTTP2.Stream do
   def consume(stream = %{status: :closed}, :reset) do
     {:ok, {[], stream}}
   end
+  def consume(stream = %{status: :closed}, {:window_update, increment}) do
+    increase_window(stream, increment)
+  end
 
   def terminate(stream = %{status: :closed}, :normal) do
     {[], %{stream | status: :closed, worker: nil, monitor: nil}}
   end
   # I think even if the reason is normal we should mark an error because the handler should have sent an end stream message
   def terminate(stream, _reason) do
-    rst_frame = Frame.RstStream.new(stream.stream_id, :internal_error)
+    rst_frame = Frame.RstStream.new(stream.id, :internal_error)
     {[rst_frame], %{stream | status: :closed, worker: nil, monitor: nil}}
   end
 
   defp increase_window(stream, increment) do
-    new_window = stream.outbound_window + increment
-    if new_window <= 2_147_483_647 do
-      {:ok, {[], %{stream | outbound_window: new_window}}}
+    new_incremented = stream.incremented + increment
+    if new_incremented + stream.initial_window_size <= 2_147_483_647 do
+      {:ok, {[], %{stream | incremented: new_incremented}}}
     else
-      rst_frame = Frame.RstStream.new(stream.stream_id, :flow_control_error)
+      rst_frame = Frame.RstStream.new(stream.id, :flow_control_error)
       # TODO test stream was reset by error
       {:ok, {[rst_frame], stream}}
     end
   end
 
   defp forward(stream, message) do
-    stream_ref = {:stream, self(), stream.stream_id, stream.monitor}
+    stream_ref = {:stream, self(), stream.id, stream.monitor}
     # # Maybe send with same ref as used for reply
     send(stream.worker, {stream_ref, message})
   end

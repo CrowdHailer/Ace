@@ -66,8 +66,8 @@ defmodule Ace.HTTP2.Connection do
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
     :ssl.send(socket, Frame.Settings.new() |> Frame.Settings.serialize())
     :ssl.setopts(socket, [active: :once])
-    decode_context = HPack.new_context(65_536)
-    encode_context = HPack.new_context(65_536)
+    decode_context = HPack.new_context(4_096)
+    encode_context = HPack.new_context(4_096)
     initial_state = %__MODULE__{
       socket: socket,
       outbound_window: 65_535,
@@ -94,7 +94,6 @@ defmodule Ace.HTTP2.Connection do
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(0, error, debug)
         outbound = Frame.GoAway.serialize(frame)
-        |> IO.inspect
         :ok = :ssl.send(state.socket, outbound)
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
         {:stop, :normal, state}
@@ -116,7 +115,7 @@ defmodule Ace.HTTP2.Connection do
       (_) -> false
     end)
     {outbound, stream} = Stream.terminate(stream, reason)
-    streams = Map.put(state.streams, stream.stream_id, stream)
+    streams = Map.put(state.streams, stream.id, stream)
     state = %{state | streams: streams}
     outbound = Enum.map(outbound, &Frame.serialize/1)
     :ok = :ssl.send(state.socket, outbound)
@@ -164,7 +163,10 @@ defmodule Ace.HTTP2.Connection do
     case update_settings(settings, %{state | settings: @default_settings}) do
       {:ok, new_state} ->
         new_state = %{new_state | next: :any}
-        {[Frame.Settings.ack()], new_state}
+        # DEBT only do this if initial_window_size has increased
+        {frames, newer_state} = transmit_available(new_state)
+        # |> IO.inspect
+        {[Frame.Settings.ack() | frames], newer_state}
       {:error, reason} ->
         {:error, reason}
     end
@@ -193,8 +195,9 @@ defmodule Ace.HTTP2.Connection do
   end
   def consume_frame(frame = %Frame.WindowUpdate{stream_id: _}, state = %{next: :any}) do
     case dispatch(frame.stream_id, {:window_update, frame.increment}, state) do
-      {:ok, {outbound, state}} ->
-        {outbound, state}
+      {:ok, {outbound, new_state}} ->
+        {frames, newer_state} = transmit_available(new_state)
+        {outbound ++ frames, newer_state}
       {:error, reason} ->
         {:error, reason}
     end
@@ -228,15 +231,19 @@ defmodule Ace.HTTP2.Connection do
   end
   def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
     if frame.end_headers do
-      {:ok, {headers, new_decode_context}} = HPack.decode(frame.header_block_fragment, state.decode_context)
-      # preface bad name as could be trailers perhaps metadata
-      preface = %{headers: headers, end_stream: frame.end_stream}
-      state = %{state | decode_context: new_decode_context}
-      case dispatch(frame.stream_id, preface, state) do
-        {:ok, {outbound, state}} ->
-          {outbound, state}
-        {:error, reason} ->
-          {:error, reason}
+      case HPack.decode(frame.header_block_fragment, state.decode_context) do
+        {:ok, {headers, new_decode_context}} ->
+          # preface bad name as could be trailers perhaps metadata
+          preface = %{headers: headers, end_stream: frame.end_stream}
+          state = %{state | decode_context: new_decode_context}
+          case dispatch(frame.stream_id, preface, state) do
+            {:ok, {outbound, state}} ->
+              {outbound, state}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        {:error, :compression_error} ->
+          {:error, {:compression_error, "bad decode"}}
       end
     else
       {[], %{state | next: {:continuation, frame.stream_id, frame.header_block_fragment, frame.end_stream}}}
@@ -289,10 +296,8 @@ defmodule Ace.HTTP2.Connection do
     #   x when x < 16_384 ->
     #     {:error, {:protocol_error, "max_frame_size too small"}}
     #   new ->
-    #     IO.inspect("updating frame size (#{new})")
     #     {:ok, state}
     # end
-    # |> IO.inspect
     {:ok, new_state}
   end
 
@@ -300,7 +305,8 @@ defmodule Ace.HTTP2.Connection do
     state
   end
   defp update_initial_window_size(state, initial_window_size) do
-    %{state| initial_window_size: initial_window_size}
+    streams = Enum.map(state.streams, fn({k, v}) -> {k, %{v | initial_window_size: initial_window_size}} end) |> Enum.into(%{})
+    %{state| initial_window_size: initial_window_size, streams: streams}
   end
 
   def transmit_available(state) do
@@ -308,7 +314,7 @@ defmodule Ace.HTTP2.Connection do
       ({_stream_id, _stream}, {0, data_frames, streams}) ->
         {0, data_frames, streams}
       ({stream_id, stream}, {connection_window, data_frames, streams}) ->
-        available_window = min(stream.outbound_window, connection_window)
+        available_window = min(Stream.outbound_window(stream), connection_window)
         {to_send, buffer} = case stream.buffer do
           <<to_send::binary-size(available_window), buffer::binary>> ->
             {to_send, buffer}
@@ -320,8 +326,7 @@ defmodule Ace.HTTP2.Connection do
             {connection_window, data_frames, streams}
           _ ->
             window_used = :erlang.iolist_size(to_send)
-            remaining_stream_window = stream.outbound_window - window_used
-            stream = %{stream | outbound_window: remaining_stream_window, buffer: buffer}
+            stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
             streams = %{streams | stream_id => stream}
             end_stream = (stream.status == :closed || stream.status == :closed_local) && (buffer == "")
             data_frame = Frame.Data.new(stream_id, to_send, end_stream)
@@ -330,7 +335,8 @@ defmodule Ace.HTTP2.Connection do
             {remaining_connection_window, data_frames ++ [data_frame], streams}
         end
     end)
-    {data_frames, %{state | outbound_window: remaining_window, streams: streams}}
+    state = %{state | outbound_window: remaining_window, streams: streams}
+    {data_frames, state}
   end
 
   def dispatch(stream_id, message, state) do
@@ -341,10 +347,9 @@ defmodule Ace.HTTP2.Connection do
         case Stream.consume(stream, message) do
           {:ok, {outbound, stream}} ->
             streams = Map.put(state.streams, stream_id, stream)
-            {:ok, {outbound, %{state | streams: streams, client_stream_id: max(stream.stream_id, state.client_stream_id)}}}
+            {:ok, {outbound, %{state | streams: streams, client_stream_id: max(stream.id, state.client_stream_id)}}}
           {:error, reason} ->
             {:error, reason}
-            |> IO.inspect
         end
       {:error, reason} ->
         {:error, reason}
@@ -367,7 +372,7 @@ defmodule Ace.HTTP2.Connection do
       {[], state}
     else
       connection_window = state.outbound_window
-      stream_window = stream.outbound_window
+      stream_window = Stream.outbound_window(stream)
       available_window = min(stream_window, connection_window)
       {to_send, buffer} = case data do
         <<to_send::binary-size(available_window), buffer::binary>> ->
@@ -378,8 +383,7 @@ defmodule Ace.HTTP2.Connection do
 
       true = :erlang.is_binary(to_send)
       window_used = :erlang.iolist_size(to_send)
-      remaining_stream_window = stream_window - window_used
-      stream = %{stream | outbound_window: remaining_stream_window, buffer: buffer}
+      stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
       stream = case {stream.status, end_stream} do
         {:closed_remote, true} ->
           %{stream | status: :closed}
@@ -389,7 +393,6 @@ defmodule Ace.HTTP2.Connection do
           stream
       end
       streams = %{state.streams | stream_id => stream}
-      # TODO only end stream if buffer empty and data ends stream
       data_frame = Frame.Data.new(stream_id, to_send, end_stream && (buffer == ""))
       remaining_connection_window = connection_window - window_used
       {[data_frame], %{state | streams: streams, outbound_window: remaining_connection_window}}
