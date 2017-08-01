@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.RstStream do
+  @moduledoc false
   @enforce_keys [:stream_id, :error]
   defstruct @enforce_keys
 

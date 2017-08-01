@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.Data do
+  @moduledoc false
   @enforce_keys [:data, :stream_id, :end_stream]
   defstruct @enforce_keys
 

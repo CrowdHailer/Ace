@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.PushPromise do
+  @moduledoc false
   @enforce_keys [:stream_id, :promised_stream_id, :header_block_fragment]
   defstruct @enforce_keys
 

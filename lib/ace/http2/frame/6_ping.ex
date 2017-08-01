@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.Ping do
+  @moduledoc false
   @enforce_keys [:identifier, :ack]
   defstruct @enforce_keys
 

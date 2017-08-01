@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.GoAway do
+  @moduledoc false
   @enforce_keys [:error, :last_stream_id, :debug]
   defstruct @enforce_keys
 

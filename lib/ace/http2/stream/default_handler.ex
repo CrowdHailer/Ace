@@ -1,5 +1,5 @@
 defmodule Ace.HTTP2.Stream.DefaultHandler do
-
+  @moduledoc false
   def handle_info({stream, _}, state) do
     headers = %{
       ":status" => "404",

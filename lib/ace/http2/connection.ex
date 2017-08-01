@@ -1,16 +1,4 @@
 defmodule Ace.HTTP2.Connection do
-  @moduledoc """
-  **Hypertext Transfer Protocol Version 2 (HTTP/2)**
-
-  > HTTP/2 enables a more efficient use of network
-  > resources and a reduced perception of latency by introducing header
-  > field compression and allowing multiple concurrent exchanges on the
-  > same connection.  It also introduces unsolicited push of
-  > representations from servers to clients.
-
-  *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
-  """
-
   require Logger
   alias Ace.{
     HPack

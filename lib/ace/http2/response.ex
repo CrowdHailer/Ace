@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Response do
+  @moduledoc false
   defstruct [
     :sent, # nil/headers/body/complete
     :status,

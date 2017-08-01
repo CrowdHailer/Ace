@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.WindowUpdate do
+  @moduledoc false
   @enforce_keys [:stream_id, :increment]
   defstruct @enforce_keys
 

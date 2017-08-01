@@ -1,6 +1,21 @@
 defmodule Ace.HTTP2 do
+  @moduledoc """
+  **Hypertext Transfer Protocol Version 2 (HTTP/2)**
+
+  > HTTP/2 enables a more efficient use of network
+  > resources and a reduced perception of latency by introducing header
+  > field compression and allowing multiple concurrent exchanges on the
+  > same connection.  It also introduces unsolicited push of
+  > representations from servers to clients.
+
+  *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
+  """
+
   use Supervisor
 
+  @doc """
+  Start an endpoint to accept HTTP/2.0 connections
+  """
   def start_link(app, port, opts) do
     name = Keyword.get(opts, :name, __MODULE__)
     connections = Keyword.get(opts, :connections, 100)

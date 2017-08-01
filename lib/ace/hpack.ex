@@ -1,4 +1,6 @@
 defmodule Ace.HPack do
+  @moduledoc false
+  
   def new_context(table_size) do
     :hpack.new_context(table_size)
   end

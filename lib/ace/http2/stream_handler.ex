@@ -1,6 +1,7 @@
 # Can pass in a supervisor that has router and config preset
 # then can blindly start worker and forward messages or find pid for client
 defmodule Ace.HTTP2.StreamHandler do
+  @moduledoc false
   use GenServer
   def start_link(config, router) do
     GenServer.start_link(__MODULE__, {config, router})

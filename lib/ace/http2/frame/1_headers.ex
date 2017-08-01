@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.Headers do
+  @moduledoc false
   @enforce_keys [:stream_id, :header_block_fragment, :end_headers, :end_stream]
   defstruct @enforce_keys
 

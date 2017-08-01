@@ -55,6 +55,7 @@ defmodule Ace.HTTP2.Frame do
     {:ok, {nil, buffer}}
   end
 
+  def decode(parsed_frame)
   def decode(frame = {@data, _, _, _}), do: __MODULE__.Data.decode(frame)
   def decode(frame = {@headers, _, _, _}), do: __MODULE__.Headers.decode(frame)
   def decode(frame = {@priority, _, _, _}), do: __MODULE__.Priority.decode(frame)
@@ -67,6 +68,10 @@ defmodule Ace.HTTP2.Frame do
   def decode(frame = {@continuation, _, _, _}), do: __MODULE__.Continuation.decode(frame)
   def decode({type, _, _, _}), do: {:error, {:unknown_frame_type, type}}
 
+  @doc """
+  Transform HTTP2 frame to binary that can be transmitted over connection
+  """
+  def serialize(http2_frame)
   def serialize(frame = %__MODULE__.Data{}), do: __MODULE__.Data.serialize(frame)
   def serialize(frame = %__MODULE__.Headers{}), do: __MODULE__.Headers.serialize(frame)
   def serialize(frame = %__MODULE__.Priority{}), do: __MODULE__.Priority.serialize(frame)
@@ -78,6 +83,9 @@ defmodule Ace.HTTP2.Frame do
   def serialize(frame = %__MODULE__.WindowUpdate{}), do: __MODULE__.WindowUpdate.serialize(frame)
   def serialize(frame = %__MODULE__.Continuation{}), do: __MODULE__.Continuation.serialize(frame)
 
+  @doc """
+  Add padding to a frames data
+  """
   def pad_data(data, optional_pad_length)
   def pad_data(data, nil) do
     data
@@ -87,6 +95,9 @@ defmodule Ace.HTTP2.Frame do
     <<pad_length, data::binary, 0::size(bit_pad_length)>>
   end
 
+  @doc """
+  Remove the padding from the payload of a frame
+  """
   def remove_padding(<<pad_length, rest::binary>>) do
     rest_length = :erlang.iolist_size(rest)
     data_length = rest_length - pad_length

@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Stream do
+  @moduledoc false
   alias Ace.HTTP2.{
     # Debt I don't think the stream should know about frames
     Frame

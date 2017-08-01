@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [next]()
+## [0.11.0](https://github.com/CrowdHailer/Ace/tree/0.11.0) - 2017-08-01
 
 ## Added
 - Casting for accepted values for each known setting.

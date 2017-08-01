@@ -49,23 +49,4 @@ defmodule Ace.HTTP2SetupTest do
     assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
     assert {:ok, Frame.Settings.ack()} == Support.read_next(connection)
   end
-
-  test "send window update", %{client: connection} do
-    payload = [
-      Ace.HTTP2.Connection.preface(),
-      Frame.Settings.new() |> Frame.Settings.serialize(),
-    ]
-    :ssl.send(connection, payload)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
-    assert {:ok, Frame.Settings.ack()} == Support.read_next(connection)
-
-    :ssl.send(connection, <<4::24, 8::8, 0::8, 0::32, 1::32>>)
-    Process.sleep(2_000)
-    # TODO send data down
-  end
-
-# Can't send a headers frame with stream id odd for server
-
-
-
 end

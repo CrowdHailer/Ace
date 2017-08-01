@@ -66,7 +66,7 @@ defmodule Ace.Server do
 
   def await_connection(server, socket) do
     {:ok, ref} = accept_connection(server, socket)
-    # TODO link
+    # DEBT link
     await_connection(ref)
   end
   def await_connection(ref) do

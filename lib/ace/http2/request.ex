@@ -1,5 +1,6 @@
 # DEBT move to Ace.Request
 defmodule Ace.HTTP2.Request do
+  @moduledoc false
   # @enforce_keys [:scheme, :authority, :method, :path, :headers]
   defstruct [:scheme, :authority, :method, :path, :headers, :body]
 

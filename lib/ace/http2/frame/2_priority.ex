@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Frame.Priority do
+  @moduledoc false
   @enforce_keys [:stream_id, :stream_dependency, :weight, :exclusive]
   defstruct @enforce_keys
 
