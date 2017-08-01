@@ -10,6 +10,7 @@
 - Stream isolation; one process per stream
 - Bidirectional streaming; stream data to and from clients
 - TLS(SSL) support via ALPN; data encrypted in transit
+- Verified against [h2spec](https://github.com/summerwind/h2spec) (*143/146*)
 - [Raxx](https://github.com/crowdhailer/raxx) interface; simplicitfy for request/response interactions
 
 *For more view the [features board](https://github.com/CrowdHailer/Ace/projects/1).*
