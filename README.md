@@ -7,6 +7,7 @@
 
 ## Features
 
+- Consistent server and client interfaces
 - Stream isolation; one process per stream
 - Bidirectional streaming; stream data to and from clients
 - TLS(SSL) support via ALPN; data encrypted in transit
