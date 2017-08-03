@@ -1,3 +1,4 @@
+# Perhaps should be called endpoint
 defmodule Ace.HTTP2.Connection do
   require Logger
   alias Ace.{
@@ -28,7 +29,8 @@ defmodule Ace.HTTP2.Connection do
     outbound_window: nil,
     streams: nil,
     stream_supervisor: nil,
-    client_stream_id: 0
+    client_stream_id: 0,
+    next_available_stream_id: nil,
     # accept_push always false for server but usable in client.
   ]
 
@@ -38,6 +40,38 @@ defmodule Ace.HTTP2.Connection do
     GenServer.start_link(__MODULE__, {listen_socket, stream_supervisor})
   end
 
+  def init({:client, {host, port}}) do
+    {:ok, connection} = :ssl.connect(host, port, [
+      mode: :binary,
+      packet: :raw,
+      active: :false,
+      alpn_advertised_protocols: ["h2"]]
+    )
+    {:ok, "h2"} = :ssl.negotiated_protocol(connection)
+    payload = [
+      Ace.HTTP2.Connection.preface(),
+      # TODO push promise false
+      Frame.Settings.new() |> Frame.Settings.serialize(),
+    ]
+    :ssl.send(connection, payload)
+
+    :ssl.setopts(connection, [active: :once])
+    decode_context = HPack.new_context(4_096)
+    encode_context = HPack.new_context(4_096)
+    initial_state = %__MODULE__{
+      socket: connection,
+      outbound_window: 65_535,
+      # DEBT set when handshaking settings
+      initial_window_size: 65_535,
+      decode_context: decode_context,
+      encode_context: encode_context,
+      streams: %{},
+      stream_supervisor: :client,
+      next_available_stream_id: 1,
+    }
+    state = %{initial_state | next: :handshake}
+    {:ok, state}
+  end
   def init({listen_socket, {mod, conf}}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
       [Supervisor.Spec.worker(mod, [conf], restart: :transient)],
@@ -108,6 +142,26 @@ defmodule Ace.HTTP2.Connection do
     outbound = Enum.map(outbound, &Frame.serialize/1)
     :ok = :ssl.send(state.socket, outbound)
     {:noreply, state}
+  end
+  def handle_call({:request, headers, receiver}, _from, state) do
+    stream_id = state.next_available_stream_id
+    monitor = Process.monitor(receiver)
+    stream = %Stream{
+      id: stream_id,
+      status: :idle,
+      worker: receiver,
+      monitor: monitor,
+      initial_window_size: state.initial_window_size,
+      sent: 0,
+      incremented: 0,
+      buffer: "",
+    }
+    streams = Map.put(state.streams, stream_id, stream)
+    state = %{state | next_available_stream_id: stream_id + 2, streams: streams}
+    {frames, state} = stream_set_dispatch(stream_id, %{headers: headers, end_stream: true}, state)
+    outbound = Enum.map(frames, &Frame.serialize/1)
+    :ok = :ssl.send(state.socket, outbound)
+    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
   end
 
   def consume(buffer, state) do

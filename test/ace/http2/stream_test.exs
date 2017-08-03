@@ -13,11 +13,11 @@ defmodule Ace.HTTP2.StreamTest do
     connection = Support.open_connection(port)
     payload = [
       Ace.HTTP2.Connection.preface(),
-      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
+      Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
+    assert {:ok, %Frame.Settings{ack: false}} == Support.read_next(connection)
+    assert {:ok, %Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
   end
 

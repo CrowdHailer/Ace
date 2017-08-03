@@ -36,7 +36,16 @@ defmodule Ace.HTTP2.Stream do
     (stream.incremented + stream.initial_window_size) - stream.sent
   end
 
-  def build_request(raw, required \\ {:scheme, :authority, :method, :path})
+  def build_request([{":status", status} | headers]) do
+    case read_headers(headers) do
+      {:ok, headers} ->
+        {status, ""} = Integer.parse(status)
+        {:ok, {status, headers}}
+    end
+  end
+  def build_request(request_headers) do
+    build_request(request_headers, {:scheme, :authority, :method, :path})
+  end
   def build_request([{":scheme", scheme} | rest], {:scheme, authority, method, path}) do
     case scheme do
       "" ->
