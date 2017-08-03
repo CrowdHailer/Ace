@@ -31,6 +31,7 @@ defmodule Ace.HTTP2.Connection do
     stream_supervisor: nil,
     client_stream_id: 0,
     next_available_stream_id: nil,
+    name: nil
     # accept_push always false for server but usable in client.
   ]
 
@@ -90,6 +91,7 @@ defmodule Ace.HTTP2.Connection do
     :ssl.setopts(socket, [active: :once])
     decode_context = HPack.new_context(4_096)
     encode_context = HPack.new_context(4_096)
+    {:ok, {_, port}} = :ssl.sockname(listen_socket)
     initial_state = %__MODULE__{
       socket: socket,
       outbound_window: 65_535,
@@ -98,7 +100,8 @@ defmodule Ace.HTTP2.Connection do
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
-      stream_supervisor: stream_supervisor
+      stream_supervisor: stream_supervisor,
+      name: "SERVER #{port}"
     }
     {:noreply, {:pending, initial_state}}
   end
@@ -143,6 +146,7 @@ defmodule Ace.HTTP2.Connection do
     :ok = :ssl.send(state.socket, outbound)
     {:noreply, state}
   end
+  # TODO this is replaced by next calls
   def handle_call({:request, headers, receiver}, _from, state) do
     stream_id = state.next_available_stream_id
     monitor = Process.monitor(receiver)
@@ -163,6 +167,29 @@ defmodule Ace.HTTP2.Connection do
     :ok = :ssl.send(state.socket, outbound)
     {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
   end
+  def handle_call({:new_stream, receiver}, _from, state) do
+    stream_id = state.next_available_stream_id
+    monitor = Process.monitor(receiver)
+    stream = %Stream{
+      id: stream_id,
+      status: :idle,
+      worker: receiver,
+      monitor: monitor,
+      initial_window_size: state.initial_window_size,
+      sent: 0,
+      incremented: 0,
+      buffer: "",
+    }
+    streams = Map.put(state.streams, stream_id, stream)
+    state = %{state | next_available_stream_id: stream_id + 2, streams: streams}
+    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
+  end
+  def handle_call({:send, {:stream, _, stream_id, _}, message}, _from, state) do
+    {frames, state} = stream_set_dispatch(stream_id, message, state)
+    outbound = Enum.map(frames, &Frame.serialize/1)
+    :ok = :ssl.send(state.socket, outbound)
+    {:reply, :ok, state}
+  end
 
   def consume(buffer, state) do
     case Frame.parse_from_buffer(buffer, max_length: 16_384) do
@@ -171,7 +198,7 @@ defmodule Ace.HTTP2.Connection do
         if raw_frame do
           case Frame.decode(raw_frame) do
             {:ok, frame} ->
-              Logger.debug("UP: #{inspect(frame)}")
+              Logger.debug("#{state.name}: #{inspect(frame)}")
               case consume_frame(frame, state) do
                 {outbound, state} when is_list(outbound) ->
                   outbound = Enum.map(outbound, &Frame.serialize/1)
@@ -398,11 +425,39 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
+  def stream_set_dispatch(id, request = %Ace.Request{}, state) do
+    authority = case request.authority do
+      :connection ->
+        "todo.com"
+    end
+    headers = [
+      {":scheme", Atom.to_string(request.scheme)},
+      {":authority", authority},
+      {":method", Atom.to_string(request.method)},
+      {":path", request.path} |
+      request.headers
+    ]
+    case request.body do
+      false ->
+        stream_set_dispatch(id, %{headers: headers, end_stream: true}, state)
+      true ->
+        stream_set_dispatch(id, %{headers: headers, end_stream: false}, state)
+    end
+  end
   def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
     # Map or array to map, best receive a list and response takes care of ordering
     headers = for h <- headers, do: h
     {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
     state = %{state | encode_context: new_encode_context}
+    streams = case Map.fetch(state.streams, id) do
+      {:ok, stream = %{status: :idle}} ->
+        new_status = if end_stream, do: :closed_local, else: :open
+        %{state.streams | id => %{stream | status: new_status}}
+      _ ->
+      # DEBT remove
+        state.streams
+    end
+    state = %{state | streams: streams}
     header_frame = Frame.Headers.new(id, header_block, true, end_stream)
     {[header_frame], state}
   end

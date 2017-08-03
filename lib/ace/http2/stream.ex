@@ -36,6 +36,10 @@ defmodule Ace.HTTP2.Stream do
     (stream.incremented + stream.initial_window_size) - stream.sent
   end
 
+  # TODO rename
+  def build_request(headers = [{<<c, _rest::binary>>, _}]) when c != ?: do
+    read_headers(headers)
+  end
   def build_request([{":status", status} | headers]) do
     case read_headers(headers) do
       {:ok, headers} ->
@@ -129,6 +133,15 @@ defmodule Ace.HTTP2.Stream do
   # in idle state can receive only headers and priority
   def consume(stream = %{status: :idle}, message = %{headers: headers, end_stream: end_stream}) do
     case build_request(headers) do
+      {:ok, {status_code, headers}} when is_integer(status_code) ->
+        status = if end_stream do
+          :closed_remote
+        else
+          :open
+        end
+        response = Ace.Response.new(status_code, headers, !end_stream)
+        forward(stream, response)
+        {:ok, {[], %{stream | status: status}}}
       {:ok, _request} ->
         # DEBT send Ace.Request not headers
         status = if end_stream do
@@ -162,7 +175,11 @@ defmodule Ace.HTTP2.Stream do
     {:ok, {[], stream}}
   end
   def consume(stream = %{status: :open}, message = %{headers: headers, end_stream: end_stream}) do
-    case read_headers(headers) do
+    case build_request(headers) do
+      {:ok, {code, headers}} when is_integer(code) ->
+        response = Ace.Response.new(code, headers, !end_stream)
+        forward(stream, response)
+        {:ok, {[], stream}}
       {:ok, _trailers} ->
         # TODO send trailers
         if end_stream do
@@ -186,6 +203,35 @@ defmodule Ace.HTTP2.Stream do
     {:ok, {[], %{stream | status: :closed}}}
   end
 
+  def consume(stream = %{status: :closed_local}, message = %{headers: headers, end_stream: end_stream}) do
+    case build_request(headers) do
+      {:ok, {code, headers}} when is_integer(code) ->
+        response = Ace.Response.new(code, headers, !end_stream)
+        forward(stream, response)
+        {:ok, {[], stream}}
+      {:ok, _trailers} ->
+        # TODO send trailers
+        if end_stream do
+          stream = %{stream | status: :closed_remote}
+          forward(stream, message)
+          {:ok, {[], stream}}
+        else
+          # DEBT could be stream error
+          {:error, {:protocol_error, "Trailers must end a stream"}}
+        end
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+  def consume(stream = %{status: :closed_local}, message = %{data: _, end_stream: end_stream}) do
+    stream = if end_stream do
+      %{stream | status: :closed}
+    else
+      stream
+    end
+    forward(stream, message)
+    {:ok, {[], stream}}
+  end
   def consume(%{status: :closed_remote}, %{headers: _}) do
     {:error, {:stream_closed, "Headers received on closed stream"}}
   end

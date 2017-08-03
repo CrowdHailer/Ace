@@ -1,121 +1,69 @@
 defmodule Ace.HTTP2.ClientTest do
   use ExUnit.Case
 
+  alias Ace.{
+    Request,
+    Response
+  }
   alias Ace.HTTP2.{
-    Frame
+    Client
   }
 
   setup do
-    {_server, port} = Support.start_server(self())
-    {:ok, %{port: port}}
+    {:ok, client} = Client.start_link("http2.golang.org")
+    {:ok, %{client: client}}
   end
 
-  test "fetch request info" do
-    # # Client auto add authority + scheme
-    # %Request{
-    #   # scheme is nil use :https
-    #   # authority is nil fetch from connection
-    #   path:
-    #   method:
-    #   headers:
-    #   body: :true, :false, "Here is the whole body" # binary or true
-    # }
-    # %Response{
-    #   status:
-    #   headers:
-    #   body: same
-    # }
-    # %Data/Payload/Body{
-    # end_stream: true/false
-    # }
-    # %Trailers{
-    #   headers: []
-    # }
-    #
-    # def end_stream(body: body) when is_binary(body) do
-    #   true
-    # end
-    # def end_stream(body: body) do
-    #   !body
-    # end
-    #
-    # def collect([r, data, dta]) do
-    #   squash in data
-    # end
-    #
-    #
-    # {:ok, stream} = Client.stream(connection, request)
-    # {:ok, stream} = Client.stream(connection, :GET, "/foo", [], false)
-    # {:ok, stream} = Client.stream(connection, Request.new(:GET, "/foo", [], false))
-    # Request.get("/path", [{"content-length", "4"}], authority: "foo.com", scheme: :http)
-    #
-    # :ok = Client.send_data("blh", :end)
-    #
-    # {:ok, %Response{, body: true}} = Client.response(ref)
-    # {:ok, %Response{, body: true}} = Client.read_response(ref)
-    # {:ok, %Payload{, data: "Hello"}} = Client.read_body(ref)
-    # # gather accumulate accrue
-    # {:ok, %Response{, body: "the whole response"}} = Client.collect_response(ref)
-    #
-    # {:ok, response} = Client.send_sync(connection, Request.new(:GET, "/foo", [], false))
-    # # THis should raise an error as incorrect usage
-    # {:error, :body_must_be_provided_for_syn_sending} = Client.send_sync(connection, Request.new(:POST, "/foo", [], true))
-    #
-    #
-    #
-    #
-    #
-    # # Always make streaming data second step
-    # # 1
-    # {:ok, stream} = Client.stream_up(connection, method, path, headers)
-    # :ok = Client.send_data(stream, "some")
-    # :ok = Client.send_data(stream, "more")
-    # :ok = Client.send_data(stream, "stuff.", true)
-    # # 2
-    # {:ok, stream} = Client.open_stream(connection, request)
-    # {:ok, stream} = Client.stream_data(request)
-    # {:ok, stream} = Client.end_stream(request)
-    # {:ok, response} = Clieant.read_stream(stream)
-    #
-    # {:ok, {response, stream}} = Client.stream_down(method, path, headers, payload)
-    #
-    #
-    #
-    # {:ok, response} = Client.request(method, path, headers, payload)
+  test "sends correct request headers", %{client: client} do
+    request = Request.get("/reqinfo")
+    {:ok, stream} = Client.stream(client, request)
+    assert_receive {^stream, response = %Response{}}, 1_000
+    assert 200 == response.status
+    assert true == response.body
 
+    assert_receive {^stream, response = %{data: data, end_stream: end_stream}}, 1_000
+    assert true == end_stream
 
-    {:ok, client} = Ace.HTTP2.Client.start_link({"http2.golang.org", 443})
-    {:ok, ref} = Ace.HTTP2.Client.send(client, [
-      {":scheme", "https"},
-      {":authority", "example.com"},
-      {":method", "GET"},
-      {":path", "/serverpush"}
-      ])
-    assert_receive 5, 7_000
+    assert String.contains?(data, "Method: GET")
+    assert String.contains?(data, "Protocol: HTTP/2.0")
+    assert String.contains?(data, "RequestURI: \"/reqinfo\"")
   end
 
-  test "", %{port: port} do
-    # Ace.Client.start_link({"localhost", 8080})
-    # HTTP1 + 2
-    {:ok, client} = Ace.HTTP2.Client.start_link({"localhost", port})
-
-    {:ok, ref} = Ace.HTTP2.Client.send(client, [
-      {":scheme", "https"},
-      {":authority", "example.com"},
-      {":method", "GET"},
-      {":path", "/"}
-    ])
-    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
-    GenServer.reply(from, {:ok, self()})
-    assert_receive {stream, request}, 1_000
-    Ace.HTTP2.StreamHandler.send_to_client(stream, %{headers: [{":status", "200"}], end_stream: false})
-    Ace.HTTP2.StreamHandler.send_to_client(stream, %{data: "Hello, world!", end_stream: true})
-    assert_receive {^ref, response}, 1_000
-    assert_receive {^ref, response}, 1_000
-    Process.sleep(5_000)
-    # request = Ace.Request.get("/hello")
-    #
-    # Await full response
-    # {:ok, ref} = Ace.HTTP2.Client.send_sync
+  test "bidirectional streaming of data", %{client: client} do
+    request = Request.put("/ECHO", [], true)
+    {:ok, stream} = Client.stream(client, request)
+    :ok = Client.send_data(stream, "foo")
+    assert_receive {^stream, response = %Response{}}, 1_000
+    assert 200 == response.status
+    assert true == response.body
+    assert_receive {^stream, response = %{data: "FOO", end_stream: false}}, 1_000
+    :ok = Client.send_data(stream, "bar")
+    assert_receive {^stream, response = %{data: "BAR", end_stream: false}}, 1_000
+    # I do not think the remote closes stream if you do
+    # :ok = Client.send_data(stream, "fin", true)
+    # assert_receive {^stream, response = %{data: "FIN", end_stream: true}}, 1_000
   end
+
+  test "read response with no body", %{client: client} do
+    request = Request.new(:HEAD, "/", [], false)
+    {:ok, stream} = Client.stream(client, request)
+    assert_receive {^stream, response = %Response{}}, 1_000
+    assert 200 == response.status
+    assert false == response.body
+  end
+
+  test "send synchronously without a body in response", %{client: client} do
+    request = Request.new(:HEAD, "/", [], false)
+    {:ok, response} = Client.send_sync(client, request)
+    assert 200 == response.status
+    assert false == response.body
+  end
+
+  test "send synchronously with a body in response", %{client: client} do
+    request = Request.new(:GET, "/", [], false)
+    {:ok, response} = Client.send_sync(client, request)
+    assert 200 == response.status
+    assert "<html>" <> _ = response.body
+  end
+
 end
