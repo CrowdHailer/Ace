@@ -1,5 +1,7 @@
 # Getting Started
 
+*These instructions are for setting up a server, see `Ace.HTTP2.Client` for working with the HTTP/2.0 client.*
+
 Welcome to Ace;
 Once added to your project this guide will demonstrate setting up a simple end point.
 
