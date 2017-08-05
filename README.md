@@ -1,6 +1,6 @@
 # Ace
 
-**HTTP/2 server for elixir**
+**HTTP/2 server and client for Elixir**
 
 - [Install from Hex](https://hex.pm/packages/ace)
 - [Documentation available on hexdoc](https://hexdocs.pm/ace)
@@ -9,10 +9,10 @@
 
 - Consistent server and client interfaces
 - Stream isolation; one process per stream
-- Bidirectional streaming; stream data to and from clients
-- TLS(SSL) support via ALPN; data encrypted in transit
+- Bidirectional streaming; send and receive streamed data
+- Secure data transport; TLS(SSL) support via ALPN
 - Verified against [h2spec](https://github.com/summerwind/h2spec) (*143/146*)
-- [Raxx](https://github.com/crowdhailer/raxx) interface; simplicitfy for request/response interactions
+- Simple request/response interactions; [Raxx](https://github.com/crowdhailer/raxx) interface
 
 *For more view the [features board](https://github.com/CrowdHailer/Ace/projects/1).*
 
@@ -20,7 +20,7 @@
 
 - **[Getting started](getting_started.md)**
 
-*For TCP/TLS server see [previous version](https://github.com/CrowdHailer/Ace/tree/0.9.1).*
+*For TCP/TLS server see [previous version](https://github.com/CrowdHailer/Ace/tree/0.9.x).*
 
 ## Testing
 
