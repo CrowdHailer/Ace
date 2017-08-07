@@ -66,4 +66,10 @@ defmodule Ace.HTTP2.ClientTest do
     assert "<html>" <> _ = response.body
   end
 
+  test "handles Reset frames triggered by sending trailers", %{client: client} do
+    {:ok, stream} = Client.stream(client)
+    :ok = Client.send(stream, %{headers: [{"x-foo", "bar"}], end_stream: true})
+    assert_receive {^stream, {:reset, :protocol_error}}, 1_000
+  end
+
 end

@@ -291,7 +291,9 @@ defmodule Ace.HTTP2.Connection do
     {:error, {:protocol_error, "Clients cannot send push promises"}}
   end
   def consume_frame(frame = %Frame.RstStream{}, state = %{next: :any}) do
-    case dispatch(frame.stream_id, :reset, state) do
+    # DEBT %Reset{error: frame.error}
+    # OR %Closed{}
+    case dispatch(frame.stream_id, {:reset, frame.error}, state) do
       {:ok, {outbound, state}} ->
         {outbound, state}
       {:error, reason} ->

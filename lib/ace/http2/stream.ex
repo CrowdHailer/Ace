@@ -155,7 +155,7 @@ defmodule Ace.HTTP2.Stream do
         {:error, reason}
     end
   end
-  def consume(%{status: :idle}, :reset) do
+  def consume(%{status: :idle}, {:reset, _reason}) do
     {:error, {:protocol_error, "RstStream frame received on a stream in idle state. (RFC7540 5.1)"}}
   end
   def consume(%{status: :idle}, %{data: _}) do
@@ -198,7 +198,8 @@ defmodule Ace.HTTP2.Stream do
   def consume(stream = %{status: :open}, {:window_update, increment}) do
     increase_window(stream, increment)
   end
-  def consume(stream = %{status: :open}, :reset) do
+  def consume(stream = %{status: :open}, {:reset, reason}) do
+    forward(stream, {:reset, reason})
     # TODO reset stream
     {:ok, {[], %{stream | status: :closed}}}
   end
@@ -232,6 +233,10 @@ defmodule Ace.HTTP2.Stream do
     forward(stream, message)
     {:ok, {[], stream}}
   end
+  def consume(stream = %{status: :closed_local}, {:reset, reason}) do
+    forward(stream, {:reset, reason})
+    {:ok, {[], %{stream | status: :closed}}}
+  end
   def consume(%{status: :closed_remote}, %{headers: _}) do
     {:error, {:stream_closed, "Headers received on closed stream"}}
   end
@@ -241,7 +246,7 @@ defmodule Ace.HTTP2.Stream do
   def consume(stream = %{status: :closed_remote}, {:window_update, increment}) do
     increase_window(stream, increment)
   end
-  def consume(stream = %{status: :closed_remote}, :reset) do
+  def consume(stream = %{status: :closed_remote}, {:reset, _reason}) do
     # TODO flow control
     {:ok, {[], %{stream | status: :closed}}}
   end
@@ -251,7 +256,7 @@ defmodule Ace.HTTP2.Stream do
   def consume(%{status: :closed}, %{data: _}) do
     {:error, {:protocol_error, "Data received on closed stream"}}
   end
-  def consume(stream = %{status: :closed}, :reset) do
+  def consume(stream = %{status: :closed}, {:reset, _reason}) do
     {:ok, {[], stream}}
   end
   def consume(stream = %{status: :closed}, {:window_update, increment}) do

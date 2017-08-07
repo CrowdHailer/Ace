@@ -83,6 +83,7 @@ defmodule Ace.HTTP2.Client do
   See the client tests for more examples.
   """
 
+  import Kernel, except: [send: 2]
   alias Ace.HTTP2.{
     Connection
   }
@@ -112,11 +113,27 @@ defmodule Ace.HTTP2.Client do
   This function returns a stream reference send and receive data.
   If requests has body `true` then data may be streamed using `send_data/2`.
   """
-  def stream(pid, request) do
-    {:ok, stream} = GenServer.call(pid, {:new_stream, self()})
+  def stream(connection, request) do
+    {:ok, stream} = stream(connection)
     # send - transmit, publish, dispatch, put, relay, emit, broadcast
-    :ok = GenServer.call(pid, {:send, stream, request})
+    :ok = send(stream, request)
     {:ok, stream}
+  end
+  @doc """
+  Start a new stream within a running connection.
+
+  Stream will start in idle state.
+  """
+  def stream(connection) do
+    GenServer.call(connection, {:new_stream, self()})
+  end
+
+  @doc """
+  Send information over a stream.
+  """
+  def send(stream = {:stream, connection, _, _}, command) do
+    # TODO some return value to know it has gone
+    :ok = GenServer.call(connection, {:send, stream, command})
   end
 
   @doc """
