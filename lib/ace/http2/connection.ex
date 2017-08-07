@@ -101,6 +101,7 @@ defmodule Ace.HTTP2.Connection do
       encode_context: encode_context,
       streams: %{},
       stream_supervisor: stream_supervisor,
+      next_available_stream_id: 2,
       name: "SERVER #{port}"
     }
     {:noreply, {:pending, initial_state}}
@@ -287,8 +288,44 @@ defmodule Ace.HTTP2.Connection do
       end
     end
   end
-  def consume_frame(%Frame.PushPromise{}, _state = %{next: :any}) do
-    {:error, {:protocol_error, "Clients cannot send push promises"}}
+  def consume_frame(frame = %Frame.PushPromise{}, state = %{next: :any}) do
+    # Is a server?
+    # DEBT better decider here
+    if rem(state.next_available_stream_id, 2) == 0 do
+      {:error, {:protocol_error, "Clients cannot send push promises"}}
+    else
+      if frame.end_headers do
+        case HPack.decode(frame.header_block_fragment, state.decode_context) do
+          {:ok, {headers, new_decode_context}} ->
+            state = %{state | decode_context: new_decode_context}
+
+            receiver = state.streams[frame.stream_id].worker
+            monitor = Process.monitor(receiver)
+            stream = %Stream{
+              id: frame.promised_stream_id,
+              status: :reserved_remote,
+              worker: receiver,
+              monitor: monitor,
+              initial_window_size: state.initial_window_size,
+              sent: 0,
+              incremented: 0,
+              buffer: "",
+            }
+            streams = Map.put(state.streams, frame.promised_stream_id, stream)
+            state = %{state | streams: streams}
+            # {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
+
+            promised_stream_ref = {:stream, self(), frame.promised_stream_id, monitor}
+            message = {:promise, {promised_stream_ref, headers}}
+
+            case dispatch(frame.stream_id, message, state) do
+              {:ok, {outbound, state}} ->
+                {outbound, state}
+            end
+        end
+
+      end
+    end
   end
   def consume_frame(frame = %Frame.RstStream{}, state = %{next: :any}) do
     # DEBT %Reset{error: frame.error}
@@ -523,7 +560,13 @@ defmodule Ace.HTTP2.Connection do
       {:error, {:protocol_error, "New streams must always have a higher stream id"}}
     end
   end
-  def new_stream(_, _) do
-    {:error, {:protocol_error, "Clients must start odd streams"}}
+  def new_stream(stream_id, state) do
+    # Is a server?
+    # DEBT better decider here
+    if rem(state.next_available_stream_id, 2) == 0 do
+      {:error, {:protocol_error, "Clients must start odd streams"}}
+    else
+      {:ok, Stream.idle(stream_id, state)}
+    end
   end
 end

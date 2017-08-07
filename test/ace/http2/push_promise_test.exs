@@ -21,7 +21,7 @@ defmodule Ace.HTTP2.PushPromiseTest do
   alias Ace.HTTP2.Frame
 
   test "sending a push promise from a client is a protocol error", %{client: connection} do
-    priority_frame = Frame.PushPromise.new(2, 1, "header_block_fragment")
+    priority_frame = Frame.PushPromise.new(2, 1, "header_block_fragment", true)
     |> IO.inspect
     :ssl.send(connection, Frame.PushPromise.serialize(priority_frame) |> IO.inspect)
     assert {:ok, %Frame.GoAway{debug: debug}} = Support.read_next(connection, 2_000)

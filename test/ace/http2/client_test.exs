@@ -72,4 +72,15 @@ defmodule Ace.HTTP2.ClientTest do
     assert_receive {^stream, {:reset, :protocol_error}}, 1_000
   end
 
+  test "Get a push promise", %{client: client} do
+    request = Request.get("/serverpush")
+    {:ok, stream} = Client.stream(client, request)
+    assert_receive {^stream, {:promise, {new_stream, headers}}}, 1_000
+    assert {:ok, r} = Client.collect_response(new_stream)
+    assert_receive {^stream, {:promise, {new_stream, headers}}}, 1_000
+    assert {:ok, r} = Client.collect_response(new_stream)
+    assert_receive {^stream, {:promise, {new_stream, headers}}}, 1_000
+    assert {:ok, r} = Client.collect_response(new_stream)
+  end
+
 end

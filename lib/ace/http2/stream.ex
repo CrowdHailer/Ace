@@ -165,6 +165,17 @@ defmodule Ace.HTTP2.Stream do
     {:error, {:protocol_error, "WindowUpdate frame received on a stream in idle state. (RFC7540 5.1)"}}
   end
 
+  def consume(stream = %{status: :reserved_remote}, message = %{headers: headers, end_stream: end_stream}) do
+    stream = if end_stream do
+      %{stream | status: :closed}
+    else
+      %{stream | status: :closed_local}
+    end
+    {:ok, {code, headers}} = build_request(headers)
+    response = Ace.Response.new(code, headers, !end_stream)
+    forward(stream, response)
+    {:ok, {[], stream}}
+  end
   def consume(stream = %{status: :open}, message = %{data: _, end_stream: end_stream}) do
     stream = if end_stream do
       %{stream | status: :closed_remote}
@@ -236,6 +247,11 @@ defmodule Ace.HTTP2.Stream do
   def consume(stream = %{status: :closed_local}, {:reset, reason}) do
     forward(stream, {:reset, reason})
     {:ok, {[], %{stream | status: :closed}}}
+  end
+  def consume(stream = %{status: :closed_local}, {:promise, promise}) do
+    forward(stream, {:promise, promise})
+    IO.inspect(promise)
+    {:ok, {[], stream}}
   end
   def consume(%{status: :closed_remote}, %{headers: _}) do
     {:error, {:stream_closed, "Headers received on closed stream"}}

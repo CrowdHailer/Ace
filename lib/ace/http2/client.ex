@@ -155,6 +155,9 @@ defmodule Ace.HTTP2.Client do
           {:ok, body} = read_body(stream)
           {:ok, %{response | body: body}}
         end
+      after
+        1_000 ->
+          :no_headers
     end
   end
 
@@ -186,6 +189,9 @@ defmodule Ace.HTTP2.Client do
         else
           read_body(stream, buffer)
         end
+      after
+        1_000 ->
+          :timeout
     end
   end
 

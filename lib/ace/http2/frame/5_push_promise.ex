@@ -1,18 +1,30 @@
 defmodule Ace.HTTP2.Frame.PushPromise do
   @moduledoc false
-  @enforce_keys [:stream_id, :promised_stream_id, :header_block_fragment]
+  @enforce_keys [:stream_id, :promised_stream_id, :header_block_fragment, :end_headers]
   defstruct @enforce_keys
 
-  def new(stream_id, promised_stream_id, header_block_fragment) do
+  def new(stream_id, promised_stream_id, header_block_fragment, end_headers) do
     %__MODULE__{
       stream_id: stream_id,
       promised_stream_id: promised_stream_id,
-      header_block_fragment: header_block_fragment
+      header_block_fragment: header_block_fragment,
+      end_headers: end_headers
     }
   end
 
-  def decode({5, _flags, stream_id, _header_block_fragment}) do
-    {:ok, new(stream_id, 0, "TODO")}
+  def decode({5, flags, stream_id, payload}) do
+    <<_::4, padded::1, end_headers::1, _::2>> = flags
+    end_headers = end_headers == 1
+
+    data = if padded == 1 do
+      Ace.HTTP2.Frame.remove_padding(payload)
+    else
+      payload
+    end
+
+    <<_R::1, promised_stream_id::31, header_block_fragment::binary>> = data
+
+    {:ok, new(stream_id, promised_stream_id, header_block_fragment, end_headers)}
   end
 
   def serialize(frame) do
