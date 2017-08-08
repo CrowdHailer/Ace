@@ -49,6 +49,17 @@ defmodule Ace.HTTP.RequestTest do
     assert upload.type == "text/plain"
   end
 
+  test "handles absoluteURI", %{port: port} do
+    request = """
+    GET http://www.raxx.com/ HTTP/1.1
+    Host: www.raxx.com
+
+    """
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(socket, request)
+    assert_receive %{host: "www.raxx.com", path: []}
+  end
+
   test "test handles request with split start-line ", %{port: port} do
     request = """
     GET / HTTP/1.1
