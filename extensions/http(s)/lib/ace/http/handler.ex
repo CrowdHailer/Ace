@@ -73,8 +73,11 @@ defmodule Ace.HTTP.Handler do
       {:ok, {:http_request, method, http_uri, _version}, rest} ->
         path_string =
           case http_uri do
-            {:abs_path, path_string} -> path_string
-            {:absoluteURI, _scheme, _host, _port, path_string} -> path_string # Throw away the rest of the absolute URI since we are not proxying
+            {:abs_path, path_string} ->
+              path_string
+            {:absoluteURI, _scheme, _host, _port, path_string} ->
+              # Throw away the rest of the absolute URI since we are not proxying
+              path_string
           end
         %{path: path, query: query_string} = URI.parse(path_string)
         # DEBT in case of path '//' then parsing returns path of nil.
