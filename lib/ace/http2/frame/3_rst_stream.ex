@@ -1,5 +1,10 @@
 defmodule Ace.HTTP2.Frame.RstStream do
   @moduledoc false
+
+  alias Ace.HTTP2.{
+    Errors
+  }
+
   @enforce_keys [:stream_id, :error]
   defstruct @enforce_keys
 
@@ -8,7 +13,7 @@ defmodule Ace.HTTP2.Frame.RstStream do
   end
 
   def decode({3, _flags, stream_id, <<error_code::32>>}) when stream_id > 0 do
-    error = Ace.HTTP2.Frame.GoAway.error(error_code)
+    error = Errors.decode(error_code)
     {:ok, new(stream_id, error)}
   end
   def decode({3, _flags, 0, <<_::32>>}) do
@@ -19,8 +24,7 @@ defmodule Ace.HTTP2.Frame.RstStream do
   end
 
   def serialize(frame) do
-    # DEBT move to general errors
-    payload = <<Ace.HTTP2.Frame.GoAway.error_code(frame.error)::32>>
+    payload = <<Errors.encode(frame.error)::32>>
     <<4::24, 3::8, 0::8, 0::1, frame.stream_id::31, payload::binary>>
   end
 end
