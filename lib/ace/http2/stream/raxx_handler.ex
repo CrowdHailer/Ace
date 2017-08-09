@@ -16,11 +16,8 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
     GenServer.start_link(__MODULE__, {:waiting, {mod, config}})
   end
 
-  def handle_info({stream, %{headers: headers, end_stream: end_stream}}, {:waiting, app}) do
-    {:ok, request} = Ace.HTTP2.Stream.build_request(headers)
-    request = %{request | body: !end_stream}
-    request = %{request | body: ""}
-    handle_request(request, app, stream, end_stream)
+  def handle_info({stream, request = %Ace.Request{}}, {:waiting, app}) do
+    handle_request(%{request | body: ""}, app, stream, !request.body)
   end
   def handle_info({stream, %{data: data, end_stream: end_stream}}, {request, app}) do
     request = %{request | body: request.body <> data}
@@ -55,18 +52,18 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
         headers: headers,
         end_stream: response.body == ""
       }
-      Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+      Ace.HTTP2.Server.send(stream, preface)
       if response.body != "" do
         data = %{
           data: response.body,
           end_stream: true
         }
-        Ace.HTTP2.StreamHandler.send_to_client(stream, data)
+        Ace.HTTP2.Server.send(stream, data)
       end
 
       {:noreply, {request, app}}
     else
-      Ace.HTTP2.StreamHandler.send_to_client(stream, %Ace.HTTP2.Stream.Reset{error: :protocol_error})
+      Ace.HTTP2.Server.send(stream, %Ace.HTTP2.Stream.Reset{error: :protocol_error})
       {:stop, :normal, {request, app}}
     end
   end

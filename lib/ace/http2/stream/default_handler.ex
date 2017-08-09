@@ -9,7 +9,7 @@ defmodule Ace.HTTP2.Stream.DefaultHandler do
       headers: headers,
       end_stream: true
     }
-    Ace.HTTP2.StreamHandler.send_to_client(stream, preface)
+    Ace.HTTP2.Server.send(stream, preface)
     {:noreply, state}
   end
 end

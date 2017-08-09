@@ -150,14 +150,15 @@ defmodule Ace.HTTP2.Stream do
         response = Ace.Response.new(status_code, headers, !end_stream)
         forward(stream, response)
         {:ok, {[], %{stream | status: status}}}
-      {:ok, _request} ->
-        # DEBT send Ace.Request not headers
+      {:ok, request = %Ace.Request{}} ->
+        request = %{request | body: !end_stream}
+
         status = if end_stream do
           :closed_remote
         else
           :open
         end
-        forward(stream, message)
+        forward(stream, request)
         {:ok, {[], %{stream | status: status}}}
       {:error, reason} ->
         {:error, reason}

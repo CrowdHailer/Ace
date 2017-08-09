@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Send generic data over a stream using `Ace.HTTP2.Client.send/1`.
 - Forward stream resets with reason to worker processes.
 
+# Changed
+- Server receives request object not raw headers.
+- Server sends with response object not raw headers.
+
 ## [0.11.1](https://github.com/CrowdHailer/Ace/tree/0.11.1) - 2017-08-03
 
 ## Added

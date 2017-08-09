@@ -2,55 +2,62 @@ defmodule Ace.HTTP2Test do
   use ExUnit.Case
 
   alias Ace.{
-    HPack
+    Request,
+    Response,
+    HTTP2.Client,
+    HTTP2.Server
   }
-  alias Ace.HTTP2.{
-    Frame
-  }
 
-  def handle_request(_, _) do
-    Raxx.Response.ok("Hello, World!", [{"content-length", "13"}])
+  setup do
+    # DEBT change to standard server start
+    {_server, port} = Support.start_server(self())
+    {:ok, %{port: port}}
   end
 
-  test "start endpoint" do
-    Ace.HTTP2.start_link(
-      {Ace.HTTP2.Stream.RaxxHandler, {__MODULE__, :foo}},
-      9999,
-      certfile: Path.expand("../ace/tls/cert.pem", __DIR__),
-      keyfile: Path.expand("../ace/tls/key.pem", __DIR__),
-      connections: 3
-    )
-    {:ok, connection} = :ssl.connect('localhost', 9999, [
-      mode: :binary,
-      packet: :raw,
-      active: :false,
-      alpn_advertised_protocols: ["h2"]]
-    )
-    {:ok, "h2"} = :ssl.negotiated_protocol(connection)
+  test "full request is streamed from client to server", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
 
-    payload = [
-      Ace.HTTP2.Connection.preface(),
-      Ace.HTTP2.Frame.Settings.new() |> Ace.HTTP2.Frame.Settings.serialize(),
-    ]
-    :ssl.send(connection, payload)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: false}} == Support.read_next(connection)
-    assert {:ok, %Ace.HTTP2.Frame.Settings{ack: true}} == Support.read_next(connection)
+    request = Request.post("/", [{"content-type", "text/plain"}], true)
+    :ok = Client.send(client_stream, request)
 
-    encode_context = HPack.new_context(1_000)
-    headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
-    headers_frame = Frame.Headers.new(1, header_block, true, true)
-    Support.send_frame(connection, headers_frame)
-    assert {:ok, %Frame.Headers{}} = Support.read_next(connection)
-    assert {:ok, %Frame.Data{}} = Support.read_next(connection)
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {server_stream, received = %Request{}}, 1_000
+    assert received.path == request.path
+
+    :ok = Client.send_data(client_stream, "Hello, ")
+    assert_receive {^server_stream, %{data: "Hello, ", end_stream: false}}, 1_000
+
+    :ok = Client.send(client_stream, %{headers: [{"x-foo", "bar"}], end_stream: true})
+    assert_receive {^server_stream, %{headers: [{"x-foo", "bar"}], end_stream: true}}, 1_000
   end
 
-  defp home_page_headers(rest \\ []) do
-    [
-      {":scheme", "https"},
-      {":authority", "example.com"},
-      {":method", "GET"},
-      {":path", "/"}
-    ] ++ rest
+  # Check sending complete request ends stream with/out body
+
+  # Client should not break protocol
+  # disallow sending on an ended stream
+  # disallow sending trailers which do not end stream
+
+  test "full response is streamed from server to client", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.get("/", [{"content-type", "text/plain"}])
+    :ok = Client.send(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {server_stream, %Request{}}, 1_000
+
+    response = Response.new(200, [{"content-type", "text/plain"}], true)
+    # TODO return ok
+    Server.send(server_stream, response)
+    assert_receive {client_stream, received = %Response{}}, 1_000
+    assert 200 == received.status
   end
+
+  # Check sending complete request ends stream with/out body
 end

@@ -483,6 +483,23 @@ defmodule Ace.HTTP2.Connection do
         stream_set_dispatch(id, %{headers: headers, end_stream: false}, state)
     end
   end
+  def stream_set_dispatch(id, response = %Ace.Response{}, state) do
+    # Map or array to map, best receive a list and response takes care of ordering
+    headers = for h <- [{":status", Integer.to_string(response.status)} | response.headers], do: h
+    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+    state = %{state | encode_context: new_encode_context}
+    streams = case Map.fetch(state.streams, id) do
+      {:ok, stream = %{status: :idle}} ->
+        new_status = if !response.body, do: :closed_local, else: :open
+        %{state.streams | id => %{stream | status: new_status}}
+      _ ->
+      # DEBT remove
+        state.streams
+    end
+    state = %{state | streams: streams}
+    header_frame = Frame.Headers.new(id, header_block, true, !response.body)
+    {[header_frame], state}
+  end
   def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
     # Map or array to map, best receive a list and response takes care of ordering
     headers = for h <- headers, do: h

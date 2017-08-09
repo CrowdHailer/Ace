@@ -7,10 +7,7 @@ defmodule Ace.HTTP2.StreamHandler do
     GenServer.start_link(__MODULE__, {config, router})
   end
 
-  def handle_info({stream, message}, {config, router}) do
-    {:ok, request} = Ace.HTTP2.Stream.build_request(message.headers)
-    request = %{request | body: !message.end_stream}
-    |> IO.inspect
+  def handle_info({stream, request}, {config, router}) do
     # DEBT try/catch assume always returns check with dialyzer
     handler = try do
       router.route(request)
@@ -19,13 +16,9 @@ defmodule Ace.HTTP2.StreamHandler do
       # TODO implement DefaultHandler
       Ace.HTTP2.Stream.DefaultHandler
     end
-    case handler.handle_info({stream, message}, config) do
+    case handler.handle_info({stream, request}, config) do
       {:noreply, state} ->
         :gen_server.enter_loop(handler, [], state)
     end
-  end
-
-  def send_to_client({:stream, pid, id, ref}, message) do
-    send(pid, {{:stream, id, ref}, message})
   end
 end

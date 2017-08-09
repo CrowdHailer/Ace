@@ -79,9 +79,9 @@ all data is sent from client
 
 The worker can stream data to the client at any point using
 ```elixir
-StreamHandler.send_to_client(stream, %{headers: headers(),  end_stream: boolean()})
+Server.send(stream, %{headers: headers(),  end_stream: boolean()})
 # OR
-StreamHandler.send_to_client(stream, %{data: binary(), end_stream: boolean()})
+Server.send(stream, %{data: binary(), end_stream: boolean()})
 ```
 
 #### Example
@@ -100,12 +100,12 @@ defmodule MyApp.StreamHandler do
       headers: [{":status", "200"}, {"content-length", "13"}],
       end_stream: false
     }
-    StreamHandler.send_to_client(stream, response_headers)
+    Server.send(stream, response_headers)
     response_body = %{
       data: "Hello, World!",
       end_stream: true
     }
-    StreamHandler.send_to_client(stream, response_body)
+    Server.send(stream, response_body)
     {:stop, :normal, state}
   end
 end
