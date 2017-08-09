@@ -33,5 +33,5 @@ Run [h2spec](https://github.com/summerwind/h2spec) against the example `hello_ht
   ```
 2. Run h2spec from docker
   ```
-  sudo docker run --net="host" summerwind/h2spec  --port 8443 -t -k
+  sudo docker run --net="host" summerwind/h2spec --port 8443 -t -k -S
   ```
