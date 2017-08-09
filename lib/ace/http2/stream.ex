@@ -96,7 +96,15 @@ defmodule Ace.HTTP2.Stream do
     else
       case read_headers(headers) do
         {:ok, headers} ->
-          {:ok, {request, headers}}
+          request = %Ace.Request{
+            scheme: scheme,
+            authority: authority,
+            method: method,
+            path: path,
+            headers: headers,
+            body: false
+          }
+          {:ok, request}
         {:error, reason} ->
           {:error, reason}
       end
@@ -124,7 +132,7 @@ defmodule Ace.HTTP2.Stream do
   def read_headers([{k, v} | rest], acc) do
     case String.downcase(k) == k do
       true ->
-        read_headers(rest, [{k, v}, acc])
+        read_headers(rest, [{k, v} | acc])
       false ->
         {:error, {:protocol_error, "headers must be lower case"}}
     end

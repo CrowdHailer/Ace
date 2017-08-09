@@ -8,7 +8,8 @@ defmodule Ace.HTTP2.StreamHandler do
   end
 
   def handle_info({stream, message}, {config, router}) do
-    request = Ace.HTTP2.Request.from_headers(message.headers)
+    {:ok, request} = Ace.HTTP2.Stream.build_request(message.headers)
+    request = %{request | body: !message.end_stream}
     |> IO.inspect
     # DEBT try/catch assume always returns check with dialyzer
     handler = try do

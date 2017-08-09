@@ -17,7 +17,8 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
   end
 
   def handle_info({stream, %{headers: headers, end_stream: end_stream}}, {:waiting, app}) do
-    request = Ace.HTTP2.Request.from_headers(headers)
+    {:ok, request} = Ace.HTTP2.Stream.build_request(headers)
+    request = %{request | body: !end_stream}
     request = %{request | body: ""}
     handle_request(request, app, stream, end_stream)
   end
