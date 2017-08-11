@@ -47,23 +47,12 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
     # Needs h2spec
     if content_length == :undefined || content_length == length do
       response = dispatch_request(request, app)
-      headers = [{":status", "#{response.status}"} | response.headers]
-      preface = %{
-        headers: headers,
-        end_stream: response.body == ""
-      }
-      Ace.HTTP2.Server.send(stream, preface)
-      if response.body != "" do
-        data = %{
-          data: response.body,
-          end_stream: true
-        }
-        Ace.HTTP2.Server.send(stream, data)
-      end
+      # TODO handle response with empty body
+      Ace.HTTP2.Server.send_response(stream, response)
 
       {:noreply, {request, app}}
     else
-      Ace.HTTP2.Server.send(stream, %Ace.HTTP2.Stream.Reset{error: :protocol_error})
+      Ace.HTTP2.Server.send_reset(stream, :protocol_error, "Incorrect content-length")
       {:stop, :normal, {request, app}}
     end
   end

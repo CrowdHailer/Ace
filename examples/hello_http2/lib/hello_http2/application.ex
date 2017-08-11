@@ -8,7 +8,7 @@ defmodule HelloHTTP2.Application do
     certfile = Application.app_dir(:hello_http2, "/priv/cert.pem")
     keyfile = Application.app_dir(:hello_http2, "/priv/key.pem")
 
-    Ace.HTTP2.start_link(
+    Ace.HTTP2.Service.start_link(
       {HelloHTTP2.WWW, :conf},
       8443,
       certfile: certfile,

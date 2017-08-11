@@ -108,18 +108,6 @@ defmodule Ace.HTTP2.Client do
   end
 
   @doc """
-  Send a request that will start a new stream to the server.
-
-  This function returns a stream reference send and receive data.
-  If requests has body `true` then data may be streamed using `send_data/2`.
-  """
-  def stream(connection, request) do
-    {:ok, stream} = stream(connection)
-    # send - transmit, publish, dispatch, put, relay, emit, broadcast
-    :ok = send(stream, request)
-    {:ok, stream}
-  end
-  @doc """
   Start a new stream within a running connection.
 
   Stream will start in idle state.
@@ -131,16 +119,21 @@ defmodule Ace.HTTP2.Client do
   @doc """
   Send information over a stream.
   """
-  def send(stream = {:stream, connection, _, _}, command) do
+  def send_request(stream = {:stream, connection, _, _}, request) do
     # TODO some return value to know it has gone
-    :ok = GenServer.call(connection, {:send, stream, command})
+    :ok = GenServer.call(connection, {:send_request, stream, request})
   end
 
   @doc """
   Add data to an open stream.
   """
   def send_data(stream = {:stream, connection, _, _}, data, end_stream \\ false) do
-    :ok = GenServer.call(connection, {:send, stream, %{data: data, end_stream: end_stream}})
+    :ok = GenServer.call(connection, {:send_data, stream, %{data: data, end_stream: end_stream}})
+  end
+
+  def send_trailers(stream = {:stream, connection, _, _}, trailers) do
+    # TODO some return value to know it has gone
+    :ok = GenServer.call(connection, {:send_trailers, stream, trailers})
   end
 
   @doc """
@@ -166,13 +159,13 @@ defmodule Ace.HTTP2.Client do
 
   NOTE the request must have have body as a binary or `false`.
   """
-  def send_sync(pid, request) do
+  def send_sync(connection, request) do
     if Ace.Request.complete?(request) do
-      {:ok, stream} = GenServer.call(pid, {:new_stream, self()})
+      {:ok, stream} = stream(connection)
+      :ok = send_request(stream, request)
       # send - transmit, publish, dispatch, put, relay, emit, broadcast
-      :ok = GenServer.call(pid, {:send, stream, request})
       if is_binary(request.body) do
-        :ok = GenServer.call(pid, {:send, stream, %{data: request.body, end_stream: true}})
+        send_data(stream, request.body, true)
       end
       collect_response(stream)
     else

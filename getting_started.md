@@ -51,7 +51,7 @@ defmodule MyApp.Application do
     certfile = Application.app_dir(:my_app, "/priv/cert.pem")
     keyfile = Application.app_dir(:my_app, "/priv/key.pem")
 
-    Ace.HTTP2.start_link(
+    Ace.HTTP2.Service.start_link(
       {MyApp.SimpleHandler, :config},
       8443,
       certfile: certfile,
@@ -64,7 +64,7 @@ end
 
 ##### Note
 
-`Ace.HTTP2.start_link/3` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
+`Ace.HTTP2.Service.start_link/3` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
 
 ## Bidirectional streaming
 

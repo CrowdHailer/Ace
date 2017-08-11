@@ -19,7 +19,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Request.post("/", [{"content-type", "text/plain"}], true)
-    :ok = Client.send(client_stream, request)
+    :ok = Client.send_request(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
     GenServer.reply(from, {:ok, self()})
@@ -30,7 +30,7 @@ defmodule Ace.HTTP2Test do
     :ok = Client.send_data(client_stream, "Hello, ")
     assert_receive {^server_stream, %{data: "Hello, ", end_stream: false}}, 1_000
 
-    :ok = Client.send(client_stream, %{headers: [{"x-foo", "bar"}], end_stream: true})
+    :ok = Client.send_trailers(client_stream, [{"x-foo", "bar"}])
     assert_receive {^server_stream, %{headers: [{"x-foo", "bar"}], end_stream: true}}, 1_000
   end
 
@@ -45,7 +45,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Request.get("/", [{"content-type", "text/plain"}])
-    :ok = Client.send(client_stream, request)
+    :ok = Client.send_request(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
     GenServer.reply(from, {:ok, self()})
@@ -54,9 +54,11 @@ defmodule Ace.HTTP2Test do
 
     response = Response.new(200, [{"content-type", "text/plain"}], true)
     # TODO return ok
-    Server.send(server_stream, response)
+    Server.send_response(server_stream, response)
     assert_receive {client_stream, received = %Response{}}, 1_000
     assert 200 == received.status
+
+    # TODO send_data
   end
 
   # Check sending complete request ends stream with/out body
@@ -66,24 +68,26 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Request.get("/", [{"content-type", "text/plain"}])
-    :ok = Client.send(client_stream, request)
+    :ok = Client.send_request(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
     GenServer.reply(from, {:ok, self()})
 
     request = %{Request.get("/favicon") | authority: "localhost"}
     assert_receive {server_stream, %Request{}}, 1_000
-    Server.push(server_stream, request)
+    Server.send_promise(server_stream, request)
 
     assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
     GenServer.reply(from, {:ok, self()})
 
     assert_receive {server_pushed_stream, %Request{path: "/favicon"}}, 1_000
+    IO.inspect(server_pushed_stream)
 
     assert_receive {^client_stream, {:promise, {client_promised_stream, %Request{path: "/favicon"}}}}, 1_000
+    IO.inspect(client_promised_stream)
 
     response = Response.new(200, [{"content-type", "text/html"}], true)
-    Server.send(server_pushed_stream, response)
+    Server.send_response(server_pushed_stream, response)
 
     assert_receive {^client_promised_stream, %Response{headers: [{"content-type", "text/html"}]}}, 1_000
   end

@@ -20,7 +20,6 @@ defmodule Ace.HTTP2.Connection do
     # next: :preface, :handshake, :any, :continuation,
     next: :any,
     peer: :server,
-    buffer: "",
     settings: nil,
     socket: nil,
     decode_context: nil,
@@ -30,16 +29,10 @@ defmodule Ace.HTTP2.Connection do
     streams: nil,
     stream_supervisor: nil,
     client_stream_id: 0,
-    next_available_stream_id: nil,
+    next_local_stream_id: nil,
     name: nil
     # accept_push always false for server but usable in client.
   ]
-
-  use GenServer
-  def start_link(listen_socket, stream_supervisor) do
-    IO.inspect("start server")
-    GenServer.start_link(__MODULE__, {listen_socket, stream_supervisor})
-  end
 
   def init({:client, {host, port}}) do
     {:ok, connection} = :ssl.connect(host, port, [
@@ -68,10 +61,10 @@ defmodule Ace.HTTP2.Connection do
       encode_context: encode_context,
       streams: %{},
       stream_supervisor: :client,
-      next_available_stream_id: 1,
+      next_local_stream_id: 1,
     }
     state = %{initial_state | next: :handshake}
-    {:ok, state}
+    {:ok, {"", state}}
   end
   def init({listen_socket, {mod, conf}}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
@@ -101,19 +94,18 @@ defmodule Ace.HTTP2.Connection do
       encode_context: encode_context,
       streams: %{},
       stream_supervisor: stream_supervisor,
-      next_available_stream_id: 2,
+      next_local_stream_id: 2,
       name: "SERVER #{port}"
     }
     {:noreply, {:pending, initial_state}}
   end
   def handle_info({:ssl, connection, @preface <> data}, {:pending, state}) do
     state = %{state | next: :handshake}
-    handle_info({:ssl, connection, data}, state)
+    handle_info({:ssl, connection, data}, {"", state})
   end
-  def handle_info({:ssl, _, data}, state = %__MODULE__{}) do
-    data = state.buffer <> data
-    state = %{state | buffer: ""}
-    case consume(data, state) do
+  def handle_info({:ssl, _, data}, {buffer, state = %__MODULE__{}}) do
+    buffer = buffer <> data
+    case consume(buffer, state) do
       {:ok, state} ->
         {:noreply, state}
       {:error, {error, debug}} ->
@@ -128,92 +120,143 @@ defmodule Ace.HTTP2.Connection do
   def handle_info({:ssl_closed, _socket}, state) do
     {:stop, :normal, state}
   end
-  def handle_info({{:stream, stream_id, _ref}, message}, state) do
-    {frames, state} = stream_set_dispatch(stream_id, message, state)
-    outbound = Enum.map(frames, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, outbound)
-    {:noreply, state}
-  end
-  def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, {buffer, state}) do
     {_id, stream} = Enum.find(state.streams, fn
       ({_id, %{monitor: ^ref}}) ->
         true
       (_) -> false
     end)
     {outbound, stream} = Stream.terminate(stream, reason)
-    streams = Map.put(state.streams, stream.id, stream)
+    state = put_stream(state, stream)
+    outbound = Enum.map(outbound, &Frame.serialize/1)
+    :ok = :ssl.send(state.socket, outbound)
+    {:noreply, {buffer, state}}
+  end
+  def handle_call({:new_stream, receiver}, _from, {buffer, state}) do
+    {stream_id, state} = next_stream_id(state)
+    stream = Stream.idle(stream_id, receiver, state.initial_window_size)
+    state = put_stream(state, stream)
+    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, {buffer, state}}
+  end
+
+  def handle_call({:send_request, {:stream, _, stream_id, _}, request}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, {outbound, new_stream}} = Stream.send_request(stream, request)
+    streams = %{state.streams | stream_id => new_stream}
     state = %{state | streams: streams}
-    outbound = Enum.map(outbound, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, outbound)
-    {:noreply, state}
+    state = Enum.reduce(outbound, state, fn(%{headers: headers, end_stream: end_stream}, state) ->
+      {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+      state = %{state | encode_context: new_encode_context}
+      header_frame = Frame.Headers.new(stream_id, header_block, true, end_stream)
+      :ok = :ssl.send(state.socket, Frame.serialize(header_frame))
+      state
+    end)
+    {:reply, :ok, {buffer, state}}
   end
-  # TODO this is replaced by next calls
-  def handle_call({:request, headers, receiver}, _from, state) do
-    stream_id = state.next_available_stream_id
-    monitor = Process.monitor(receiver)
-    stream = %Stream{
-      id: stream_id,
-      status: :idle,
-      worker: receiver,
-      monitor: monitor,
-      initial_window_size: state.initial_window_size,
-      sent: 0,
-      incremented: 0,
-      buffer: "",
-    }
-    streams = Map.put(state.streams, stream_id, stream)
-    state = %{state | next_available_stream_id: stream_id + 2, streams: streams}
-    {frames, state} = stream_set_dispatch(stream_id, %{headers: headers, end_stream: true}, state)
-    outbound = Enum.map(frames, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, outbound)
-    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
+  def handle_call({:send_response, {:stream, _, stream_id, _}, response}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, {outbound, new_stream}} = Stream.send_response(stream, response)
+    state = put_stream(state, new_stream)
+    state = Enum.reduce(outbound, state, fn
+      (%{headers: headers, end_stream: end_stream}, state) ->
+        {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+        state = %{state | encode_context: new_encode_context}
+        header_frame = Frame.Headers.new(stream_id, header_block, true, end_stream)
+        :ok = :ssl.send(state.socket, Frame.serialize(header_frame))
+        state
+      (%{data: data, end_stream: end_stream}, state) ->
+        data_frame = Frame.Data.new(stream_id, data, end_stream)
+        :ok = :ssl.send(state.socket, Frame.serialize(data_frame))
+        state
+    end)
+    {:reply, :ok, {buffer, state}}
   end
-  def handle_call({:new_stream, receiver}, _from, state) do
-    stream_id = state.next_available_stream_id
-    monitor = Process.monitor(receiver)
-    stream = %Stream{
-      id: stream_id,
-      status: :idle,
-      worker: receiver,
-      monitor: monitor,
-      initial_window_size: state.initial_window_size,
-      sent: 0,
-      incremented: 0,
-      buffer: "",
-    }
-    streams = Map.put(state.streams, stream_id, stream)
-    state = %{state | next_available_stream_id: stream_id + 2, streams: streams}
-    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
-  end
-  def handle_call({:send, {:stream, _, stream_id, _}, message}, _from, state) do
-    {frames, state} = stream_set_dispatch(stream_id, message, state)
-    outbound = Enum.map(frames, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, outbound)
-    {:reply, :ok, state}
-  end
-  def handle_info({:push, {:stream, original_id, _ref}, request}, state) do
-    {stream, state} = next_stream(state)
-    headers = [
-      {":scheme", Atom.to_string(request.scheme)},
-      # TODO do something smart when authority is :connection
-      {":authority", "#{request.authority}"},
-      {":method", Atom.to_string(request.method)},
-      {":path", request.path} |
-      request.headers
-    ]
+  def handle_call({:send_promise, {:stream, _, original_id, _ref}, request}, from, {buffer, state}) do
+    GenServer.reply(from, :ok)
+    {promised_stream, state} = next_stream(state)
+    headers = Ace.HTTP2.request_to_headers(request)
     {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-    promise_frame = Frame.PushPromise.new(original_id, stream.id, header_block, true)
-    {:ok, {outbound, state}} = dispatch(stream.id, %{headers: headers, end_stream: true}, state)
-    outbound = [promise_frame | outbound]
-    outbound = Enum.map(outbound, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, outbound)
-    {:noreply, state}
+    state = %{state | encode_context: new_encode_context}
+    promise_frame = Frame.PushPromise.new(original_id, promised_stream.id, header_block, true)
+    :ok = :ssl.send(state.socket, Frame.serialize(promise_frame))
+    {:ok, {outbound, state}} = case Stream.receive_headers(promised_stream, request) do
+      {:ok, {outbound, stream}} ->
+        state = put_stream(state, stream)
+        {:ok, {outbound, state}}
+      {:error, reason} ->
+        {:error, reason}
+    end
+    {:noreply, {buffer, state}}
+  end
+  def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, from, {conn_buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    if stream.status == :closed || stream.status == :closed_local do
+      Logger.info("Data lost because stream already closed")
+      # DEBT expose through backpressure
+      {[], state}
+    else
+      connection_window = state.outbound_window
+      stream_window = Stream.outbound_window(stream)
+      available_window = min(stream_window, connection_window)
+      {to_send, buffer} = case data do
+        <<to_send::binary-size(available_window), buffer::binary>> ->
+          {to_send, buffer}
+        to_send ->
+          {to_send, ""}
+      end
+
+      true = :erlang.is_binary(to_send)
+      window_used = :erlang.iolist_size(to_send)
+      stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
+      stream = case {stream.status, end_stream} do
+        {:closed_remote, true} ->
+          %{stream | status: :closed}
+        {:open, true} ->
+          %{stream | status: :closed_local}
+        {_, false} ->
+          stream
+      end
+      streams = %{state.streams | stream_id => stream}
+      data_frame = Frame.Data.new(stream_id, to_send, end_stream && (buffer == ""))
+      remaining_connection_window = connection_window - window_used
+      state = %{state | streams: streams, outbound_window: remaining_connection_window}
+      :ok = :ssl.send(state.socket, Frame.serialize(data_frame))
+      {:reply, :ok, {conn_buffer, state}}
+    end
+  end
+  def handle_call({:send_trailers, {:stream, _, stream_id, _}, trailers}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, {outbound, new_stream}} = Stream.send_trailers(stream, trailers)
+    state = put_stream(state, new_stream)
+    state = Enum.reduce(outbound, state, fn(%{headers: headers, end_stream: end_stream}, state) ->
+      {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+      state = %{state | encode_context: new_encode_context}
+      header_frame = Frame.Headers.new(stream_id, header_block, true, end_stream)
+      :ok = :ssl.send(state.socket, Frame.serialize(header_frame))
+      state
+    end)
+    {:reply, :ok, {buffer, state}}
+  end
+  def handle_call({:send_reset, {:stream, _, stream_id, _}, error, reason}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    state = Stream.send_reset(stream, error, reason)
+    |> handle_stream_response(state)
+    |> handle_connection_response
+    {:reply, :ok, {buffer, state}}
+  end
+
+  def handle_connection_response({:ok, {frames, state}}) do
+    IO.inspect(frames)
+    io_list = Enum.map(frames, &Frame.serialize/1)
+    :ok = :ssl.send(state.socket, io_list)
+    state
   end
 
   def next_stream(state) do
-    stream = Stream.idle(state.next_available_stream_id, state)
-    streams = Map.put(state.streams, stream.id, stream)
-    state = %{state | streams: streams}
+    {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
+    {stream_id, state} = next_stream_id(state)
+    stream = Stream.reserve(stream_id, worker, state.initial_window_size)
+    state = put_stream(state, stream)
     {stream, state}
   end
   def consume(buffer, state) do
@@ -225,7 +268,8 @@ defmodule Ace.HTTP2.Connection do
             {:ok, frame} ->
               Logger.debug("#{state.name}: #{inspect(frame)}")
               case consume_frame(frame, state) do
-                {outbound, state} when is_list(outbound) ->
+                {:ok, {outbound, state}} when is_list(outbound) ->
+                  IO.inspect(outbound)
                   outbound = Enum.map(outbound, &Frame.serialize/1)
                   :ok = :ssl.send(state.socket, outbound)
                   consume(unprocessed, state)
@@ -244,9 +288,8 @@ defmodule Ace.HTTP2.Connection do
               {:error, reason}
           end
         else
-          state = %{state | buffer: unprocessed}
           :ssl.setopts(state.socket, [active: :once])
-          {:ok, state}
+          {:ok, {unprocessed, state}}
         end
       {:error, reason} ->
         {:error, reason}
@@ -258,9 +301,9 @@ defmodule Ace.HTTP2.Connection do
       {:ok, new_state} ->
         new_state = %{new_state | next: :any}
         # DEBT only do this if initial_window_size has increased
-        {frames, newer_state} = transmit_available(new_state)
+        {:ok, {frames, newer_state}} = transmit_available(new_state)
         # |> IO.inspect
-        {[Frame.Settings.ack() | frames], newer_state}
+        {:ok, {[Frame.Settings.ack() | frames], newer_state}}
       {:error, reason} ->
         {:error, reason}
     end
@@ -269,10 +312,10 @@ defmodule Ace.HTTP2.Connection do
     {:error, {:protocol_error, "Did not receive settings frame"}}
   end
   def consume_frame(frame = %Frame.Ping{ack: false}, state = %{next: :any}) do
-    {[Frame.Ping.ack(frame)], state}
+    {:ok, {[Frame.Ping.ack(frame)], state}}
   end
   def consume_frame(%Frame.Ping{ack: true}, state = %{next: :any}) do
-    {[], state}
+    {:ok, {[], state}}
   end
   def consume_frame(%Frame.GoAway{error: :no_error}, _state = %{next: :any}) do
     {:error, {:no_error, "Client closed connection"}}
@@ -287,26 +330,23 @@ defmodule Ace.HTTP2.Connection do
       {:error, {:flow_control_error, "Total window size exceeded max allowed"}}
     end
   end
-  def consume_frame(frame = %Frame.WindowUpdate{stream_id: _}, state = %{next: :any}) do
-    case dispatch(frame.stream_id, {:window_update, frame.increment}, state) do
-      {:ok, {outbound, new_state}} ->
-        {frames, newer_state} = transmit_available(new_state)
-        {outbound ++ frames, newer_state}
-      {:error, reason} ->
-        {:error, reason}
-    end
+  def consume_frame(frame = %Frame.WindowUpdate{}, state = %{next: :any}) do
+    {:ok, stream} = Map.fetch(state.streams, frame.stream_id)
+    {:ok, {outbound, new_stream}} = Stream.receive_window_update(stream, frame.increment)
+    new_state = put_stream(state, new_stream)
+    {:ok, {outbound, new_state}}
   end
   def consume_frame(%Frame.Priority{}, state = %{next: :any}) do
     IO.inspect("Ignoring priority frame")
-    {[], state}
+    {:ok, {[], state}}
   end
   def consume_frame(settings = %Frame.Settings{}, state = %{next: :any}) do
     if settings.ack do
-      {[], state}
+      {:ok, {[], state}}
     else
       case update_settings(settings, state) do
         {:ok, new_state} ->
-          {[Frame.Settings.ack()], new_state}
+          {:ok, {[Frame.Settings.ack()], new_state}}
         {:error, reason} ->
           {:error, reason}
       end
@@ -315,7 +355,7 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(frame = %Frame.PushPromise{}, state = %{next: :any}) do
     # Is a server?
     # DEBT better decider here
-    if rem(state.next_available_stream_id, 2) == 0 do
+    if rem(state.next_local_stream_id, 2) == 0 do
       {:error, {:protocol_error, "Clients cannot send push promises"}}
     else
       if frame.end_headers do
@@ -323,56 +363,46 @@ defmodule Ace.HTTP2.Connection do
           {:ok, {headers, new_decode_context}} ->
             state = %{state | decode_context: new_decode_context}
 
-            receiver = state.streams[frame.stream_id].worker
-            monitor = Process.monitor(receiver)
-            stream = %Stream{
-              id: frame.promised_stream_id,
-              status: :reserved_remote,
-              worker: receiver,
-              monitor: monitor,
-              initial_window_size: state.initial_window_size,
-              sent: 0,
-              incremented: 0,
-              buffer: "",
-            }
-            streams = Map.put(state.streams, frame.promised_stream_id, stream)
-            state = %{state | streams: streams}
-            # {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
+            {:ok, original_stream} = Map.fetch(state.streams, frame.stream_id)
 
-            promised_stream_ref = {:stream, self(), frame.promised_stream_id, monitor}
-            {:ok, request} = Ace.HTTP2.Stream.build_request(headers)
-            message = {:promise, {promised_stream_ref, request}}
+            promised_stream = Stream.reserved(frame.promised_stream_id, original_stream.worker, state.initial_window_size)
+            state = put_stream(state, promised_stream)
 
-            case dispatch(frame.stream_id, message, state) do
-              {:ok, {outbound, state}} ->
-                {outbound, state}
-            end
+            {:ok, request} = Ace.HTTP2.build_request(headers)
+
+            {:ok, {outbound, latest_original}} = Stream.receive_promise(original_stream, promised_stream, request)
+
+            state = put_stream(state, latest_original)
+            {:ok, {outbound, state}}
         end
       else
         {:error, :todo_join_push_headers}
       end
     end
   end
+
   def consume_frame(frame = %Frame.RstStream{}, state = %{next: :any}) do
     # DEBT %Reset{error: frame.error}
     # OR %Closed{}
-    case dispatch(frame.stream_id, {:reset, frame.error}, state) do
-      {:ok, {outbound, state}} ->
-        {outbound, state}
-      {:error, reason} ->
-        {:error, reason}
-    end
+    stream = get_stream(state, frame)
+    Stream.receive_reset(stream, frame.error)
+    |> handle_stream_response(state)
   end
   def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
     if frame.end_headers do
       case HPack.decode(frame.header_block_fragment, state.decode_context) do
         {:ok, {headers, new_decode_context}} ->
-          # preface bad name as could be trailers perhaps metadata
-          preface = %{headers: headers, end_stream: frame.end_stream}
           state = %{state | decode_context: new_decode_context}
-          case dispatch(frame.stream_id, preface, state) do
-            {:ok, {outbound, state}} ->
-              {outbound, state}
+          {:ok, stream} = if stream = get_stream(state, frame) do
+            {:ok, stream}
+          else
+            new_stream(frame.stream_id, state)
+          end
+
+          case Stream.receive_headers(stream, headers, frame.end_stream) do
+            {:ok, {outbound, stream}} ->
+              state = put_stream(state, stream)
+              {:ok, {outbound, %{state | client_stream_id: max(stream.id, state.client_stream_id)}}}
             {:error, reason} ->
               {:error, reason}
           end
@@ -380,25 +410,22 @@ defmodule Ace.HTTP2.Connection do
           {:error, {:compression_error, "bad decode"}}
       end
     else
-      {[], %{state | next: {:continuation, frame.stream_id, frame.header_block_fragment, frame.end_stream}}}
+      {:ok, {[], %{state | next: {:continuation, frame}}}}
     end
   end
-  def consume_frame(frame = %Frame.Continuation{}, state = %{next: {:continuation, _stream_id, buffer, end_stream}}) do
-    buffer = buffer <> frame.header_block_fragment
-    if frame.end_headers do
-      {:ok, {headers, new_decode_context}} = HPack.decode(buffer, state.decode_context)
-      # preface bad name as could be trailers perhaps metadata
-      state = %{state | decode_context: new_decode_context}
-      preface = %{headers: headers, end_stream: end_stream}
-      case dispatch(frame.stream_id, preface, state) do
-        {:ok, {outbound, state}} ->
-          state = %{state | next: :any}
-          {outbound, state}
-        {:error, reason} ->
-          {:error, reason}
-      end
+  def consume_frame(%Frame.Continuation{stream_id: 0}, _state) do
+    {:error, {:protocol_error, "Continuation not to be sent on zero stream"}}
+  end
+  def consume_frame(continuation = %Frame.Continuation{}, state = %{next: {:continuation, headers_frame = %Frame.Headers{}}}) do
+    header_block_fragment = headers_frame.header_block_fragment <> continuation.header_block_fragment
+    # TODO check stream ids
+    headers_frame = %{headers_frame | header_block_fragment: header_block_fragment}
+    if continuation.end_headers do
+      headers_frame = %{headers_frame | end_headers: true}
+      state = %{state | next: :any}
+      consume_frame(headers_frame, state)
     else
-      {[], %{state | next: {:continuation, frame.stream_id, buffer, end_stream}}}
+      {:ok, {[], %{state | next: {:continuation, headers_frame}}}}
     end
   end
   def consume_frame(frame = %Frame.Data{}, state = %{next: :any}) do
@@ -408,10 +435,12 @@ defmodule Ace.HTTP2.Connection do
     # control window of the maximum size (2^31-1) and can maintain this
     # window by sending a WINDOW_UPDATE frame when any data is received.
     # This effectively disables flow control for that receiver.
-    data = %{data: frame.data, end_stream: frame.end_stream}
-    case dispatch(frame.stream_id, data, state) do
-      {:ok, {outbound, state}} ->
-        {outbound ++ [Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)], state}
+    stream = get_stream(state, frame)
+    case Stream.receive_data(stream, frame.data, frame.end_stream) do
+      {:ok, {outbound, stream}} ->
+        state = put_stream(state, stream)
+        outbound = outbound ++ [Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)]
+        {:ok, {outbound, %{state | client_stream_id: max(stream.id, state.client_stream_id)}}}
       {:error, reason} ->
         {:error, reason}
     end
@@ -419,6 +448,14 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(frame, %{next: next}) do
     IO.inspect("expected next '#{inspect(next)}' got: #{inspect(frame)}")
     {:error, {:protocol_error, "Unexpected frame"}}
+  end
+
+  def handle_stream_response({:ok, {outbound, stream}}, previous_state) do
+    state = put_stream(previous_state, stream)
+    {:ok, {outbound, state}}
+  end
+  def handle_stream_response({:error, reason}, _previous_state) do
+    {:error, reason}
   end
 
   # TODO handle all settings
@@ -470,135 +507,30 @@ defmodule Ace.HTTP2.Connection do
         end
     end)
     state = %{state | outbound_window: remaining_window, streams: streams}
-    {data_frames, state}
+    {:ok, {data_frames, state}}
   end
 
-  def dispatch(stream_id, message, state) do
-    # NOTE only evaluate creating new stream if one does not exist
-    # DEBT don't have stream rely on shape of connection state
-    case fetch_stream(state, stream_id) do
-      {:ok, stream} ->
-        case Stream.consume(stream, message) do
-          {:ok, {outbound, stream}} ->
-            streams = Map.put(state.streams, stream_id, stream)
-            {:ok, {outbound, %{state | streams: streams, client_stream_id: max(stream.id, state.client_stream_id)}}}
-          {:error, reason} ->
-            {:error, reason}
-        end
-      {:error, reason} ->
-        {:error, reason}
-    end
+  def get_stream(state, frame) do
+    Map.get(state.streams, frame.stream_id)
   end
 
-  def stream_set_dispatch(id, request = %Ace.Request{}, state) do
-    authority = case request.authority do
-      :connection ->
-        "todo.com"
-    end
-    headers = [
-      {":scheme", Atom.to_string(request.scheme)},
-      {":authority", authority},
-      {":method", Atom.to_string(request.method)},
-      {":path", request.path} |
-      request.headers
-    ]
-    case request.body do
-      false ->
-        stream_set_dispatch(id, %{headers: headers, end_stream: true}, state)
-      true ->
-        stream_set_dispatch(id, %{headers: headers, end_stream: false}, state)
-    end
-  end
-  def stream_set_dispatch(id, response = %Ace.Response{}, state) do
-    # Map or array to map, best receive a list and response takes care of ordering
-    headers = for h <- [{":status", Integer.to_string(response.status)} | response.headers], do: h
-    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-    state = %{state | encode_context: new_encode_context}
-    streams = case Map.fetch(state.streams, id) do
-      {:ok, stream = %{status: :idle}} ->
-        new_status = if !response.body, do: :closed_local, else: :open
-        %{state.streams | id => %{stream | status: new_status}}
-      _ ->
-      # DEBT remove
-        state.streams
-    end
-    state = %{state | streams: streams}
-    header_frame = Frame.Headers.new(id, header_block, true, !response.body)
-    {[header_frame], state}
-  end
-  def stream_set_dispatch(id, %{headers: headers, end_stream: end_stream}, state) do
-    # Map or array to map, best receive a list and response takes care of ordering
-    headers = for h <- headers, do: h
-    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-    state = %{state | encode_context: new_encode_context}
-    streams = case Map.fetch(state.streams, id) do
-      {:ok, stream = %{status: :idle}} ->
-        new_status = if end_stream, do: :closed_local, else: :open
-        %{state.streams | id => %{stream | status: new_status}}
-      _ ->
-      # DEBT remove
-        state.streams
-    end
-    state = %{state | streams: streams}
-    header_frame = Frame.Headers.new(id, header_block, true, end_stream)
-    {[header_frame], state}
-  end
-  def stream_set_dispatch(stream_id, %{data: data, end_stream: end_stream}, state) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    if stream.status == :closed || stream.status == :closed_local do
-      Logger.info("Data lost because stream already closed")
-      # DEBT expose through backpressure
-      {[], state}
-    else
-      connection_window = state.outbound_window
-      stream_window = Stream.outbound_window(stream)
-      available_window = min(stream_window, connection_window)
-      {to_send, buffer} = case data do
-        <<to_send::binary-size(available_window), buffer::binary>> ->
-          {to_send, buffer}
-        to_send ->
-          {to_send, ""}
-      end
-
-      true = :erlang.is_binary(to_send)
-      window_used = :erlang.iolist_size(to_send)
-      stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
-      stream = case {stream.status, end_stream} do
-        {:closed_remote, true} ->
-          %{stream | status: :closed}
-        {:open, true} ->
-          %{stream | status: :closed_local}
-        {_, false} ->
-          stream
-      end
-      streams = %{state.streams | stream_id => stream}
-      data_frame = Frame.Data.new(stream_id, to_send, end_stream && (buffer == ""))
-      remaining_connection_window = connection_window - window_used
-      {[data_frame], %{state | streams: streams, outbound_window: remaining_connection_window}}
-    end
-  end
-  def stream_set_dispatch(stream_id, %Ace.HTTP2.Stream.Reset{error: reason}, state) do
-    # DEBT does not check if stream idle or already closed
-    # stream = fetch_stream(state, stream_id)
-    rst_frame = Frame.RstStream.new(stream_id, reason)
-    {[rst_frame], state}
+  def put_stream(state, stream) do
+    new_streams = Map.put(state.streams, stream.id, stream)
+    %{state | streams: new_streams}
   end
 
-  defp fetch_stream(state, stream_id) do
-    case Map.fetch(state.streams, stream_id) do
-      {:ok, stream} ->
-        {:ok, stream}
-      :error ->
-        new_stream(stream_id, state)
-    end
+  def next_stream_id(state = %{next_local_stream_id: stream_id}) do
+    {stream_id, %{state | next_local_stream_id: stream_id + 2}}
   end
 
+  # rename client_started_stream
   def new_stream(0, _) do
     {:error, {:protocol_error, "Stream 0 reserved for connection"}}
   end
   def new_stream(stream_id, state) when rem(stream_id, 2) == 1 do
     if stream_id > state.client_stream_id do
-      {:ok, Stream.idle(stream_id, state)}
+      {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
+      {:ok, Stream.idle(stream_id, worker, state.initial_window_size)}
     else
       {:error, {:protocol_error, "New streams must always have a higher stream id"}}
     end
@@ -606,10 +538,11 @@ defmodule Ace.HTTP2.Connection do
   def new_stream(stream_id, state) do
     # Is a server?
     # DEBT better decider here
-    if rem(state.next_available_stream_id, 2) == 0 do
+    if rem(state.next_local_stream_id, 2) == 0 do
       {:error, {:protocol_error, "Clients must start odd streams"}}
     else
-      {:ok, Stream.idle(stream_id, state)}
+      {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
+      {:ok, Stream.idle(stream_id, worker, state.initial_window_size)}
     end
   end
 end
