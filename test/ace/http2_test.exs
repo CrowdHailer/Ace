@@ -60,4 +60,34 @@ defmodule Ace.HTTP2Test do
   end
 
   # Check sending complete request ends stream with/out body
+
+  test "send a promise from the server", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.get("/", [{"content-type", "text/plain"}])
+    :ok = Client.send(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    request = %{Request.get("/favicon") | authority: "localhost"}
+    assert_receive {server_stream, %Request{}}, 1_000
+    Server.push(server_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {server_pushed_stream, %Request{path: "/favicon"}}, 1_000
+
+    assert_receive {^client_stream, {:promise, {client_promised_stream, %Request{path: "/favicon"}}}}, 1_000
+
+    response = Response.new(200, [{"content-type", "text/html"}], true)
+    Server.send(server_pushed_stream, response)
+
+    assert_receive {^client_promised_stream, %Response{headers: [{"content-type", "text/html"}]}}, 1_000
+  end
+
+  # Server can push on closed, idle streams
+  # Test cannot push to client with push disabled
 end

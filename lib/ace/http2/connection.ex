@@ -191,7 +191,31 @@ defmodule Ace.HTTP2.Connection do
     :ok = :ssl.send(state.socket, outbound)
     {:reply, :ok, state}
   end
+  def handle_info({:push, {:stream, original_id, _ref}, request}, state) do
+    {stream, state} = next_stream(state)
+    headers = [
+      {":scheme", Atom.to_string(request.scheme)},
+      # TODO do something smart when authority is :connection
+      {":authority", "#{request.authority}"},
+      {":method", Atom.to_string(request.method)},
+      {":path", request.path} |
+      request.headers
+    ]
+    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+    promise_frame = Frame.PushPromise.new(original_id, stream.id, header_block, true)
+    {:ok, {outbound, state}} = dispatch(stream.id, %{headers: headers, end_stream: true}, state)
+    outbound = [promise_frame | outbound]
+    outbound = Enum.map(outbound, &Frame.serialize/1)
+    :ok = :ssl.send(state.socket, outbound)
+    {:noreply, state}
+  end
 
+  def next_stream(state) do
+    stream = Stream.idle(state.next_available_stream_id, state)
+    streams = Map.put(state.streams, stream.id, stream)
+    state = %{state | streams: streams}
+    {stream, state}
+  end
   def consume(buffer, state) do
     case Frame.parse_from_buffer(buffer, max_length: 16_384) do
       {:ok, {raw_frame, unprocessed}} ->
@@ -316,14 +340,16 @@ defmodule Ace.HTTP2.Connection do
             # {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, state}
 
             promised_stream_ref = {:stream, self(), frame.promised_stream_id, monitor}
-            message = {:promise, {promised_stream_ref, headers}}
+            {:ok, request} = Ace.HTTP2.Stream.build_request(headers)
+            message = {:promise, {promised_stream_ref, request}}
 
             case dispatch(frame.stream_id, message, state) do
               {:ok, {outbound, state}} ->
                 {outbound, state}
             end
         end
-
+      else
+        {:error, :todo_join_push_headers}
       end
     end
   end

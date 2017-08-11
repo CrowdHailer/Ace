@@ -259,7 +259,6 @@ defmodule Ace.HTTP2.Stream do
   end
   def consume(stream = %{status: :closed_local}, {:promise, promise}) do
     forward(stream, {:promise, promise})
-    IO.inspect(promise)
     {:ok, {[], stream}}
   end
   def consume(%{status: :closed_remote}, %{headers: _}) do
