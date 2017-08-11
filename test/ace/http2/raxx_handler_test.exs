@@ -28,7 +28,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   test "required headers are translated", %{client: connection} do
     encode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -44,7 +44,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   test "data is added to body", %{client: connection} do
     encode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, false)
     Support.send_frame(connection, headers_frame)
 
@@ -58,7 +58,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   test "data from multiple frames is added to body", %{client: connection} do
     encode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, false)
     Support.send_frame(connection, headers_frame)
 
@@ -80,7 +80,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
       {":method", "GET"},
       {":path", "/foo/bar?a=value&b[c]=nested%20value"}
     ]
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -92,7 +92,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   test "optional headers are added to request", %{client: connection} do
     encode_context = HPack.new_context(1_000)
     headers = home_page_headers([{"content-length", "0"}, {"accept", "*/*"}])
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
@@ -100,19 +100,20 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     assert [{"content-length", "0"}, {"accept", "*/*"}] = request.headers
   end
 
-  test "multiple cookies are handled", %{client: connection} do
-
-  end
+  # TODO
+  # test "multiple cookies are handled", %{client: connection} do
+  #
+  # end
 
   test "response status is set", %{client: connection} do
     encode_context = HPack.new_context(1_000)
     decode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
-    assert_receive {:"$gen_call", from, request = %Raxx.Request{}}
+    assert_receive {:"$gen_call", from, %Raxx.Request{}}
     GenServer.reply(from, {:ok, Raxx.Response.forbidden()})
 
     assert {:ok, %Frame.Headers{end_stream: true, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
@@ -123,11 +124,11 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     encode_context = HPack.new_context(1_000)
     decode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
-    assert_receive {:"$gen_call", from, request = %Raxx.Request{}}
+    assert_receive {:"$gen_call", from, %Raxx.Request{}}
     GenServer.reply(from, {:ok, Raxx.Response.ok([{"server", "Ace"}])})
 
     assert {:ok, %Frame.Headers{end_stream: true, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
@@ -139,11 +140,11 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     encode_context = HPack.new_context(1_000)
     decode_context = HPack.new_context(1_000)
     headers = home_page_headers()
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
-    assert_receive {:"$gen_call", from, request = %Raxx.Request{}}
+    assert_receive {:"$gen_call", from, %Raxx.Request{}}
     GenServer.reply(from, {:ok, Raxx.Response.ok("Hello, World!")})
 
     assert {:ok, %Frame.Headers{end_stream: false, header_block_fragment: header_block}} = Support.read_next(connection, 2_000)
@@ -151,14 +152,14 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     assert {:ok, %Frame.Data{end_stream: true, data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 
-  # should be a stream_test
-  test "large response body sent in parts", %{client: connection} do
-
-  end
-
-  test "push promises are sent after headers", %{client: connection} do
-
-  end
+  # # TODO should be a stream_test
+  # test "large response body sent in parts", %{client: connection} do
+  #
+  # end
+  #
+  # test "push promises are sent after headers", %{client: connection} do
+  #
+  # end
 
   defp home_page_headers(rest \\ []) do
     [

@@ -27,7 +27,7 @@ defmodule Ace.HTTP2.Stream do
 
   defp new(stream_id, status, worker, initial_window_size) do
     monitor = Process.monitor(worker)
-    stream = %__MODULE__{
+    %__MODULE__{
       id: stream_id,
       status: status,
       worker: worker,
@@ -119,10 +119,11 @@ defmodule Ace.HTTP2.Stream do
     {:ok, {[%{headers: trailers, end_stream: true}], new_stream}}
   end
 
-  def send_reset(stream, error, debug) do
+  def send_reset(stream, error, _debug) do
+    # TODO debug never used
     new_status = {:closed, :closed}
     new_stream = %{stream | status: new_status}
-    {:ok, {[Ace.HTTP2.Frame.RstStream.new(stream.id, :internal_error)], new_stream}}
+    {:ok, {[Ace.HTTP2.Frame.RstStream.new(stream.id, error)], new_stream}}
   end
 
   defp process_send_end_stream(stream) do
@@ -162,7 +163,7 @@ defmodule Ace.HTTP2.Stream do
         forward(stream, trailers)
         # TODO add data nonzero
         {:ok, {[], {local, {:open, 0}}}}
-      {local, :closed} ->
+      {_local, :closed} ->
         {:error, {:stream_closed, "Headers received on closed stream"}}
     end
     |> case do

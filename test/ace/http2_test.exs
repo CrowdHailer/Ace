@@ -55,7 +55,7 @@ defmodule Ace.HTTP2Test do
     response = Response.new(200, [{"content-type", "text/plain"}], true)
     # TODO return ok
     Server.send_response(server_stream, response)
-    assert_receive {client_stream, received = %Response{}}, 1_000
+    assert_receive {_client_stream, received = %Response{}}, 1_000
     assert 200 == received.status
 
     # TODO send_data

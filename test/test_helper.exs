@@ -49,7 +49,7 @@ defmodule EchoServer do
   end
 
   def handle_packet(inbound, state) do
-    {:send, "ECHO: #{String.strip(inbound)}\n", state}
+    {:send, "ECHO: #{String.trim(inbound)}\n", state}
   end
 
   def handle_info(_info, state) do

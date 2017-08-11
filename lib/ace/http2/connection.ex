@@ -186,9 +186,10 @@ defmodule Ace.HTTP2.Connection do
       {:error, reason} ->
         {:error, reason}
     end
+    IO.inspect(outbound)
     {:noreply, {buffer, state}}
   end
-  def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, from, {conn_buffer, state}) do
+  def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, _from, {conn_buffer, state}) do
     {:ok, stream} = Map.fetch(state.streams, stream_id)
     if stream.status == :closed || stream.status == :closed_local do
       Logger.info("Data lost because stream already closed")

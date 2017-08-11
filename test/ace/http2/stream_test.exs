@@ -29,7 +29,7 @@ defmodule Ace.HTTP2.StreamTest do
       {":method", "GET"},
       {":path", "/"}
     ]
-    {:ok, {header_block, encode_context}} = HPack.encode(headers, encode_context)
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
     receive do

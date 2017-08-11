@@ -22,7 +22,7 @@ defmodule Ace.HTTP2.ClientTest do
     assert 200 == response.status
     assert true == response.body
 
-    assert_receive {^stream, response = %{data: data, end_stream: end_stream}}, 1_000
+    assert_receive {^stream, %{data: data, end_stream: end_stream}}, 1_000
     assert true == end_stream
 
     assert String.contains?(data, "Method: GET")
@@ -38,9 +38,9 @@ defmodule Ace.HTTP2.ClientTest do
     assert_receive {^stream, response = %Response{}}, 1_000
     assert 200 == response.status
     assert true == response.body
-    assert_receive {^stream, response = %{data: "FOO", end_stream: false}}, 1_000
+    assert_receive {^stream, %{data: "FOO", end_stream: false}}, 1_000
     :ok = Client.send_data(stream, "bar")
-    assert_receive {^stream, response = %{data: "BAR", end_stream: false}}, 1_000
+    assert_receive {^stream, %{data: "BAR", end_stream: false}}, 1_000
     # I do not think the remote closes stream if you do
     # :ok = Client.send_data(stream, "fin", true)
     # assert_receive {^stream, response = %{data: "FIN", end_stream: true}}, 1_000
@@ -79,12 +79,12 @@ defmodule Ace.HTTP2.ClientTest do
     request = Request.get("/serverpush")
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
-    assert_receive {^stream, {:promise, {new_stream, headers}}}, 1_000
-    assert {:ok, r} = Client.collect_response(new_stream)
-    assert_receive {^stream, {:promise, {new_stream, headers}}}, 1_000
-    assert {:ok, r} = Client.collect_response(new_stream)
-    assert_receive {^stream, {:promise, {new_stream, headers}}}, 1_000
-    assert {:ok, r} = Client.collect_response(new_stream)
+    assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
+    assert {:ok, %Response{}} = Client.collect_response(new_stream)
+    assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
+    assert {:ok, %Response{}} = Client.collect_response(new_stream)
+    assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
+    assert {:ok, %Response{}} = Client.collect_response(new_stream)
   end
 
 end
