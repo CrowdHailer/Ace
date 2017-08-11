@@ -7,9 +7,9 @@ defmodule Ace.HTTP2.Stream do
     :worker,
     :monitor,
     :initial_window_size,
-    :sent,
     :incremented,
-    :buffer
+    :sent,
+    :queue
   ]
   defstruct @enforce_keys
 
@@ -33,83 +33,90 @@ defmodule Ace.HTTP2.Stream do
       worker: worker,
       monitor: monitor,
       initial_window_size: initial_window_size,
-      sent: 0,
       incremented: 0,
-      buffer: "",
+      sent: 0,
+      queue: [],
     }
   end
 
   def outbound_window(stream) do
-    (stream.incremented + stream.initial_window_size) - stream.sent
+    sent = case stream.status do
+      {{:open, sent}} ->
+        sent
+      _ ->
+        0
+    end
+    (stream.incremented + stream.initial_window_size) - sent
   end
 
-  def send_request(stream, request) do
+  def send_request(stream, request = %{body: body}) when is_boolean(body) do
     case stream.status do
       {:idle, :idle} ->
-        headers = Ace.HTTP2.request_to_headers(request)
         new_status = {{:open, 0}, :idle}
-        new_stream = %{stream | status: new_status}
-        case request.body do
-          true ->
-            {:ok, {[%{headers: headers, end_stream: false}], new_stream}}
-          false ->
-            {:ok, {[%{headers: headers, end_stream: true}], process_send_end_stream(new_stream)}}
-          body ->
-            send_data(stream, body, true, [%{headers: headers, end_stream: false}])
-        end
+        headers = Ace.HTTP2.request_to_headers(request)
+        queue = [%{headers: headers, end_stream: !body}]
+        new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
+        {:ok, new_stream}
     end
   end
-  def send_response(stream, response) do
-    response = if response.body == "" do
-      %{response | body: false}
-    else
-      response
+  def send_request(stream, request = %{body: ""}) do
+    send_request(stream, %{request | body: false})
+  end
+  def send_request(stream, request = %{body: body}) do
+    case send_request(stream, %{request | body: true}) do
+      {:ok, stream_with_headers} ->
+        send_data(stream_with_headers, body, true)
+      {:error, reason} ->
+        {:error, reason}
     end
+  end
+
+  def send_response(stream, response = %{body: body}) when is_boolean(body) do
     case stream.status do
       {:idle, :idle} ->
         {:error, :dont_send_response_first}
       {:closed, :closed} ->
         # DEBT happens to reset stream, notify worker data not sent
-        {:ok, {[], stream}}
+        {:ok, stream}
       {:idle, remote} ->
-        headers = Ace.HTTP2.response_to_headers(response)
         new_status = {{:open, 0}, remote}
-        new_stream = %{stream | status: new_status}
-        case response.body do
-          true ->
-            {:ok, {[%{headers: headers, end_stream: false}], new_stream}}
-          false ->
-            {:ok, {[%{headers: headers, end_stream: true}], process_send_end_stream(new_stream)}}
-          body ->
-            send_data(new_stream, body, true, [%{headers: headers, end_stream: false}])
-        end
-      {:reserved, :closed} ->
         headers = Ace.HTTP2.response_to_headers(response)
+        queue = [%{headers: headers, end_stream: !body}]
+        new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
+        {:ok, new_stream}
+      {:reserved, :closed} ->
         new_status = {{:open, 0}, :closed}
-        new_stream = %{stream | status: new_status}
-        case response.body do
-          true ->
-            {:ok, {[%{headers: headers, end_stream: false}], new_stream}}
-          false ->
-            {:ok, {[%{headers: headers, end_stream: true}], process_send_end_stream(new_stream)}}
-          body ->
-            send_data(new_stream, body, true, [%{headers: headers, end_stream: false}])
-        end
+        headers = Ace.HTTP2.response_to_headers(response)
+        queue = [%{headers: headers, end_stream: !body}]
+        new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
+        {:ok, new_stream}
+    end
+  end
+  def send_response(stream, response = %{body: ""}) do
+    send_response(stream, %{response | body: false})
+  end
+  def send_response(stream, response = %{body: body}) do
+    case send_response(stream, %{response | body: true}) do
+      {:ok, stream_with_headers} ->
+        send_data(stream_with_headers, body, true)
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
   def send_data(stream, data, end_stream, pending \\ []) do
     case stream.status do
       {{:open, sent}, remote} ->
+        # TODO need to move back to sent because the status can be closed but we still need to work out whats sent for windowing.
         new_status = {{:open, sent + :erlang.iolist_size(data)}, remote}
-        new_stream = %{stream | status: new_status}
-        message = %{data: data, end_stream: end_stream}
+        queue = [%{data: data, end_stream: end_stream}]
+        new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
         final_stream = if end_stream do
           process_send_end_stream(new_stream)
         else
           new_stream
         end
-        {:ok, {pending ++ [message], final_stream}}
+        {:ok, final_stream}
     end
   end
 
