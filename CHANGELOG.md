@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.HTTP2.Client.send_trailers/2`.
 - `Ace.HTTP2.Server.send_response/2`.
 - `Ace.HTTP2.Server.send_reset/2`.
+- Inspect protocol implementation for each frame type.
 
 # Changed
 - Server receives request object not raw headers.

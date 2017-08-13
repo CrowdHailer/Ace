@@ -54,4 +54,10 @@ defmodule Ace.HTTP2.Frame.Headers do
     flags = <<0::5, end_headers_flag::1, 0::1, end_stream_flag::1>>
     <<length::24, 1::8, flags::binary, 0::1, frame.stream_id::31, frame.header_block_fragment::binary>>
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.Headers do
+    def inspect(%{stream_id: stream_id, end_headers: end_headers, end_stream: end_stream}, _opts) do
+      "HEADERS(stream_id: #{stream_id}, end_headers: #{end_headers}, end_stream: #{end_stream})"
+    end
+  end
 end

@@ -271,7 +271,7 @@ defmodule Ace.HTTP2.Connection do
         if raw_frame do
           case Frame.decode(raw_frame) do
             {:ok, frame} ->
-              Logger.debug("#{state.name}: #{inspect(frame)}")
+              Logger.debug("#{state.name} received: #{inspect(frame)}")
               case consume_frame(frame, state) do
                 {:ok, {outbound, state}} when is_list(outbound) ->
                   IO.inspect(outbound)

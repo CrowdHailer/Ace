@@ -26,4 +26,10 @@ defmodule Ace.HTTP2.Frame.WindowUpdate do
   def serialize(%{stream_id: stream_id, increment: increment}) do
     <<4::24, 8::8, 0::8, 0::1, stream_id::31, 0::1, increment::31>>
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.WindowUpdate do
+    def inspect(%{stream_id: stream_id, increment: increment}, _opts) do
+      "WINDOWN_UPDATE(stream_id: #{stream_id}, increment: #{increment})"
+    end
+  end
 end

@@ -27,4 +27,10 @@ defmodule Ace.HTTP2.Frame.RstStream do
     payload = <<Errors.encode(frame.error)::32>>
     <<4::24, 3::8, 0::8, 0::1, frame.stream_id::31, payload::binary>>
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.RstStream do
+    def inspect(%{stream_id: stream_id, error: error}, _opts) do
+      "RST_STREAM(stream_id: #{stream_id}, error: #{error})"
+    end
+  end
 end

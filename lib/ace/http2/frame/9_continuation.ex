@@ -28,4 +28,10 @@ defmodule Ace.HTTP2.Frame.Continuation do
     flags = <<0::5, end_headers_flag::1, 0::1, 0::1>>
     <<length::24, 9::8, flags::binary, 0::1, frame.stream_id::31, frame.header_block_fragment::binary>>
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.Continuation do
+    def inspect(%{stream_id: stream_id, end_headers: end_headers}, _opts) do
+      "CONTINUATION(stream_id: #{stream_id}, end_headers: #{end_headers})"
+    end
+  end
 end

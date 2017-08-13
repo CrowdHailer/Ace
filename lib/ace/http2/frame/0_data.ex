@@ -38,4 +38,12 @@ defmodule Ace.HTTP2.Frame.Data do
       padded: padded_flag == 1
     }
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.Data do
+    def inspect(%{data: data, end_stream: end_stream, stream_id: stream_id}, _opts) do
+      {preview, rest} = String.split_at(data, 50)
+      end_preview = if rest == "", do: "", else: "..."
+      "DATA(stream_id: #{stream_id}, end_stream: #{end_stream}, data: #{preview}#{end_preview})"
+    end
+  end
 end

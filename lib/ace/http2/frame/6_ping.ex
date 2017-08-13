@@ -37,4 +37,10 @@ defmodule Ace.HTTP2.Frame.Ping do
     length = :erlang.iolist_size(identifier)
     <<length::24, @type_id::8, flags::binary, 0::1, 0::31, identifier::binary>>
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.Ping do
+    def inspect(%{ack: ack, identifier: identifier}, _opts) do
+      "PING(ack: #{ack}, identifier: #{inspect(identifier)})"
+    end
+  end
 end

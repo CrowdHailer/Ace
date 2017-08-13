@@ -27,4 +27,10 @@ defmodule Ace.HTTP2.Frame.GoAway do
   def payload(%__MODULE__{last_stream_id: last_stream_id, error: error, debug: debug}) do
     <<0::1, last_stream_id::31, Errors.encode(error)::32, debug::binary>>
   end
+
+  defimpl Inspect, for: Ace.HTTP2.Frame.GoAway do
+    def inspect(%{stream_id: stream_id, error: error, debug: debug, last_stream_id: last_stream_id}, _opts) do
+      "GO_AWAY(stream_id: #{stream_id}, error: #{error}, debug: #{debug}, last_stream_id: #{last_stream_id})"
+    end
+  end
 end

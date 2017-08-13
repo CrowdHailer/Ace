@@ -128,3 +128,29 @@ defmodule Ace.HTTP2.Frame.Settings do
     parameters_to_payload(rest, payload)
   end
 end
+
+defimpl Inspect, for: Ace.HTTP2.Frame.Settings do
+  @parameter_keys [
+    :header_table_size,
+    :enable_push,
+    :max_concurrent_streams,
+    :initial_window_size,
+    :max_frame_size,
+    :max_header_list_size
+  ]
+  def inspect(%{ack: true}, _opts) do
+    "SETTINGS(ack: true)"
+  end
+  def inspect(settings = %{ack: false}, _opts) do
+    setting_params = Enum.flat_map(@parameter_keys, fn
+      (key) ->
+        case Map.fetch(settings, key) do
+          {:ok, nil} ->
+            []
+          {:ok, value} ->
+            ["#{key}: #{value}"]
+        end
+    end)
+    "SETTINGS(#{setting_params |> Enum.join(", ")})"
+  end
+end
