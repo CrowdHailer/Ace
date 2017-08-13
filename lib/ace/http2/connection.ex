@@ -155,20 +155,55 @@ defmodule Ace.HTTP2.Connection do
     {frames, state} = send_available(state)
     :ok = do_send_frames(frames, state)
     {:reply, :ok, {buffer, state}}
-    # state = put_stream(state, new_stream)
-    # state = Enum.reduce(outbound, state, fn
-    #   (%{headers: headers, end_stream: end_stream}, state) ->
-    #     {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-    #     state = %{state | encode_context: new_encode_context}
-    #     header_frame = Frame.Headers.new(stream_id, header_block, true, end_stream)
-    #     :ok = :ssl.send(state.socket, Frame.serialize(header_frame))
-    #     state
-    #   (%{data: data, end_stream: end_stream}, state) ->
-    #     data_frame = Frame.Data.new(stream_id, data, end_stream)
-    #     :ok = :ssl.send(state.socket, Frame.serialize(data_frame))
-    #     state
-    # end)
-    # {:reply, :ok, {buffer, state}}
+  end
+
+  def handle_call({:send_promise, {:stream, _, original_id, _ref}, request}, from, {buffer, state}) do
+    GenServer.reply(from, :ok)
+    {promised_stream, state} = next_stream(state)
+    headers = Ace.HTTP2.request_to_headers(request)
+    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+    state = %{state | encode_context: new_encode_context}
+    # TODO break up headers frame block
+    promise_frame = Frame.PushPromise.new(original_id, promised_stream.id, header_block, true)
+    :ok = :ssl.send(state.socket, Frame.serialize(promise_frame))
+    # SEND PROMISE
+    # Then handle response
+
+    {:ok, {outbound, state}} = case Stream.receive_headers(promised_stream, request) do
+      {:ok, {outbound, stream}} ->
+        state = put_stream(state, stream)
+        {:ok, {outbound, state}}
+      {:error, reason} ->
+        {:error, reason}
+    end
+    IO.inspect(outbound)
+    {:noreply, {buffer, state}}
+  end
+
+  def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, new_stream} = Stream.send_data(stream, data, end_stream)
+    state = put_stream(state, new_stream)
+    {frames, state} = send_available(state)
+    :ok = do_send_frames(frames, state)
+    {:reply, :ok, {buffer, state}}
+  end
+
+  def handle_call({:send_trailers, {:stream, _, stream_id, _}, trailers}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, new_stream} = Stream.send_trailers(stream, trailers)
+    state = put_stream(state, new_stream)
+    {frames, state} = send_available(state)
+    :ok = do_send_frames(frames, state)
+    {:reply, :ok, {buffer, state}}
+  end
+
+  def handle_call({:send_reset, {:stream, _, stream_id, _}, error, reason}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, new_stream} = Stream.send_reset(stream, error)
+    state = put_stream(state, new_stream)
+    {frames, state} = send_available(state)
+    {:reply, :ok, {buffer, state}}
   end
 
   def send_available(connection) do
@@ -201,129 +236,25 @@ defmodule Ace.HTTP2.Connection do
       connection = put_stream(connection, stream)
       {previous, connection}
     else
-      {to_send, queue} = case fragment.data do
-        <<to_send::binary-size(available_window), buffer::binary>> ->
-          {to_send, [%{}]}
-        to_send ->
-          {to_send, rest}
-      end
-      # we need to return the status of the buffer so we can send end headers as needed
-      # remaining messages needs requing
-      window_used = :erlang.iolist_size(to_send)
-      stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
-    end
-  end
-
-  def transmit_available(state) do
-    {remaining_window, data_frames, streams} = Enum.reduce(state.streams, {state.outbound_window, [], state.streams}, fn
-      ({_stream_id, _stream}, {0, data_frames, streams}) ->
-        {0, data_frames, streams}
-      ({stream_id, stream}, {connection_window, data_frames, streams}) ->
-        available_window = min(Stream.outbound_window(stream), connection_window)
-        {to_send, buffer} = case stream.buffer do
-          <<to_send::binary-size(available_window), buffer::binary>> ->
-            {to_send, buffer}
-          to_send ->
-            {to_send, ""}
-        end
-        case to_send do
-          "" ->
-            {connection_window, data_frames, streams}
-          _ ->
-            window_used = :erlang.iolist_size(to_send)
-            stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
-            streams = %{streams | stream_id => stream}
-            end_stream = (stream.status == :closed || stream.status == :closed_local) && (buffer == "")
-            data_frame = Frame.Data.new(stream_id, to_send, end_stream)
-            remaining_connection_window = connection_window - window_used
-
-            {remaining_connection_window, data_frames ++ [data_frame], streams}
-        end
-    end)
-    state = %{state | outbound_window: remaining_window, streams: streams}
-    {:ok, {data_frames, state}}
-  end
-
-  def handle_call({:send_promise, {:stream, _, original_id, _ref}, request}, from, {buffer, state}) do
-    GenServer.reply(from, :ok)
-    {promised_stream, state} = next_stream(state)
-    headers = Ace.HTTP2.request_to_headers(request)
-    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-    state = %{state | encode_context: new_encode_context}
-    promise_frame = Frame.PushPromise.new(original_id, promised_stream.id, header_block, true)
-    :ok = :ssl.send(state.socket, Frame.serialize(promise_frame))
-    {:ok, {outbound, state}} = case Stream.receive_headers(promised_stream, request) do
-      {:ok, {outbound, stream}} ->
-        state = put_stream(state, stream)
-        {:ok, {outbound, state}}
-      {:error, reason} ->
-        {:error, reason}
-    end
-    IO.inspect(outbound)
-    {:noreply, {buffer, state}}
-  end
-  def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, _from, {conn_buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    if stream.status == :closed || stream.status == :closed_local do
-      Logger.info("Data lost because stream already closed")
-      # DEBT expose through backpressure
-      {[], state}
-    else
-      connection_window = state.outbound_window
-      stream_window = Stream.outbound_window(stream)
-      available_window = min(stream_window, connection_window)
-      {to_send, buffer} = case data do
-        <<to_send::binary-size(available_window), buffer::binary>> ->
-          {to_send, buffer}
+      {to_send, remaining_data} = case fragment.data do
+        <<to_send::binary-size(available_window), remaining_data::binary>> ->
+          {to_send, remaining_data}
         to_send ->
           {to_send, ""}
       end
-
-      true = :erlang.is_binary(to_send)
-      window_used = :erlang.iolist_size(to_send)
-      # stream = %{stream | sent: stream.sent + window_used, buffer: buffer}
-      stream = case {stream.status, end_stream} do
-        {:closed_remote, true} ->
-          %{stream | status: :closed}
-        {:open, true} ->
-          %{stream | status: :closed_local}
-        {_, false} ->
-          stream
+      end_stream = (remaining_data == "") && fragment.end_stream
+      queue = case remaining_data do
+        "" ->
+          rest
+        data ->
+          [%{data: data, end_stream: fragment.end_stream} | rest]
       end
-      streams = %{state.streams | stream_id => stream}
-      data_frame = Frame.Data.new(stream_id, to_send, end_stream && (buffer == ""))
-      remaining_connection_window = connection_window - window_used
-      state = %{state | streams: streams, outbound_window: remaining_connection_window}
-      :ok = :ssl.send(state.socket, Frame.serialize(data_frame))
-      {:reply, :ok, {conn_buffer, state}}
+      # TODO respect maximum frame size
+      data_frame = Frame.Data.new(stream.id, to_send, end_stream)
+      window_used = :erlang.iolist_size(to_send)
+      stream = %{stream | sent: stream.sent + window_used, queue: queue}
+      pop_stream(stream, connection, previous ++ [data_frame])
     end
-  end
-  def handle_call({:send_trailers, {:stream, _, stream_id, _}, trailers}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, {outbound, new_stream}} = Stream.send_trailers(stream, trailers)
-    state = put_stream(state, new_stream)
-    state = Enum.reduce(outbound, state, fn(%{headers: headers, end_stream: end_stream}, state) ->
-      {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-      state = %{state | encode_context: new_encode_context}
-      header_frame = Frame.Headers.new(stream_id, header_block, true, end_stream)
-      :ok = :ssl.send(state.socket, Frame.serialize(header_frame))
-      state
-    end)
-    {:reply, :ok, {buffer, state}}
-  end
-  def handle_call({:send_reset, {:stream, _, stream_id, _}, error, reason}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    state = Stream.send_reset(stream, error, reason)
-    |> handle_stream_response(state)
-    |> handle_connection_response
-    {:reply, :ok, {buffer, state}}
-  end
-
-  def handle_connection_response({:ok, {frames, state}}) do
-    IO.inspect(frames)
-    io_list = Enum.map(frames, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, io_list)
-    state
   end
 
   def next_stream(state) do
@@ -375,7 +306,7 @@ defmodule Ace.HTTP2.Connection do
       {:ok, new_state} ->
         new_state = %{new_state | next: :any}
         # DEBT only do this if initial_window_size has increased
-        {:ok, {frames, newer_state}} = transmit_available(new_state)
+        {frames, newer_state} = send_available(new_state)
         # |> IO.inspect
         {:ok, {[Frame.Settings.ack() | frames], newer_state}}
       {:error, reason} ->
@@ -399,7 +330,9 @@ defmodule Ace.HTTP2.Connection do
     # 2^31 - 1
     if new_window <= 2_147_483_647 do
       {[], %{state | outbound_window: new_window}}
-      transmit_available(%{state | outbound_window: new_window})
+      new_state = %{state | outbound_window: new_window}
+      {frames, newer_state} = send_available(new_state)
+      {:ok, {frames, newer_state}}
     else
       {:error, {:flow_control_error, "Total window size exceeded max allowed"}}
     end

@@ -117,20 +117,24 @@ defmodule Ace.HTTP2.Stream do
           new_stream
         end
         {:ok, final_stream}
+      {:closed, :closed} ->
+        IO.inspect("Sending data lost on closed stream")
+        {:ok, stream}
     end
   end
 
   def send_trailers(stream, trailers) do
     new_status = process_send_end_stream(stream)
-    new_stream = %{stream | status: new_status}
-    {:ok, {[%{headers: trailers, end_stream: true}], new_stream}}
+    queue = stream.queue ++ [%{headers: trailers, end_stream: true}]
+    new_stream = %{stream | status: new_status, queue: queue}
+    {:ok, new_stream}
   end
 
-  def send_reset(stream, error, _debug) do
-    # TODO debug never used
+  def send_reset(stream, error) do
     new_status = {:closed, :closed}
-    new_stream = %{stream | status: new_status}
-    {:ok, {[Ace.HTTP2.Frame.RstStream.new(stream.id, error)], new_stream}}
+    queue = [{:reset, error}]
+    new_stream = %{stream | status: new_status, queue: queue}
+    {:ok, new_stream}
   end
 
   defp process_send_end_stream(stream) do
@@ -217,9 +221,7 @@ defmodule Ace.HTTP2.Stream do
     case stream.status do
       {:idle, :idle} ->
         {:error, {:protocol_error, "WindowUpdate frame received on a stream in idle state. (RFC7540 5.1)"}}
-      {:idle, _remote} ->
-        increase_window(stream, increment)
-      {{:open, _}, _remote} ->
+      {_local, _remote} ->
         increase_window(stream, increment)
     end
   end
