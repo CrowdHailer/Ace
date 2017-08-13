@@ -27,6 +27,9 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
     IO.puts("Dropping trailers #{inspect(trailers)}")
     handle_request(request, app, stream, end_stream)
   end
+  def handle_info({_, {:reset, _reason}}, state) do
+    {:stop, state, :normal}
+  end
 
   def handle_request(request, app, _stream, false) do
     {:noreply, {request, app}}

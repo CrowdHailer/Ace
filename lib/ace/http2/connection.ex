@@ -126,10 +126,11 @@ defmodule Ace.HTTP2.Connection do
         true
       (_) -> false
     end)
-    {outbound, stream} = Stream.terminate(stream, reason)
+    Logger.warn("Stopping stream #{stream.id} due to #{inspect(reason)}")
+    {:ok, new_stream} = Stream.send_reset(stream, :internal_error)
     state = put_stream(state, stream)
-    outbound = Enum.map(outbound, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, outbound)
+    {frames, state} = send_available(state)
+    :ok = do_send_frames(frames, state)
     {:noreply, {buffer, state}}
   end
   def handle_call({:new_stream, receiver}, _from, {buffer, state}) do
@@ -170,13 +171,12 @@ defmodule Ace.HTTP2.Connection do
     # Then handle response
 
     {:ok, {outbound, state}} = case Stream.receive_headers(promised_stream, request) do
-      {:ok, {outbound, stream}} ->
+      {:ok, stream} ->
         state = put_stream(state, stream)
-        {:ok, {outbound, state}}
+        {:ok, {[], state}}
       {:error, reason} ->
         {:error, reason}
     end
-    IO.inspect(outbound)
     {:noreply, {buffer, state}}
   end
 
@@ -203,6 +203,7 @@ defmodule Ace.HTTP2.Connection do
     {:ok, new_stream} = Stream.send_reset(stream, error)
     state = put_stream(state, new_stream)
     {frames, state} = send_available(state)
+    :ok = do_send_frames(frames, state)
     {:reply, :ok, {buffer, state}}
   end
 
@@ -214,6 +215,7 @@ defmodule Ace.HTTP2.Connection do
     end)
   end
   def do_send_frames(frames, state) do
+    Enum.each(frames, &Logger.debug("#{state.name} sent: #{inspect(&1)}"))
     io_list = Enum.map(frames, &Frame.serialize/1)
     :ok = :ssl.send(state.socket, io_list)
   end
@@ -253,6 +255,7 @@ defmodule Ace.HTTP2.Connection do
       data_frame = Frame.Data.new(stream.id, to_send, end_stream)
       window_used = :erlang.iolist_size(to_send)
       stream = %{stream | sent: stream.sent + window_used, queue: queue}
+      connection = %{connection | outbound_window: connection.outbound_window - window_used}
       pop_stream(stream, connection, previous ++ [data_frame])
     end
   end
@@ -264,6 +267,7 @@ defmodule Ace.HTTP2.Connection do
     state = put_stream(state, stream)
     {stream, state}
   end
+  # Do not separate frame and binary level as this step needs to know state for max_frame
   def consume(buffer, state) do
     case Frame.parse_from_buffer(buffer, max_length: 16_384) do
       {:ok, {raw_frame, unprocessed}} ->
@@ -273,10 +277,8 @@ defmodule Ace.HTTP2.Connection do
             {:ok, frame} ->
               Logger.debug("#{state.name} received: #{inspect(frame)}")
               case consume_frame(frame, state) do
-                {:ok, {outbound, state}} when is_list(outbound) ->
-                  IO.inspect(outbound)
-                  outbound = Enum.map(outbound, &Frame.serialize/1)
-                  :ok = :ssl.send(state.socket, outbound)
+                {:ok, {frames, state}} ->
+                  :ok = do_send_frames(frames, state)
                   consume(unprocessed, state)
                 {:error, reason} ->
                   {:error, reason}
@@ -307,7 +309,6 @@ defmodule Ace.HTTP2.Connection do
         new_state = %{new_state | next: :any}
         # DEBT only do this if initial_window_size has increased
         {frames, newer_state} = send_available(new_state)
-        # |> IO.inspect
         {:ok, {[Frame.Settings.ack() | frames], newer_state}}
       {:error, reason} ->
         {:error, reason}
@@ -377,10 +378,10 @@ defmodule Ace.HTTP2.Connection do
 
             {:ok, request} = Ace.HTTP2.build_request(headers)
 
-            {:ok, {outbound, latest_original}} = Stream.receive_promise(original_stream, promised_stream, request)
+            {:ok, latest_original} = Stream.receive_promise(original_stream, promised_stream, request)
 
             state = put_stream(state, latest_original)
-            {:ok, {outbound, state}}
+            {:ok, {[], state}}
         end
       else
         {:error, :todo_join_push_headers}
@@ -410,9 +411,10 @@ defmodule Ace.HTTP2.Connection do
               {:ok, stream} = fetch_stream(state, frame)
 
               case Stream.receive_headers(stream, headers, frame.end_stream) do
-                {:ok, {outbound, stream}} ->
+                {:ok, stream} ->
+                  IO.inspect(stream)
                   state = put_stream(state, stream)
-                  {:ok, {outbound, %{state | max_peer_stream_id: max(stream.id, state.max_peer_stream_id)}}}
+                  {:ok, {[], %{state | max_peer_stream_id: max(stream.id, state.max_peer_stream_id)}}}
                 {:error, reason} ->
                   {:error, reason}
               end
@@ -449,10 +451,10 @@ defmodule Ace.HTTP2.Connection do
     # This effectively disables flow control for that receiver.
     {:ok, stream} = fetch_stream(state, frame)
     case Stream.receive_data(stream, frame.data, frame.end_stream) do
-      {:ok, {outbound, stream}} ->
+      {:ok, stream} ->
         state = put_stream(state, stream)
-        outbound = outbound ++ [Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)]
-        {:ok, {outbound, %{state | max_peer_stream_id: max(stream.id, state.max_peer_stream_id)}}}
+        outbound = [Frame.WindowUpdate.new(0, 65_535), Frame.WindowUpdate.new(frame.stream_id, 65_535)]
+        {:ok, {outbound, state}}
       {:error, reason} ->
         {:error, reason}
     end
@@ -514,7 +516,7 @@ defmodule Ace.HTTP2.Connection do
   Only clients can open a stream, servers must reserve a stream
   """
   def open_stream(_state, 0) do
-    {:error, {:protocol_error, "Stream 0 reserved for connectionlevel communication"}}
+    {:error, {:protocol_error, "Stream 0 reserved for connection level communication"}}
   end
   def open_stream(_state, stream_id) when rem(stream_id, 2) == 0 do
     {:error, {:protocol_error, "Clients must start odd streams"}}

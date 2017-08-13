@@ -1,6 +1,8 @@
 defmodule Ace.HTTP2.Stream do
   @moduledoc false
 
+  @max_stream_window 2_147_483_647
+
   @enforce_keys [
     :id,
     :status,
@@ -40,19 +42,13 @@ defmodule Ace.HTTP2.Stream do
   end
 
   def outbound_window(stream) do
-    sent = case stream.status do
-      {{:open, sent}} ->
-        sent
-      _ ->
-        0
-    end
-    (stream.incremented + stream.initial_window_size) - sent
+    (stream.incremented + stream.initial_window_size) - stream.sent
   end
 
   def send_request(stream, request = %{body: body}) when is_boolean(body) do
     case stream.status do
       {:idle, :idle} ->
-        new_status = {{:open, 0}, :idle}
+        new_status = {:open, :idle}
         headers = Ace.HTTP2.request_to_headers(request)
         queue = [%{headers: headers, end_stream: !body}]
         new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
@@ -79,13 +75,13 @@ defmodule Ace.HTTP2.Stream do
         # DEBT happens to reset stream, notify worker data not sent
         {:ok, stream}
       {:idle, remote} ->
-        new_status = {{:open, 0}, remote}
+        new_status = {:open, remote}
         headers = Ace.HTTP2.response_to_headers(response)
         queue = [%{headers: headers, end_stream: !body}]
         new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
         {:ok, new_stream}
       {:reserved, :closed} ->
-        new_status = {{:open, 0}, :closed}
+        new_status = {:open, :closed}
         headers = Ace.HTTP2.response_to_headers(response)
         queue = [%{headers: headers, end_stream: !body}]
         new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
@@ -106,11 +102,10 @@ defmodule Ace.HTTP2.Stream do
 
   def send_data(stream, data, end_stream, pending \\ []) do
     case stream.status do
-      {{:open, sent}, remote} ->
+      {:open, remote} ->
         # TODO need to move back to sent because the status can be closed but we still need to work out whats sent for windowing.
-        new_status = {{:open, sent + :erlang.iolist_size(data)}, remote}
         queue = [%{data: data, end_stream: end_stream}]
-        new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
+        new_stream = %{stream | queue: stream.queue ++ queue}
         final_stream = if end_stream do
           process_send_end_stream(new_stream)
         else
@@ -130,6 +125,7 @@ defmodule Ace.HTTP2.Stream do
     {:ok, new_stream}
   end
 
+  # Sending a reset drops the queue
   def send_reset(stream, error) do
     new_status = {:closed, :closed}
     queue = [{:reset, error}]
@@ -139,7 +135,7 @@ defmodule Ace.HTTP2.Stream do
 
   defp process_send_end_stream(stream) do
     case stream.status do
-      {{:open, _}, remote} ->
+      {:open, remote} ->
         new_status = {:closed, remote}
         %{stream | status: new_status}
     end
@@ -151,7 +147,7 @@ defmodule Ace.HTTP2.Stream do
         forward(stream, request)
         new_status = {:reserved, :closed}
         new_stream = %{stream | status: new_status}
-        {:ok, {[], new_stream}}
+        {:ok, new_stream}
     end
   end
   def receive_headers(stream, headers, end_stream) do
@@ -159,33 +155,37 @@ defmodule Ace.HTTP2.Stream do
       {:idle, :idle} ->
         {:ok, request} = Ace.HTTP2.headers_to_request(headers, end_stream)
         forward(stream, request)
-        {:ok, {[], {:idle, {:open, 0}}}}
+        {:ok, {:idle, :open}}
       {local, :idle} ->
         {:ok, response} = Ace.HTTP2.headers_to_response(headers, end_stream)
         forward(stream, response)
-        {:ok, {[], {local, {:open, 0}}}}
+        {:ok, {local, :open}}
       {local, :reserved} ->
         {:ok, response} = Ace.HTTP2.headers_to_response(headers, end_stream)
         forward(stream, response)
-        {:ok, {[], {local, {:open, 0}}}}
-      {local, {:open, _}} ->
+        {:ok, {local, :open}}
+      {local, :open} ->
         # check end_stream
-        trailers = Ace.HTTP2.headers_to_trailers(headers)
-        forward(stream, trailers)
-        # TODO add data nonzero
-        {:ok, {[], {local, {:open, 0}}}}
+        if end_stream do
+          trailers = Ace.HTTP2.headers_to_trailers(headers)
+          forward(stream, trailers)
+          # Open but will be closed by handle process_received_end_stream
+          {:ok, {local, :open}}
+        else
+          {:error, {:protocol_error, "trailers must end the stream"}}
+        end
       {_local, :closed} ->
         {:error, {:stream_closed, "Headers received on closed stream"}}
     end
     |> case do
-      {:ok, {messages, new_status}} ->
+      {:ok, new_status} ->
         new_stream = %{stream | status: new_status}
-        {messages2, final_stream} = if end_stream do
+        {:ok, final_stream} = if end_stream do
           process_received_end_stream(new_stream)
         else
-          {:ok, {messages, new_stream}}
+          {:ok, new_stream}
         end
-        {messages ++ messages2, final_stream}
+        {:ok, final_stream}
       {:error, reason} ->
         {:error, reason}
     end
@@ -194,15 +194,14 @@ defmodule Ace.HTTP2.Stream do
   def receive_promise(original, promised, request) do
     promised_stream_ref = {:stream, self(), promised.id, promised.monitor}
     forward(original, {:promise, {promised_stream_ref, request}})
-    {:ok, {[], original}}
+    {:ok, original}
   end
 
   def receive_data(stream, data, end_stream) do
     new_status = case stream.status do
-      {local, {:open, receive_data}} ->
+      {local, :open} ->
         forward(stream, %{data: data, end_stream: end_stream})
-        new_reveiced_data = receive_data + :erlang.iolist_size(data)
-        {local, {:open, new_reveiced_data}}
+        {local, :open}
       # errors
       {:idle, :idle} ->
         {:error, {:protocol_error, "DATA frame received on a stream in idle state. (RFC7540 5.1)"}}
@@ -213,7 +212,7 @@ defmodule Ace.HTTP2.Stream do
     if end_stream do
       process_received_end_stream(new_stream)
     else
-      {:ok, {[], new_stream}}
+      {:ok, new_stream}
     end
   end
 
@@ -228,10 +227,10 @@ defmodule Ace.HTTP2.Stream do
 
   def process_received_end_stream(stream) do
     new_status = case stream.status do
-      {local, {:open, _}} ->
+      {local, :open} ->
         {local, :closed}
     end
-    {:ok, {[], %{stream | status: new_status}}}
+    {:ok, %{stream | status: new_status}}
   end
 
   def receive_reset(stream, reason) do
@@ -239,30 +238,19 @@ defmodule Ace.HTTP2.Stream do
       {:idle, :idle} ->
         {:error, {:protocol_error, "RstStream frame received on a stream in idle state. (RFC7540 5.1)"}}
       {:closed, :closed} ->
-        {:ok, {[], stream}}
+        {:ok, stream}
       {_, _} ->
         forward(stream, {:reset, reason})
-        {:ok, {[], %{stream | status: {:closed, :closed}}}}
+        {:ok, %{stream | status: {:closed, :closed}}}
     end
   end
 
-  def terminate(stream = %{status: :closed}, :normal) do
-    {[], %{stream | status: :closed, worker: nil, monitor: nil}}
-  end
-  # I think even if the reason is normal we should mark an error because the handler should have sent an end stream message
-  def terminate(stream, _reason) do
-    rst_frame = Ace.HTTP2.Frame.RstStream.new(stream.id, :internal_error)
-    {[rst_frame], %{stream | status: :closed, worker: nil, monitor: nil}}
-  end
-
   defp increase_window(stream, increment) do
-    new_incremented = stream.incremented + increment
-    if new_incremented + stream.initial_window_size <= 2_147_483_647 do
-      {:ok, {[], %{stream | incremented: new_incremented}}}
+    new_stream = %{stream | incremented: stream.incremented + increment}
+    if outbound_window(new_stream) <= @max_stream_window do
+      {:ok, new_stream}
     else
-      rst_frame = Ace.HTTP2.Frame.RstStream.new(stream.id, :flow_control_error)
-      # TODO test stream was reset by error
-      {:ok, {[rst_frame], stream}}
+      {:error, {:flow_control_error, "Stream window was increased beyond maximum"}}
     end
   end
 
