@@ -1,11 +1,11 @@
 defmodule Ace.HTTP2.Frame.Ping do
   @moduledoc false
+
   @enforce_keys [:identifier, :ack]
   defstruct @enforce_keys
 
   @type_id 6
 
-  # TODO informative error for bad ping identifier
   def new(identifier, ack \\ false) when bit_size(identifier) == 64 do
     %__MODULE__{identifier: identifier, ack: ack}
   end

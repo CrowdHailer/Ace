@@ -340,9 +340,9 @@ defmodule Ace.HTTP2.Connection do
   end
   def consume_frame(frame = %Frame.WindowUpdate{}, state = %{next: :any}) do
     {:ok, stream} = Map.fetch(state.streams, frame.stream_id)
-    {:ok, {outbound, new_stream}} = Stream.receive_window_update(stream, frame.increment)
+    {:ok, new_stream} = Stream.receive_window_update(stream, frame.increment)
     new_state = put_stream(state, new_stream)
-    {:ok, {outbound, new_state}}
+    {:ok, {[], new_state}}
   end
   def consume_frame(%Frame.Priority{}, state = %{next: :any}) do
     IO.inspect("Ignoring priority frame")

@@ -18,10 +18,6 @@ defmodule Ace.HTTP2.ServerSettingsTest do
     {:ok, %{client: connection}}
   end
 
-  def route(_) do
-    __MODULE__
-  end
-
 
   # TODO diff given settings with defaults and only send changed
   # TODO start server with a max frame size and check it is sent to client and reflected in behaviour
@@ -32,8 +28,12 @@ defmodule Ace.HTTP2.ServerSettingsTest do
     :ok = Support.send_frame(connection, frame)
 
     assert {:ok, frame = %Frame.GoAway{}} = Support.read_next(connection)
-    assert "Frame greater than max allowed: (16385 >= 16384)" = frame.debug
     assert :frame_size_error = frame.error
+    assert "Frame greater than max allowed: (16385 >= 16384)" = frame.debug
+  end
+
+  test "" do
+
   end
 
   # send incorrectly sized rst_stream frame

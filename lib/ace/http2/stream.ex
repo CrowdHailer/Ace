@@ -113,7 +113,6 @@ defmodule Ace.HTTP2.Stream do
         end
         {:ok, final_stream}
       {:closed, :closed} ->
-        IO.inspect("Sending data lost on closed stream")
         {:ok, stream}
     end
   end

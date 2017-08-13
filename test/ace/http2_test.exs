@@ -14,7 +14,7 @@ defmodule Ace.HTTP2Test do
     {:ok, %{port: port}}
   end
 
-  test "full request is streamed from client to server", %{port: port} do
+  test "request can be streamed from client to server", %{port: port} do
     {:ok, client} = Client.start_link({"localhost", port})
     {:ok, client_stream} = Client.stream(client)
 
@@ -34,13 +34,46 @@ defmodule Ace.HTTP2Test do
     assert_receive {^server_stream, %{headers: [{"x-foo", "bar"}], end_stream: true}}, 1_000
   end
 
-  # Check sending complete request ends stream with/out body
+  test "complete request with no body can be sent to server", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.get("/", [{"content-type", "text/plain"}])
+    :ok = Client.send_request(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {_server_stream, received = %Request{}}, 1_000
+    assert received.headers == request.headers
+    assert received.path == "/"
+    assert received.body == false
+  end
+
+  test "complete request with body can be sent to server", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.post("/", [{"content-type", "text/plain"}], "This is all the content.")
+    :ok = Client.send_request(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {server_stream, received = %Request{}}, 1_000
+    assert received.headers == request.headers
+    assert received.path == "/"
+    assert received.body == true
+
+    assert_receive {^server_stream, %{data: data, end_stream: true}}, 1_000
+    assert request.body == data
+  end
 
   # Client should not break protocol
   # disallow sending on an ended stream
   # disallow sending trailers which do not end stream
 
-  test "full response is streamed from server to client", %{port: port} do
+  test "response can be streamed from server to client", %{port: port} do
     {:ok, client} = Client.start_link({"localhost", port})
     {:ok, client_stream} = Client.stream(client)
 
@@ -53,12 +86,59 @@ defmodule Ace.HTTP2Test do
     assert_receive {server_stream, %Request{}}, 1_000
 
     response = Response.new(200, [{"content-type", "text/plain"}], true)
-    # TODO return ok
     Server.send_response(server_stream, response)
-    assert_receive {_client_stream, received = %Response{}}, 1_000
+
+    assert_receive {^client_stream, received = %Response{}}, 1_000
     assert 200 == received.status
 
-    # TODO send_data
+    Server.send_data(server_stream, "For the client")
+    assert_receive {^client_stream, %{data: "For the client", end_stream: false}}, 1_000
+
+    :ok = Client.send_trailers(server_stream, [{"x-foo", "bar"}])
+
+    assert_receive {^client_stream, %{data: "For the client", end_stream: false}}, 1_000
+  end
+
+  test "complete response with no body can be sent to client", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.get("/", [{"content-type", "text/plain"}])
+    :ok = Client.send_request(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {server_stream, %Request{}}, 1_000
+
+    response = Response.new(304, [], false)
+    Server.send_response(server_stream, response)
+
+    assert_receive {^client_stream, received = %Response{}}, 1_000
+    assert received.status == 304
+    assert received.body == false
+  end
+
+  test "complete response with body can be sent to client", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.get("/", [{"content-type", "text/plain"}])
+    :ok = Client.send_request(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:start_child, []}}, 1_000
+    GenServer.reply(from, {:ok, self()})
+
+    assert_receive {server_stream, %Request{}}, 1_000
+
+    response = Response.new(200, [], "Here is all the bodies")
+    Server.send_response(server_stream, response)
+
+    assert_receive {^client_stream, received = %Response{}}, 1_000
+    assert received.status == 200
+
+    assert_receive {^client_stream, %{data: body}}, 1_000
+    assert body == "Here is all the bodies"
   end
 
   # Check sending complete request ends stream with/out body
