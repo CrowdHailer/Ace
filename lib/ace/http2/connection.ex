@@ -62,6 +62,7 @@ defmodule Ace.HTTP2.Connection do
       streams: %{},
       stream_supervisor: :client,
       next_local_stream_id: 1,
+      name: "CLIENT (#{host}:#{port})"
     }
     state = %{initial_state | next: :handshake}
     {:ok, {"", state}}
@@ -95,7 +96,7 @@ defmodule Ace.HTTP2.Connection do
       streams: %{},
       stream_supervisor: stream_supervisor,
       next_local_stream_id: 2,
-      name: "SERVER #{port}"
+      name: "SERVER (port: #{port})"
     }
     {:noreply, {:pending, initial_state}}
   end
@@ -128,7 +129,7 @@ defmodule Ace.HTTP2.Connection do
     end)
     Logger.warn("Stopping stream #{stream.id} due to #{inspect(reason)}")
     {:ok, new_stream} = Stream.send_reset(stream, :internal_error)
-    state = put_stream(state, stream)
+    state = put_stream(state, new_stream)
     {frames, state} = send_available(state)
     :ok = do_send_frames(frames, state)
     {:noreply, {buffer, state}}
@@ -258,6 +259,11 @@ defmodule Ace.HTTP2.Connection do
       connection = %{connection | outbound_window: connection.outbound_window - window_used}
       pop_stream(stream, connection, previous ++ [data_frame])
     end
+  end
+  def pop_stream(stream = %{queue: [{:reset, reason}]}, connection, previous) do
+    reset_frame = Frame.RstStream.new(stream.id, reason)
+    connection = put_stream(connection, %{stream | queue: []})
+    {previous ++ [reset_frame], connection}
   end
 
   def next_stream(state) do
@@ -412,7 +418,6 @@ defmodule Ace.HTTP2.Connection do
 
               case Stream.receive_headers(stream, headers, frame.end_stream) do
                 {:ok, stream} ->
-                  IO.inspect(stream)
                   state = put_stream(state, stream)
                   {:ok, {[], %{state | max_peer_stream_id: max(stream.id, state.max_peer_stream_id)}}}
                 {:error, reason} ->

@@ -96,7 +96,7 @@ defmodule Ace.HTTP2Test do
 
     :ok = Client.send_trailers(server_stream, [{"x-foo", "bar"}])
 
-    assert_receive {^client_stream, %{data: "For the client", end_stream: false}}, 1_000
+    assert_receive {^client_stream, %{headers: [{"x-foo", "bar"}], end_stream: true}}, 1_000
   end
 
   test "complete response with no body can be sent to client", %{port: port} do

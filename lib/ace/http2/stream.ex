@@ -118,9 +118,9 @@ defmodule Ace.HTTP2.Stream do
   end
 
   def send_trailers(stream, trailers) do
-    new_status = process_send_end_stream(stream)
+    new_stream = process_send_end_stream(stream)
     queue = stream.queue ++ [%{headers: trailers, end_stream: true}]
-    new_stream = %{stream | status: new_status, queue: queue}
+    new_stream = %{stream | queue: queue}
     {:ok, new_stream}
   end
 
