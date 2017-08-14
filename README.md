@@ -10,6 +10,8 @@
 - Consistent server and client interfaces
 - Stream isolation; one process per stream
 - Bidirectional streaming; send and receive streamed data
+- Server push; to reduce latency
+- Automatic flow control; at stream and connection level
 - Secure data transport; TLS(SSL) support via ALPN
 - Verified against [h2spec](https://github.com/summerwind/h2spec) (*143/146*)
 - Simple request/response interactions; [Raxx](https://github.com/crowdhailer/raxx) interface

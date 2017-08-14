@@ -1,5 +1,7 @@
 # Perhaps should be called endpoint
 defmodule Ace.HTTP2.Connection do
+  @moduledoc false
+
   require Logger
   alias Ace.{
     HPack
@@ -44,7 +46,6 @@ defmodule Ace.HTTP2.Connection do
     {:ok, "h2"} = :ssl.negotiated_protocol(connection)
     payload = [
       Ace.HTTP2.Connection.preface(),
-      # TODO push promise false
       Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
@@ -392,7 +393,7 @@ defmodule Ace.HTTP2.Connection do
             promised_stream = Stream.reserved(frame.promised_stream_id, original_stream.worker, state.initial_window_size)
             state = put_stream(state, promised_stream)
 
-            {:ok, request} = Ace.HTTP2.build_request(headers)
+            {:ok, request} = Ace.HTTP2.headers_to_request(headers, true)
 
             {:ok, latest_original} = Stream.receive_promise(original_stream, promised_stream, request)
 

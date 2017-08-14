@@ -1,5 +1,5 @@
 defmodule HelloHTTP2.WWW do
-  use Ace.HTTP2.Stream.RaxxHandler
+  use Ace.Raxx.Handler
   alias Raxx.Response
   require Raxx.Static
 

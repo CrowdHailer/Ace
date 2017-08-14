@@ -10,7 +10,7 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
 
   setup do
     {:ok, stream_supervisor} = Supervisor.start_link(
-      [Supervisor.Spec.worker(Ace.HTTP2.Stream.RaxxHandler, [RaxxForwarder, self()], [restart: :temporary])],
+      [Supervisor.Spec.worker(Ace.Raxx.Handler, [RaxxForwarder, self()], [restart: :temporary])],
       [strategy: :simple_one_for_one]
     )
     {_server, port} = Support.start_server(stream_supervisor)

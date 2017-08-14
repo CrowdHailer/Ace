@@ -9,10 +9,10 @@ defmodule Ace.Request do
   | **path** | Path to the resource requested |
   | **headers** | The headers from the HTTP request as an array of string pairs. Note all headers will be downcased, e.g. [{"content-type", "text/plain"}] |
   | **body** | `true`, `false` or complete body as a binary. |
-  | **authority(?)** | The host and port of the server. |
-  | **scheme(?)** | `:http` or `:https`, depending on the transport used. |
+  | **authority("example.com")** | The host and port of the server. |
+  | **scheme(:https)** | `:http` or `:https`, depending on the transport used. |
 
-  *(?) optional values that have a default value*
+  *() default value*
 
   """
   @enforce_keys [:method, :path, :headers, :body, :authority, :scheme]

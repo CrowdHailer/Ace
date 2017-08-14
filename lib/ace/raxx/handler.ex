@@ -1,4 +1,4 @@
-defmodule Ace.HTTP2.Stream.RaxxHandler do
+defmodule Ace.Raxx.Handler do
   use GenServer
   defmacro __using__(_opts) do
     quote do

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Server receives request object not raw headers.
 - Server sends with response object not raw headers.
 - Client cannot start a stream and send in single call to `stream/2`.
+- `Ace.HTTP2.Stream.RaxxHandler` renamed to `Ace.Raxx.Handler`
 
 ## [0.11.1](https://github.com/CrowdHailer/Ace/tree/0.11.1) - 2017-08-03
 

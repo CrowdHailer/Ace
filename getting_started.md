@@ -1,9 +1,77 @@
 # Getting Started
 
-*These instructions are for setting up a server, see `Ace.HTTP2.Client` for working with the HTTP/2.0 client.*
+Welcome to Ace.
+This guide will walk through the key features of HTTP/2.0.
+It will explain how Ace is built to take advantage of these features.
 
-Welcome to Ace;
-Once added to your project this guide will demonstrate setting up a simple end point.
+*Want to dive straight in? see `Ace.HTTP2.Server` or `Ace.HTTP2.Client`.*
+
+## Connections and Streams
+client setup
+
+server setup
+
+diagram
+
+## Streaming
+
+HTTP maps the request of a client to a server generated response.
+This is true in HTTP/2.0, as it was in HTTP/1.x.
+
+*In HTTP/2.0 a request/response pair form a single stream.*
+
+In HTTP/2.0 the bodies of individual request's and response's are multiplexed in with other streams.
+Ace provides an API that is equally able to handle processing requests/responses as stream, handling each fragment as it arrives, or as an atomic unit.
+
+The `body` attribute of an `Ace.Request` or `Ace.Response` may be one of three types.
+
+- `:false` - There IS NO body, for example `:GET` requests always have no body.
+- `io_list()` - This body is complete encapsulated in this request/response.
+- `:true` - There IS a body, it will be streamed as fragments it is received.
+
+We can see all of these in action in a simple interaction
+
+*NOTES:*
+
+1. *Applications are not required to use `receive` directly; helpers are available for both client and server.*
+
+```elixir
+alias Ace.Request
+alias Ace.Response
+alias Ace.HTTP2.Client
+alias Ace.HTTP2.Server
+
+# ON CLIENT: prepare and send request.
+
+# This will create a request where there is no body.
+request = Request.get("/", [{"accept", "text/plain"}])
+Client.send_request(client_stream, request)
+
+# ON SERVER: respond to client
+
+# Await a clients request
+receive do
+  {server_stream, %Request{method: :GET, path: "/", body: false}} ->
+    # This response has been constructed with it's complete body and can be sent as a whole.
+    response = Response.new(200, [{"content-type", "text/plain"}], "Hello, World!")
+    Server.send_response(server_stream, response)
+end
+
+# ON CLIENT: The client receives each part of the request as it is streamed
+receive do
+  {client_stream, %Response{status: 200}} ->
+    IO.inspect("Streaming response, ok.")
+end
+receive do
+  {client_stream, %{data: data, end_stream: true}} ->
+    IO.inspect("received data, '#{data}'")
+end
+```
+
+## Server Push
+TODO
+
+###
 
 ### Stream handlers
 
@@ -12,7 +80,7 @@ Using the Raxx adapter is the simplest way to get started.
 
 ```elixir
 defmodule MyApp.SimpleHandler do
-  use Ace.HTTP2.Stream.RaxxHandler
+  use Ace.Raxx.Handler
 
   def handle_request(_request, _config) do
     Raxx.Response.ok("Hello, World!", [{"content-length", "13"}])
@@ -65,47 +133,4 @@ end
 ##### Note
 
 `Ace.HTTP2.Service.start_link/3` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
-
-## Bidirectional streaming
-
-Process will receive data messages in the following format untill
-all data is sent from client
-
-*1*
-`{stream, %{headers: list(), end_stream: boolean()}}`
-
-*0 - n*
-`{stream, %{data: binary(), end_stream: boolean()}}`
-
-The worker can stream data to the client at any point using
-```elixir
-Server.send(stream, %{headers: headers(),  end_stream: boolean()})
-# OR
-Server.send(stream, %{data: binary(), end_stream: boolean()})
-```
-
-#### Example
-
-```elixir
-defmodule MyApp.StreamHandler do
-  use GenServer
-
-  def start_link(config) do
-    GenServer.start_link(__MODULE__, config)
-  end
-
-  def handle_info({stream, {:headers, _}}, state) do
-    response_headers = %{
-      headers: [{":status", "200"}, {"content-length", "13"}],
-      end_stream: false
-    }
-    Server.send(stream, response_headers)
-    response_body = %{
-      data: "Hello, World!",
-      end_stream: true
-    }
-    Server.send(stream, response_body)
-    {:stop, :normal, state}
-  end
-end
-```
+explain how Ace is good at OTP
