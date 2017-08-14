@@ -63,10 +63,12 @@ defmodule Ace.Request do
   @doc """
   Construct a new request.
   """
-  def new(method, path, headers, body) do
+  def new(method, path, headers, body, opts \\ []) do
+    scheme = Keyword.get(opts, :scheme, :https)
+    authority = Keyword.get(opts, :scheme, "example.com")
     %__MODULE__{
-      scheme: :https,
-      authority: :connection,
+      scheme: scheme,
+      authority: authority,
       method: method,
       path: path,
       headers: headers,

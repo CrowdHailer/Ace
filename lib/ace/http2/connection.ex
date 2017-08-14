@@ -111,9 +111,10 @@ defmodule Ace.HTTP2.Connection do
         {:noreply, state}
       {:error, {error, debug}} ->
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
-        frame = Frame.GoAway.new(0, error, debug)
+        frame = Frame.GoAway.new(4, error, debug)
         outbound = Frame.GoAway.serialize(frame)
         :ok = :ssl.send(state.socket, outbound)
+        Process.sleep(1_000)
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
         {:stop, :normal, state}
     end
@@ -171,7 +172,7 @@ defmodule Ace.HTTP2.Connection do
     # SEND PROMISE
     # Then handle response
 
-    {:ok, {outbound, state}} = case Stream.receive_headers(promised_stream, request) do
+    {:ok, {_outbound, state}} = case Stream.receive_headers(promised_stream, request) do
       {:ok, stream} ->
         state = put_stream(state, stream)
         {:ok, {[], state}}
@@ -199,7 +200,7 @@ defmodule Ace.HTTP2.Connection do
     {:reply, :ok, {buffer, state}}
   end
 
-  def handle_call({:send_reset, {:stream, _, stream_id, _}, error, reason}, _from, {buffer, state}) do
+  def handle_call({:send_reset, {:stream, _, stream_id, _}, error}, _from, {buffer, state}) do
     {:ok, stream} = Map.fetch(state.streams, stream_id)
     {:ok, new_stream} = Stream.send_reset(stream, error)
     state = put_stream(state, new_stream)
@@ -235,7 +236,7 @@ defmodule Ace.HTTP2.Connection do
   end
   def pop_stream(stream = %{queue: [fragment = %{data: _} | rest]}, connection, previous) do
     available_window = min(Stream.outbound_window(stream), connection.outbound_window)
-    if available_window == 0 do
+    if available_window <= 0 do
       connection = put_stream(connection, stream)
       {previous, connection}
     else
@@ -313,9 +314,7 @@ defmodule Ace.HTTP2.Connection do
     case update_settings(settings, %{state | settings: @default_settings}) do
       {:ok, new_state} ->
         new_state = %{new_state | next: :any}
-        # DEBT only do this if initial_window_size has increased
-        {frames, newer_state} = send_available(new_state)
-        {:ok, {[Frame.Settings.ack() | frames], newer_state}}
+        {:ok, {[Frame.Settings.ack()], new_state}}
       {:error, reason} ->
         {:error, reason}
     end
@@ -346,12 +345,21 @@ defmodule Ace.HTTP2.Connection do
   end
   def consume_frame(frame = %Frame.WindowUpdate{}, state = %{next: :any}) do
     {:ok, stream} = Map.fetch(state.streams, frame.stream_id)
-    {:ok, new_stream} = Stream.receive_window_update(stream, frame.increment)
-    new_state = put_stream(state, new_stream)
-    {:ok, {[], new_state}}
+    case Stream.receive_window_update(stream, frame.increment) do
+      {:ok, new_stream} ->
+        new_state = put_stream(state, new_stream)
+        {frames, newer_state} = send_available(new_state)
+        {:ok, {frames, newer_state}}
+      {:error, {:flow_control_error, _debug}} ->
+        {:ok, new_stream} = Stream.send_reset(stream, :flow_control_error)
+        new_state = put_stream(state, new_stream)
+        {:ok, {[Frame.RstStream.new(new_stream.id, :flow_control_error)], new_state}}
+      # {:error, reason} ->
+      #   {:error, reason}
+    end
   end
   def consume_frame(%Frame.Priority{}, state = %{next: :any}) do
-    IO.inspect("Ignoring priority frame")
+    Logger.debug("#{state.name} ignoring priority information")
     {:ok, {[], state}}
   end
   def consume_frame(settings = %Frame.Settings{}, state = %{next: :any}) do
@@ -360,7 +368,9 @@ defmodule Ace.HTTP2.Connection do
     else
       case update_settings(settings, state) do
         {:ok, new_state} ->
-          {:ok, {[Frame.Settings.ack()], new_state}}
+          # DEBT only do this if initial_window_size has increased
+          {frames, newer_state} = send_available(new_state)
+          {:ok, {[Frame.Settings.ack() | frames], newer_state}}
         {:error, reason} ->
           {:error, reason}
       end
@@ -397,8 +407,9 @@ defmodule Ace.HTTP2.Connection do
 
   def consume_frame(frame = %Frame.RstStream{}, state = %{next: :any}) do
     {:ok, stream} = fetch_stream(state, frame)
-    Stream.receive_reset(stream, frame.error)
-    |> handle_stream_response(state)
+    {:ok, new_stream} = Stream.receive_reset(stream, frame.error)
+    state = put_stream(state, new_stream)
+    {:ok, {[], state}}
   end
   def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
     case fetch_stream(state, frame) do
@@ -465,16 +476,8 @@ defmodule Ace.HTTP2.Connection do
     end
   end
   def consume_frame(frame, %{next: next}) do
-    IO.inspect("expected next '#{inspect(next)}' got: #{inspect(frame)}")
+    Logger.warn("expected next '#{inspect(next)}' got: #{inspect(frame)}")
     {:error, {:protocol_error, "Unexpected frame"}}
-  end
-
-  def handle_stream_response({:ok, {outbound, stream}}, previous_state) do
-    state = put_stream(previous_state, stream)
-    {:ok, {outbound, state}}
-  end
-  def handle_stream_response({:error, reason}, _previous_state) do
-    {:error, reason}
   end
 
   # TODO handle all settings

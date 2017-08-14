@@ -89,7 +89,6 @@ Server.send(stream, %{data: binary(), end_stream: boolean()})
 ```elixir
 defmodule MyApp.StreamHandler do
   use GenServer
-  alias Ace.HTTP2.StreamHandler
 
   def start_link(config) do
     GenServer.start_link(__MODULE__, config)

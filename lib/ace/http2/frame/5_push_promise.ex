@@ -14,7 +14,6 @@ defmodule Ace.HTTP2.Frame.PushPromise do
 
   def decode({5, flags, stream_id, payload}) do
     <<_::4, padded::1, end_headers::1, _::2>> = flags
-    IO.inspect(payload)
     end_headers = end_headers == 1
 
     data = if padded == 1 do

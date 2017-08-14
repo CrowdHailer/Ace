@@ -19,7 +19,7 @@ defmodule Ace.HTTP2.Server do
     :ok = GenServer.call(pid, {:send_data, stream, %{data: data, end_stream: end_stream}})
   end
 
-  def send_reset(stream = {:stream, pid, _id, _ref}, error, debug \\ "") do
-    GenServer.call(pid, {:send_reset, stream, error, debug})
+  def send_reset(stream = {:stream, pid, _id, _ref}, error) do
+    GenServer.call(pid, {:send_reset, stream, error})
   end
 end

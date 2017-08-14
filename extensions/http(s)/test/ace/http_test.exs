@@ -96,7 +96,6 @@ defmodule Ace.HTTPTest do
     path = for _i <- 1..3000 do
       "a"
     end |> Enum.join("")
-    # |> IO.inspect
     request = """
     GET /#{path} HTTP/1.1
     Host: www.raxx.com

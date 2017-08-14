@@ -100,10 +100,9 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
-  def send_data(stream, data, end_stream, pending \\ []) do
+  def send_data(stream, data, end_stream) do
     case stream.status do
-      {:open, remote} ->
-        # TODO need to move back to sent because the status can be closed but we still need to work out whats sent for windowing.
+      {:open, _remote} ->
         queue = [%{data: data, end_stream: end_stream}]
         new_stream = %{stream | queue: stream.queue ++ queue}
         final_stream = if end_stream do
@@ -120,7 +119,7 @@ defmodule Ace.HTTP2.Stream do
   def send_trailers(stream, trailers) do
     new_stream = process_send_end_stream(stream)
     queue = stream.queue ++ [%{headers: trailers, end_stream: true}]
-    new_stream = %{stream | queue: queue}
+    new_stream = %{new_stream | queue: queue}
     {:ok, new_stream}
   end
 

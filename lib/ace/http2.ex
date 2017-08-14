@@ -14,7 +14,6 @@ defmodule Ace.HTTP2 do
   def request_to_headers(request) do
     [
       {":scheme", Atom.to_string(request.scheme)},
-      # TODO do something smart when authority is :connection
       {":authority", "#{request.authority}"},
       {":method", Atom.to_string(request.method)},
       {":path", request.path} |

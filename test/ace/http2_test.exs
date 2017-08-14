@@ -161,10 +161,8 @@ defmodule Ace.HTTP2Test do
     GenServer.reply(from, {:ok, self()})
 
     assert_receive {server_pushed_stream, %Request{path: "/favicon"}}, 1_000
-    IO.inspect(server_pushed_stream)
 
     assert_receive {^client_stream, {:promise, {client_promised_stream, %Request{path: "/favicon"}}}}, 1_000
-    IO.inspect(client_promised_stream)
 
     response = Response.new(200, [{"content-type", "text/html"}], true)
     Server.send_response(server_pushed_stream, response)

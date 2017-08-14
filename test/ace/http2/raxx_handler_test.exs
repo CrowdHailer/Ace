@@ -100,7 +100,6 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     assert [{"content-length", "0"}, {"accept", "*/*"}] = request.headers
   end
 
-  # TODO
   # test "multiple cookies are handled", %{client: connection} do
   #
   # end
@@ -152,7 +151,6 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     assert {:ok, %Frame.Data{end_stream: true, data: "Hello, World!"}} = Support.read_next(connection, 2_000)
   end
 
-  # # TODO should be a stream_test
   # test "large response body sent in parts", %{client: connection} do
   #
   # end

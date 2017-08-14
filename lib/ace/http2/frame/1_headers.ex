@@ -26,7 +26,6 @@ defmodule Ace.HTTP2.Frame.Headers do
       if stream_id == d_stream_id do
         {:error, {:protocol_error, "Headers frame can not be dependent on own stream"}}
       else
-        IO.inspect("Ignoring priority")
         {:ok, header_block_fragment}
       end
     else

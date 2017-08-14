@@ -55,7 +55,7 @@ defmodule Ace.HTTP2.Stream.RaxxHandler do
 
       {:noreply, {request, app}}
     else
-      Ace.HTTP2.Server.send_reset(stream, :protocol_error, "Incorrect content-length")
+      Ace.HTTP2.Server.send_reset(stream, :protocol_error)
       {:stop, :normal, {request, app}}
     end
   end
