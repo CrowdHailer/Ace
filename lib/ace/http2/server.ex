@@ -1,39 +1,20 @@
 defmodule Ace.HTTP2.Server do
   @moduledoc """
-  Server to handle an the HTTP/2.0 connection of a single client
+  Handle interactions with a single HTTP/2 client
+
+  To start an HTTP/2 application use `Ace.HTTP2.Service`
 
   # Needs docs on stream handlers
 
   #### Example
 
-  ```elixir
-  defmodule MyApp.StreamHandler do
-    use GenServer
-
-    def start_link(config) do
-      GenServer.start_link(__MODULE__, config)
-    end
-
-    def handle_info({stream, {:headers, _}}, state) do
-      response_headers = %{
-        headers: [{":status", "200"}, {"content-length", "13"}],
-        end_stream: false
-      }
-      Server.send(stream, response_headers)
-      response_body = %{
-        data: "Hello, World!",
-        end_stream: true
-      }
-      Server.send(stream, response_body)
-      {:stop, :normal, state}
-    end
-  end
-  ```
   """
   import Kernel, except: [send: 2]
 
   use GenServer
 
+  # Not a server and a stream worker are not the same thing
+  @doc false
   def start_link(listen_socket, stream_supervisor, settings \\ nil) do
     settings = if !settings do
       {:ok, default_settings} = Ace.HTTP2.Settings.for_server()

@@ -120,8 +120,7 @@ defmodule Ace.HTTP2.Client do
   Send information over a stream.
   """
   def send_request(stream = {:stream, connection, _, _}, request) do
-    # TODO some return value to know it has gone
-    :ok = GenServer.call(connection, {:send_request, stream, request})
+    GenServer.call(connection, {:send_request, stream, request})
   end
 
   @doc """
@@ -131,9 +130,11 @@ defmodule Ace.HTTP2.Client do
     :ok = GenServer.call(connection, {:send_data, stream, %{data: data, end_stream: end_stream}})
   end
 
+  @doc """
+  End a stream with trailers
+  """
   def send_trailers(stream = {:stream, connection, _, _}, trailers) do
-    # TODO some return value to know it has gone
-    :ok = GenServer.call(connection, {:send_trailers, stream, trailers})
+    GenServer.call(connection, {:send_trailers, stream, trailers})
   end
 
   @doc """

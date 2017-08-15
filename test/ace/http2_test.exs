@@ -10,7 +10,7 @@ defmodule Ace.HTTP2Test do
 
   setup do
     # TODO change to standard server start
-    {_server, port} = Support.start_server(self())
+    {_server, port} = Support.start_server({ForwardTo, [self()]})
     {:ok, %{port: port}}
   end
 
@@ -20,8 +20,6 @@ defmodule Ace.HTTP2Test do
 
     request = Request.post("/", [{"content-type", "text/plain"}], true)
     :ok = Client.send_request(client_stream, request)
-
-    Support.next_worker_self()
 
     assert_receive {server_stream, received = %Request{}}, 1_000
     assert received.path == request.path
@@ -40,8 +38,6 @@ defmodule Ace.HTTP2Test do
     request = Request.get("/", [{"content-type", "text/plain"}])
     :ok = Client.send_request(client_stream, request)
 
-    Support.next_worker_self()
-
     assert_receive {_server_stream, received = %Request{}}, 1_000
     assert received.headers == request.headers
     assert received.path == "/"
@@ -54,8 +50,6 @@ defmodule Ace.HTTP2Test do
 
     request = Request.post("/", [{"content-type", "text/plain"}], "This is all the content.")
     :ok = Client.send_request(client_stream, request)
-
-    Support.next_worker_self()
 
     assert_receive {server_stream, received = %Request{}}, 1_000
     assert received.headers == request.headers
@@ -76,8 +70,6 @@ defmodule Ace.HTTP2Test do
 
     request = Request.get("/", [{"content-type", "text/plain"}])
     :ok = Client.send_request(client_stream, request)
-
-    Support.next_worker_self()
 
     assert_receive {server_stream, %Request{}}, 1_000
 
@@ -102,8 +94,6 @@ defmodule Ace.HTTP2Test do
     request = Request.get("/", [{"content-type", "text/plain"}])
     :ok = Client.send_request(client_stream, request)
 
-    Support.next_worker_self()
-
     assert_receive {server_stream, %Request{}}, 1_000
 
     response = Response.new(304, [], false)
@@ -120,8 +110,6 @@ defmodule Ace.HTTP2Test do
 
     request = Request.get("/", [{"content-type", "text/plain"}])
     :ok = Client.send_request(client_stream, request)
-
-    Support.next_worker_self()
 
     assert_receive {server_stream, %Request{}}, 1_000
 
@@ -144,13 +132,9 @@ defmodule Ace.HTTP2Test do
     request = Request.get("/", [{"content-type", "text/plain"}])
     :ok = Client.send_request(client_stream, request)
 
-    Support.next_worker_self()
-
     request = %{Request.get("/favicon") | authority: "localhost"}
     assert_receive {server_stream, %Request{}}, 1_000
     Server.send_promise(server_stream, request)
-
-    Support.next_worker_self()
 
     assert_receive {server_pushed_stream, %Request{path: "/favicon"}}, 1_000
 

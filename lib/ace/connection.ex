@@ -1,4 +1,7 @@
 defmodule Ace.Connection do
+  @moduledoc false
+  # NOTE documentation hidden until HTTP/1.x merged into master.
+  
   @typedoc """
   Connection transport type.
 

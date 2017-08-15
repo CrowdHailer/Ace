@@ -2,13 +2,9 @@ defmodule Ace.HTTP2SetupTest do
   use ExUnit.Case
 
   setup do
-    {_server, port} = Support.start_server({__MODULE__, %{test_pid: self()}})
+    {_server, port} = Support.start_server({ForwardTo, [self()]})
     connection = Support.open_connection(port)
     {:ok, %{client: connection}}
-  end
-
-  def route(_) do
-    __MODULE__
   end
 
   alias Ace.HTTP2.{

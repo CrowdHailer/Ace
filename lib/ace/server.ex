@@ -1,16 +1,19 @@
 defmodule Ace.Server do
-  @moduledoc """
-  `#{__MODULE__}` manages a single client connection.
+  @moduledoc false
+  # NOTE documentation hidden until HTTP/1.x merged into master.
 
-  A server is started with an module to define behaviour and configuration as initial state.
-
-  See the README.md for a complete overview on how to make a server available.
-
-  *The server process accepts as well as manages the connection.
-  There is no separate acceptor process.
-  This means that that is no need to switch the connections owning process.
-  Several erlang servers do use separate acceptor pools.*
-  """
+  # @moduledoc """
+  # `#{__MODULE__}` manages a single client connection.
+  #
+  # A server is started with an module to define behaviour and configuration as initial state.
+  #
+  # See the README.md for a complete overview on how to make a server available.
+  #
+  # *The server process accepts as well as manages the connection.
+  # There is no separate acceptor process.
+  # This means that that is no need to switch the connections owning process.
+  # Several erlang servers do use separate acceptor pools.*
+  # """
 
   @typedoc """
   The current state of an individual server process.
@@ -102,7 +105,7 @@ defmodule Ace.Server do
   def handle_info(_message, {_mod, _state, nil}) do
     raise """
     Ace.Server should not receive messages before connection is established.
-    """ |> String.strip()
+    """ |> String.trim()
   end
   def handle_info({transport, _, packet}, {mod, state, connection}) when transport in [:tcp, :ssl] do
     # For any incoming tcp packet call the `handle_packet` action.

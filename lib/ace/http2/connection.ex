@@ -70,14 +70,11 @@ defmodule Ace.HTTP2.Connection do
     state = %{initial_state | next: :handshake}
     {:ok, {"", state}}
   end
-  def init({listen_socket, {mod, conf}, settings}) do
+  def init({listen_socket, {mod, args}, settings}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
-      [Supervisor.Spec.worker(mod, [conf], restart: :transient)],
+      [Supervisor.Spec.worker(mod, args, restart: :transient)],
       strategy: :simple_one_for_one
     )
-    init({listen_socket, stream_supervisor, settings})
-  end
-  def init({listen_socket, stream_supervisor, settings}) when is_pid(stream_supervisor) do
     {:ok, {:listen_socket, listen_socket, stream_supervisor, settings}, 0}
   end
   def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor, settings}) do

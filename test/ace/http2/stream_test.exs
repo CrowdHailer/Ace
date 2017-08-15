@@ -9,7 +9,7 @@ defmodule Ace.HTTP2.StreamTest do
   }
 
   setup do
-    {_server, port} = Support.start_server(self())
+    {_server, port} = Support.start_server({__MODULE__, [1_000]})
     connection = Support.open_connection(port)
     payload = [
       Ace.HTTP2.Connection.preface(),
@@ -19,6 +19,10 @@ defmodule Ace.HTTP2.StreamTest do
     assert {:ok, %Frame.Settings{ack: false}} == Support.read_next(connection)
     assert {:ok, %Frame.Settings{ack: true}} == Support.read_next(connection)
     {:ok, %{client: connection}}
+  end
+
+  def start_link(timeout) do
+    {:ok, spawn(fn() -> Process.sleep(timeout) end)}
   end
 
   test "stream is reset if worker terminates", %{client: connection} do
@@ -32,10 +36,6 @@ defmodule Ace.HTTP2.StreamTest do
     {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
-    receive do
-      {:"$gen_call", from, {:start_child, []}} ->
-        GenServer.reply(from, {:ok, spawn(fn() -> Process.sleep(1_000) end)})
-    end
 
     assert {:ok, %Frame.RstStream{error: :internal_error, stream_id: 1}} = Support.read_next(connection, 2_000)
   end

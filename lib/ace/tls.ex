@@ -1,11 +1,13 @@
 defmodule Ace.TLS do
-  @moduledoc """
-  TLS endpoint for secure connections to a service.
-
-  An endpoint is started with a application definition(`Ace.Application`) and configuration.
-
-  Each client connection is handle by an individual server.
-  """
+  @moduledoc false
+  # NOTE documentation hidden until HTTP/1.x merged into master.
+  # @moduledoc """
+  # TLS endpoint for secure connections to a service.
+  #
+  # An endpoint is started with a application definition(`Ace.Application`) and configuration.
+  #
+  # Each client connection is handle by an individual server.
+  # """
 
   @typedoc """
   Configuration options used when starting and endpoint.

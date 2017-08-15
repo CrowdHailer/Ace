@@ -14,16 +14,6 @@ defmodule Support do
     Path.expand("ace/tls/key.pem", __DIR__)
   end
 
-  def next_worker_self do
-    receive do
-      {:"$gen_call", from, {:start_child, []}} ->
-        GenServer.reply(from, {:ok, self()})
-    after
-      1_000 ->
-        {:error, :no_call}
-    end
-  end
-
   def read_next(connection, timeout \\ :infinity) do
     case :ssl.recv(connection, 9, timeout) do
       {:ok, <<length::24, type::8, flags::binary-size(1), 0::1, stream_id::31>>} ->
@@ -43,7 +33,7 @@ defmodule Support do
     :ssl.send(connection, Ace.HTTP2.Frame.serialize(frame))
   end
 
-  def start_server(stream_supervisor, port \\ 0) do
+  def start_server(application, port \\ 0) do
     certfile =  Path.expand("ace/tls/cert.pem", __DIR__)
     keyfile =  Path.expand("ace/tls/key.pem", __DIR__)
     options = [
@@ -56,7 +46,7 @@ defmodule Support do
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
     {:ok, listen_socket} = :ssl.listen(port, options)
-    {:ok, server} = Ace.HTTP2.Server.start_link(listen_socket, stream_supervisor)
+    {:ok, server} = Ace.HTTP2.Server.start_link(listen_socket, application)
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {server, port}
   end

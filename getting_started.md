@@ -4,7 +4,7 @@ Welcome to Ace.
 This guide will walk through the key features of HTTP/2.0.
 It will explain how Ace is built to take advantage of these features.
 
-*Want to dive straight in? see `Ace.HTTP2.Server` or `Ace.HTTP2.Client`.*
+*Want to dive straight in? see `Ace.HTTP2.Service` or `Ace.HTTP2.Client`.*
 
 ## Connections and Streams
 client setup
@@ -69,7 +69,6 @@ end
 ```
 
 ## Server Push
-TODO
 
 ###
 
@@ -121,7 +120,7 @@ defmodule MyApp.Application do
 
     Ace.HTTP2.Service.start_link(
       {MyApp.SimpleHandler, :config},
-      8443,
+      port: 8443,
       certfile: certfile,
       keyfile: keyfile,
       connections: 1_000
@@ -132,5 +131,5 @@ end
 
 ##### Note
 
-`Ace.HTTP2.Service.start_link/3` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
+`Ace.HTTP2.Service.start_link/2` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
 explain how Ace is good at OTP

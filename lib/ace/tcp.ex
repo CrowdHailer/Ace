@@ -1,9 +1,12 @@
 defmodule Ace.TCP do
-  @moduledoc """
-  Serve application from TCP endpoint.
-
-  To start a TCP endpoint run `start_link/2`.
-  """
+  @moduledoc false
+  # NOTE documentation hidden until HTTP/1.x merged into master.
+  
+  # @moduledoc """
+  # Serve application from TCP endpoint.
+  #
+  # To start a TCP endpoint run `start_link/2`.
+  # """
 
   @typedoc """
   Reference to the endpoint.

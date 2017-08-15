@@ -1,5 +1,11 @@
 Code.require_file("support.exs", __DIR__)
 
+defmodule ForwardTo do
+  def start_link(pid) do
+    {:ok, pid}
+  end
+end
+
 defmodule CounterServer do
   use Ace.Application
   def handle_connect(_, num) do

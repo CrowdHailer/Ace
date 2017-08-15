@@ -11,24 +11,24 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   }
 
   test "service cannot be started with max_frame_size less than default value" do
-    assert {:error, _} = Service.start_link(self(), 0, max_frame_size: 16_383)
+    assert {:error, _} = Service.start_link({ForwardTo, [self()]}, port: 0, max_frame_size: 16_383)
   end
 
   test "service cannot be started with max_frame_size greater than default value" do
-    assert {:error, _} = Service.start_link(self(), 0, max_frame_size: 16_777_216)
+    assert {:error, _} = Service.start_link({ForwardTo, [self()]}, port: 0, max_frame_size: 16_777_216)
   end
 
   test "max_frame_size setting is sent in handshake" do
-    opts = [owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
-    assert {:ok, service} = Service.start_link(self(), 0, opts)
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
+    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
     assert_receive {:listening, ^service, port}
     connection = Support.open_connection(port)
     assert {:ok, Frame.Settings.new(max_frame_size: 20_000)} == Support.read_next(connection)
   end
 
   test "sending oversized frame is a connection error of type frame_size_error" do
-    opts = [owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
-    assert {:ok, service} = Service.start_link(self(), 0, opts)
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
+    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -51,8 +51,8 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   end
 
   test "Service uses default setting until client has acknowledged" do
-    opts = [owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
-    assert {:ok, service} = Service.start_link(self(), 0, opts)
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
+    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -77,8 +77,8 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
   # Call things waiting in stream blocks
   test "client cannot request max_frame_size less than default" do
-    opts = [owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link(self(), 0, opts)
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
+    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -91,8 +91,8 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   end
 
   test "large response blocks from server are broken into multiple fragments" do
-    opts = [owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link(self(), 0, opts)
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
+    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -107,8 +107,6 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     {:ok, {header_block, _encode_context}} = Ace.HPack.encode(headers, encode_context)
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
-
-    :ok = Support.next_worker_self()
 
     assert_receive {server_stream, %Request{}}, 1_000
     long_value = Enum.map(1..4_000, fn(_) -> "a" end) |> Enum.join("")
@@ -140,8 +138,6 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert {:ok, frame = %Frame.Data{end_stream: true}} = Support.read_next(connection)
     assert 17_000 >= :erlang.iolist_size(frame.data)
   end
+  # TODO test promise headers broken up
 
-  test "large promise block from server is broken into multiple fragments" do
-    {_server, port} = Support.start_server(self())
-  end
 end

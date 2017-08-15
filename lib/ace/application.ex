@@ -1,29 +1,31 @@
 defmodule Ace.Application do
-  @moduledoc """
-  Behaviour module for implementing a server to handle tcp/tls connections.
-
-  See `Ace.Server` to start a server with an application
-  ## Example
-
-  ```elixir
-  defmodule CounterServer do
-    use Ace.Application
-
-    def handle_connect(_, num) do
-      {:nosend, num}
-    end
-
-    def handle_packet(_, last) do
-      count = last + 1
-      {:send, "\#{count}\r\n", count}
-    end
-
-    def handle_info(_, last) do
-      {:nosend, last}
-    end
-  end
-  ```
-  """
+  @moduledoc false
+  # NOTE documentation hidden until HTTP/1.x merged into master.
+  # @moduledoc """
+  # Behaviour module for implementing a server to handle tcp/tls connections.
+  #
+  # See `Ace.Server` to start a server with an application
+  # ## Example
+  #
+  # ```elixir
+  # defmodule CounterServer do
+  #   use Ace.Application
+  #
+  #   def handle_connect(_, num) do
+  #     {:nosend, num}
+  #   end
+  #
+  #   def handle_packet(_, last) do
+  #     count = last + 1
+  #     {:send, "\#{count}\r\n", count}
+  #   end
+  #
+  #   def handle_info(_, last) do
+  #     {:nosend, last}
+  #   end
+  # end
+  # ```
+  # """
 
   @typedoc """
   The current state of a server.

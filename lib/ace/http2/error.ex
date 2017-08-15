@@ -1,5 +1,6 @@
 defmodule Ace.HTTP2.Errors do
-  @moduledoc false
+  @moduledoc """
+  """
 
   @defined [
     {0x0, :no_error},
