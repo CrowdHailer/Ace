@@ -12,7 +12,6 @@ defmodule Ace.HTTP2.Connection do
   }
 
   @preface "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
-  @default_settings %{}
 
   def preface() do
     @preface
@@ -22,7 +21,9 @@ defmodule Ace.HTTP2.Connection do
     # next: :preface, :handshake, :any, :continuation,
     next: :any,
     peer: :server,
-    settings: nil,
+    local_settings: nil,
+    queued_settings: [],
+    remote_settings: nil,
     socket: nil,
     decode_context: nil,
     encode_context: nil,
@@ -49,13 +50,17 @@ defmodule Ace.HTTP2.Connection do
       Frame.Settings.new() |> Frame.Settings.serialize(),
     ]
     :ssl.send(connection, payload)
-
+    {:ok, default_settings} = Ace.HTTP2.Settings.for_client()
     :ssl.setopts(connection, [active: :once])
     decode_context = HPack.new_context(4_096)
     encode_context = HPack.new_context(4_096)
     initial_state = %__MODULE__{
       socket: connection,
       outbound_window: 65_535,
+      local_settings: default_settings,
+      # TODO should be the clients settings
+      queued_settings: [default_settings],
+      remote_settings: default_settings,
       # DEBT set when handshaking settings
       initial_window_size: 65_535,
       decode_context: decode_context,
@@ -68,28 +73,34 @@ defmodule Ace.HTTP2.Connection do
     state = %{initial_state | next: :handshake}
     {:ok, {"", state}}
   end
-  def init({listen_socket, {mod, conf}}) do
+  def init({listen_socket, {mod, conf}, settings}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
       [Supervisor.Spec.worker(mod, [conf], restart: :transient)],
       strategy: :simple_one_for_one
     )
-    init({listen_socket, stream_supervisor})
+    init({listen_socket, stream_supervisor, settings})
   end
-  def init({listen_socket, stream_supervisor}) when is_pid(stream_supervisor) do
-    {:ok, {:listen_socket, listen_socket, stream_supervisor}, 0}
+  def init({listen_socket, stream_supervisor, settings}) when is_pid(stream_supervisor) do
+    {:ok, {:listen_socket, listen_socket, stream_supervisor, settings}, 0}
   end
-  def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor}) do
+  def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor, settings}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
-    :ssl.send(socket, Frame.Settings.new() |> Frame.Settings.serialize())
+    {:ok, default_settings} = Ace.HTTP2.Settings.for_server()
+    initial_settings_frame = Ace.HTTP2.Settings.update_frame(settings, default_settings)
+    :ssl.send(socket, Frame.Settings.serialize(initial_settings_frame))
     :ssl.setopts(socket, [active: :once])
+    # TODO max table size
     decode_context = HPack.new_context(4_096)
     encode_context = HPack.new_context(4_096)
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     initial_state = %__MODULE__{
       socket: socket,
       outbound_window: 65_535,
+      local_settings: default_settings,
+      queued_settings: [settings],
+      remote_settings: default_settings,
       # DEBT set when handshaking settings
       initial_window_size: 65_535,
       decode_context: decode_context,
@@ -231,9 +242,30 @@ defmodule Ace.HTTP2.Connection do
     stream = %{stream | queue: rest}
     {:ok, {header_block, new_encode_context}} = HPack.encode(headers, connection.encode_context)
     connection = %{connection | encode_context: new_encode_context}
-    # TODO respect maximum frame size
-    header_frame = Frame.Headers.new(stream.id, header_block, true, end_stream)
-    pop_stream(stream, connection, previous ++ [header_frame])
+
+    max_frame_size = connection.remote_settings.max_frame_size
+
+    {initial_fragment, tail_block} = case header_block do
+      <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
+        {to_send, remaining_data}
+      to_send ->
+        {to_send, ""}
+    end
+
+    frames = case tail_block do
+      "" ->
+        [Frame.Headers.new(stream.id, initial_fragment, true, end_stream)]
+      tail_block ->
+        [Frame.Headers.new(stream.id, initial_fragment, false, end_stream) | pack_continuation(tail_block, stream.id, max_frame_size)]
+    end
+    pop_stream(stream, connection, previous ++ frames)
+  end
+  def pack_continuation(block, stream_id, max_frame_size) when byte_size(block) <= max_frame_size do
+    [Frame.Continuation.new(stream_id, block, true)]
+  end
+  def pack_continuation(long_block, stream_id, max_frame_size) do
+    <<to_send::binary-size(max_frame_size), remaining_block::binary>> = long_block
+    [Frame.Continuation.new(stream_id, to_send, false) | pack_continuation(remaining_block, stream_id, max_frame_size)]
   end
   def pop_stream(stream = %{queue: [fragment = %{data: _} | rest]}, connection, previous) do
     available_window = min(Stream.outbound_window(stream), connection.outbound_window)
@@ -254,13 +286,20 @@ defmodule Ace.HTTP2.Connection do
         data ->
           [%{data: data, end_stream: fragment.end_stream} | rest]
       end
-      # TODO respect maximum frame size
-      data_frame = Frame.Data.new(stream.id, to_send, end_stream)
+      max_frame_size = connection.remote_settings.max_frame_size
+      frames = pack_data(to_send, stream.id, end_stream, max_frame_size)
       window_used = :erlang.iolist_size(to_send)
       stream = %{stream | sent: stream.sent + window_used, queue: queue}
       connection = %{connection | outbound_window: connection.outbound_window - window_used}
-      pop_stream(stream, connection, previous ++ [data_frame])
+      pop_stream(stream, connection, previous ++ frames)
     end
+  end
+  def pack_data(block, stream_id, end_stream, max_frame_size) when byte_size(block) <= max_frame_size  do
+    [Frame.Data.new(stream_id, block, end_stream)]
+  end
+  def pack_data(long_block, stream_id, end_stream, max_frame_size) do
+    <<next_block::binary-size(max_frame_size), remaining_block::binary>> = long_block
+    [Frame.Data.new(stream_id, next_block, false) | pack_data(remaining_block, stream_id, end_stream, max_frame_size)]
   end
   def pop_stream(stream = %{queue: [{:reset, reason}]}, connection, previous) do
     reset_frame = Frame.RstStream.new(stream.id, reason)
@@ -277,7 +316,8 @@ defmodule Ace.HTTP2.Connection do
   end
   # Do not separate frame and binary level as this step needs to know state for max_frame
   def consume(buffer, state) do
-    case Frame.parse_from_buffer(buffer, max_length: 16_384) do
+    max_frame_size = state.local_settings.max_frame_size
+    case Frame.parse_from_buffer(buffer, max_length: max_frame_size) do
       {:ok, {raw_frame, unprocessed}} ->
 
         if raw_frame do
@@ -311,14 +351,9 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
-  def consume_frame(settings = %Frame.Settings{ack: false}, state = %{settings: nil, next: :handshake}) do
-    case update_settings(settings, %{state | settings: @default_settings}) do
-      {:ok, new_state} ->
-        new_state = %{new_state | next: :any}
-        {:ok, {[Frame.Settings.ack()], new_state}}
-      {:error, reason} ->
-        {:error, reason}
-    end
+  def consume_frame(frame = %Frame.Settings{ack: false}, state = %{next: :handshake}) do
+    new_settings = Ace.HTTP2.Settings.apply_frame(frame, state.remote_settings)
+    {:ok, {[Frame.Settings.ack()], %{state | remote_settings: new_settings, next: :any}}}
   end
   def consume_frame(_, %{settings: nil, next: :handshake}) do
     {:error, {:protocol_error, "Did not receive settings frame"}}
@@ -363,18 +398,14 @@ defmodule Ace.HTTP2.Connection do
     Logger.debug("#{state.name} ignoring priority information")
     {:ok, {[], state}}
   end
-  def consume_frame(settings = %Frame.Settings{}, state = %{next: :any}) do
-    if settings.ack do
+  def consume_frame(frame = %Frame.Settings{}, state = %{next: :any}) do
+    if frame.ack do
+      [new_settings | still_queued] = state.queued_settings
+      state = %{state | local_settings: new_settings, queued_settings: still_queued}
       {:ok, {[], state}}
     else
-      case update_settings(settings, state) do
-        {:ok, new_state} ->
-          # DEBT only do this if initial_window_size has increased
-          {frames, newer_state} = send_available(new_state)
-          {:ok, {[Frame.Settings.ack() | frames], newer_state}}
-        {:error, reason} ->
-          {:error, reason}
-      end
+      new_settings = Ace.HTTP2.Settings.apply_frame(frame, state.remote_settings)
+      {:ok, {[Frame.Settings.ack()], %{state | remote_settings: new_settings}}}
     end
   end
   def consume_frame(frame = %Frame.PushPromise{}, state = %{next: :any}) do
@@ -479,20 +510,6 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(frame, %{next: next}) do
     Logger.warn("expected next '#{inspect(next)}' got: #{inspect(frame)}")
     {:error, {:protocol_error, "Unexpected frame"}}
-  end
-
-  # TODO handle all settings
-  def update_settings(new, state) do
-    new_state = state
-    |> update_initial_window_size(new.initial_window_size)
-    # case new.max_frame_size do
-    #   nil ->
-    #   x when x < 16_384 ->
-    #     {:error, {:protocol_error, "max_frame_size too small"}}
-    #   new ->
-    #     {:ok, state}
-    # end
-    {:ok, new_state}
   end
 
   defp update_initial_window_size(state, nil) do

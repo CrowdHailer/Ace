@@ -6,6 +6,24 @@ defmodule RaxxForwarder do
 end
 
 defmodule Support do
+  def test_certfile() do
+    Path.expand("ace/tls/cert.pem", __DIR__)
+  end
+
+  def test_keyfile() do
+    Path.expand("ace/tls/key.pem", __DIR__)
+  end
+
+  def next_worker_self do
+    receive do
+      {:"$gen_call", from, {:start_child, []}} ->
+        GenServer.reply(from, {:ok, self()})
+    after
+      1_000 ->
+        {:error, :no_call}
+    end
+  end
+
   def read_next(connection, timeout \\ :infinity) do
     case :ssl.recv(connection, 9, timeout) do
       {:ok, <<length::24, type::8, flags::binary-size(1), 0::1, stream_id::31>>} ->

@@ -34,8 +34,14 @@ defmodule Ace.HTTP2.Server do
 
   use GenServer
 
-  def start_link(listen_socket, stream_supervisor) do
-    GenServer.start_link(Ace.HTTP2.Connection, {listen_socket, stream_supervisor})
+  def start_link(listen_socket, stream_supervisor, settings \\ nil) do
+    settings = if !settings do
+      {:ok, default_settings} = Ace.HTTP2.Settings.for_server()
+      default_settings
+    else
+      settings
+    end
+    GenServer.start_link(Ace.HTTP2.Connection, {listen_socket, stream_supervisor, settings})
   end
 
   def send_response(stream = {:stream, pid, _id, _ref}, response) do
