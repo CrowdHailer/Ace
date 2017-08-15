@@ -27,7 +27,6 @@ defmodule Ace.HTTP2.Connection do
     socket: nil,
     decode_context: nil,
     encode_context: nil,
-    initial_window_size: nil,
     outbound_window: nil,
     streams: nil,
     stream_supervisor: nil,
@@ -61,8 +60,6 @@ defmodule Ace.HTTP2.Connection do
       # TODO should be the clients settings
       queued_settings: [default_settings],
       remote_settings: default_settings,
-      # DEBT set when handshaking settings
-      initial_window_size: 65_535,
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
@@ -102,7 +99,6 @@ defmodule Ace.HTTP2.Connection do
       queued_settings: [settings],
       remote_settings: default_settings,
       # DEBT set when handshaking settings
-      initial_window_size: 65_535,
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
@@ -149,7 +145,7 @@ defmodule Ace.HTTP2.Connection do
   end
   def handle_call({:new_stream, receiver}, _from, {buffer, state}) do
     {stream_id, state} = next_stream_id(state)
-    stream = Stream.idle(stream_id, receiver, state.initial_window_size)
+    stream = Stream.idle(stream_id, receiver, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
     {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, {buffer, state}}
   end
@@ -310,7 +306,7 @@ defmodule Ace.HTTP2.Connection do
   def next_stream(state) do
     {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
     {stream_id, state} = next_stream_id(state)
-    stream = Stream.reserve(stream_id, worker, state.initial_window_size)
+    stream = Stream.reserve(stream_id, worker, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
     {stream, state}
   end
@@ -353,6 +349,7 @@ defmodule Ace.HTTP2.Connection do
 
   def consume_frame(frame = %Frame.Settings{ack: false}, state = %{next: :handshake}) do
     new_settings = Ace.HTTP2.Settings.apply_frame(frame, state.remote_settings)
+    state = update_streams_initial_window_size(state, frame.initial_window_size)
     {:ok, {[Frame.Settings.ack()], %{state | remote_settings: new_settings, next: :any}}}
   end
   def consume_frame(_, %{settings: nil, next: :handshake}) do
@@ -405,6 +402,7 @@ defmodule Ace.HTTP2.Connection do
       {:ok, {[], state}}
     else
       new_settings = Ace.HTTP2.Settings.apply_frame(frame, state.remote_settings)
+      state = update_streams_initial_window_size(state, frame.initial_window_size)
       {:ok, {[Frame.Settings.ack()], %{state | remote_settings: new_settings}}}
     end
   end
@@ -421,7 +419,7 @@ defmodule Ace.HTTP2.Connection do
 
             {:ok, original_stream} = Map.fetch(state.streams, frame.stream_id)
 
-            promised_stream = Stream.reserved(frame.promised_stream_id, original_stream.worker, state.initial_window_size)
+            promised_stream = Stream.reserved(frame.promised_stream_id, original_stream.worker, state.remote_settings.initial_window_size)
             state = put_stream(state, promised_stream)
 
             {:ok, request} = Ace.HTTP2.headers_to_request(headers, true)
@@ -512,12 +510,12 @@ defmodule Ace.HTTP2.Connection do
     {:error, {:protocol_error, "Unexpected frame"}}
   end
 
-  defp update_initial_window_size(state, nil) do
+  defp update_streams_initial_window_size(state, nil) do
     state
   end
-  defp update_initial_window_size(state, initial_window_size) do
+  defp update_streams_initial_window_size(state, initial_window_size) do
     streams = Enum.map(state.streams, fn({k, v}) -> {k, %{v | initial_window_size: initial_window_size}} end) |> Enum.into(%{})
-    %{state| initial_window_size: initial_window_size, streams: streams}
+    %{state| streams: streams}
   end
 
   def fetch_stream(state, frame) do
@@ -552,7 +550,7 @@ defmodule Ace.HTTP2.Connection do
   end
   def open_stream(connection, stream_id) do
     {:ok, worker} = Supervisor.start_child(connection.stream_supervisor, [])
-    stream = Stream.idle(stream_id, worker, connection.initial_window_size)
+    stream = Stream.idle(stream_id, worker, connection.remote_settings.initial_window_size)
     {:ok, put_stream(connection, stream)}
   end
 

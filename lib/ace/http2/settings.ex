@@ -1,10 +1,14 @@
 defmodule Ace.HTTP2.Settings do
 
-  @enforce_keys [:max_frame_size]
+  @enforce_keys [:max_frame_size, :initial_window_size]
   defstruct @enforce_keys
 
   @max_frame_size_default 16_384
   @max_frame_size_maximum 16_777_215
+
+  @initial_window_size_default 65_535
+  @initial_window_size_minimum 0
+  @initial_window_size_maximum 2_147_483_647
 
   def for_server(values \\ []) do
     # Difference for server is that push may never be true
@@ -18,11 +22,19 @@ defmodule Ace.HTTP2.Settings do
         {:error, :max_frame_size_too_small}
       value when @max_frame_size_maximum < value ->
         {:error, :max_frame_size_too_large}
-      value ->
-        settings = %__MODULE__{
-          max_frame_size: value
-        }
-        {:ok, settings}
+      max_frame_size ->
+        case Keyword.get(values, :initial_window_size, @initial_window_size_default) do
+          value when value < @initial_window_size_minimum ->
+            {:error, :initial_window_size_too_small}
+          value when @initial_window_size_maximum < value ->
+            {:error, :initial_window_size_too_large}
+          initial_window_size ->
+            settings = %__MODULE__{
+              max_frame_size: max_frame_size,
+              initial_window_size: initial_window_size,
+            }
+            {:ok, settings}
+        end
     end
   end
 
@@ -32,14 +44,24 @@ defmodule Ace.HTTP2.Settings do
     else
       []
     end
+    changed = if next.initial_window_size != previous.initial_window_size do
+      [initial_window_size: next.initial_window_size]
+    else
+      []
+    end ++ changed
     Ace.HTTP2.Frame.Settings.new(changed)
   end
 
-  def apply_frame(frame, current) do
-    if new_value = frame.max_frame_size do
-      Map.put(current, :max_frame_size, new_value)
+  def apply_frame(frame, settings) do
+    settings = if new_value = frame.max_frame_size do
+      Map.put(settings, :max_frame_size, new_value)
     else
-      current
+      settings
+    end
+    if new_value = frame.initial_window_size do
+      Map.put(settings, :initial_window_size, new_value)
+    else
+      settings
     end
   end
 end
