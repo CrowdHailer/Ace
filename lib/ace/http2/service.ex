@@ -2,10 +2,9 @@ defmodule Ace.HTTP2.Service do
   @moduledoc """
   Run a supervised tree of HTTP/2.0 servers, all available on a single port.
 
-  An behaviour of an `Ace.HTTP2.Service` is defined by the application it runs.
-  The definition of an application is a behaviour module and argument list that will be used to start the worker.
+  A behaviour of an `Ace.HTTP2.Service` is defined by the application it runs.
 
-  For example, here is simple a simple application
+  Example application:
 
       defmodule MyProject.WWW do
         def start_link(greeting) do
@@ -43,7 +42,7 @@ defmodule Ace.HTTP2.Service do
 
   ## Supervising services
 
-  Ace makes it very easy to start multiple services is a single Mix project.
+  Ace makes it easy to start multiple services in a single Mix project.
   Starting a service returns the service supervisor.
 
   This supervisor may act as the application supervisor if it is the only one started.
@@ -99,7 +98,7 @@ defmodule Ace.HTTP2.Service do
 
   ## Testing endpoints
 
-  Starting a service on port `0` will rely on the operating system to allocate and available port.
+  Starting a service on port `0` will rely on the operating system to allocate an available port.
   This allows services to be stood up for individual tests, perhaps all with different configuration.
 
   To find the port that a service has started using a process may be given as the optional owner.
