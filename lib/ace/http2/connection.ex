@@ -75,9 +75,9 @@ defmodule Ace.HTTP2.Connection do
       [Supervisor.Spec.worker(mod, args, restart: :transient)],
       strategy: :simple_one_for_one
     )
-    {:ok, {:listen_socket, listen_socket, stream_supervisor, settings}, 0}
+    {:ok, {:listening, listen_socket, stream_supervisor, settings}, 0}
   end
-  def handle_info(:timeout, {:listen_socket, listen_socket, stream_supervisor, settings}) do
+  def handle_info(:timeout, {:listening, listen_socket, stream_supervisor, settings}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)

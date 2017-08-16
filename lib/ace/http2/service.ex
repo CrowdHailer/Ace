@@ -2,22 +2,31 @@ defmodule Ace.HTTP2.Service do
   @moduledoc """
   Run a supervised tree of HTTP/2.0 servers, all available on a single port.
 
-  A behaviour of an `Ace.HTTP2.Service` is defined by the application it runs.
+  The task associated with each client request is processed by an application level worker.
+  To start workers a module and start arguments are required.
+
+  For example, given `{MyProject.WWW, ["foo"]}`, Ace will start workers by executing the following.
+  `MyProject.WWW.start_link("foo")`
 
   Example application:
 
       defmodule MyProject.WWW do
+        use GenServer
+        alias Ace.HTTP2.Server
+
         def start_link(greeting) do
           GenServer.start_link(__MODULE__, greeting)
         end
 
         def handle_info({stream, %Ace.Request{method: :GET, path: "/"}}, greeting) do
           response = Ace.Response.new(200, [], greeting)
-          Ace.HTTP2.Server.send_response(stream, response)
+          Server.send_response(stream, response)
+          {:stop, greeting, :normal}
         end
-        def handle_info({stream, _request}, _state) do
+        def handle_info({stream, _request}, greeting) do
           response = Ace.Response.new(404, [], false)
-          Ace.HTTP2.Server.send_response(stream, response)
+          Server.send_response(stream, response)
+          {:stop, greeting, :normal}
         end
       end
 

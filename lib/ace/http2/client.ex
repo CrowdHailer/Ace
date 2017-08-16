@@ -42,13 +42,16 @@ defmodule Ace.HTTP2.Client do
   In this case the body is assumed complete with no further data to stream
 
       request = Request.new(:GET, "/", [{"accept", "application/json"}], false)
-      {:ok, stream} = Client.stream(client, request)
+      {:ok, stream} = Client.stream(client)
+      :ok = Client.send_request(stream, request)
 
       request = Request.new(:POST, "/", [{"content-length", "13"}], "Hello, World!")
-      {:ok, stream} = Client.stream(client, request)
+      {:ok, stream} = Client.stream(client)
+      :ok = Client.send_request(stream, request)
 
       request = Request.new(:POST, "/", [{"content-length", "13"}], true)
-      {:ok, stream} = Client.stream(client, request)
+      {:ok, stream} = Client.stream(client)
+      :ok = Client.send_request(stream, request)
       {:ok, _} = Client.send_data(stream, "Hello, World!", end_stream: true)
 
   ## Receiving a response
