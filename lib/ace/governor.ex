@@ -37,6 +37,9 @@ defmodule Ace.Governor do
     {:ok, new_ref} = Server.accept_connection(new_server, listen_socket)
     {:noreply, {listen_socket, server_supervisor, new_ref, new_server, monitor_ref}}
   end
+  def handle_info({:DOWN, _, :process, _, :normal}, state) do
+    {:noreply, state}
+  end
   def handle_info(connection_ack(ref, _), {listen_socket, server_supervisor, ref, server, monitor_ref}) do
     true = Process.unlink(server)
     true = Process.demonitor(monitor_ref)
