@@ -4,11 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## Next
+## [0.12.0](https://github.com/CrowdHailer/Ace/tree/0.12.0) - 2017-08-17
 
 ## Added
 - Client can fetch an idle stream using `Ace.HTTP2.Client.stream/1`.
-- Send generic data over a stream using `Ace.HTTP2.Client.send/1`.
 - Forward stream resets with reason to worker processes.
 - `Ace.HTTP2.Client.send_request/2`.
 - `Ace.HTTP2.Client.send_trailers/2`.
@@ -19,7 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 # Changed
 - Server receives request object not raw headers.
 - Server sends with response object not raw headers.
-- Client cannot start a stream and send in single call to `stream/2`.
+- Client cannot start a stream with request.
 - `Ace.HTTP2.Stream.RaxxHandler` renamed to `Ace.Raxx.Handler`
 
 ## [0.11.1](https://github.com/CrowdHailer/Ace/tree/0.11.1) - 2017-08-03

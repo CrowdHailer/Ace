@@ -7,6 +7,7 @@ It will explain how Ace is built to take advantage of these features.
 *Want to dive straight in? see `Ace.HTTP2.Service` or `Ace.HTTP2.Client`.*
 
 ## Connections and Streams
+
 client setup
 
 server setup
@@ -70,29 +71,7 @@ end
 
 ## Server Push
 
-###
-
-### Stream handlers
-
-The first step is define a stream handler for you application.
-Using the Raxx adapter is the simplest way to get started.
-
-```elixir
-defmodule MyApp.SimpleHandler do
-  use Ace.Raxx.Handler
-
-  def handle_request(_request, _config) do
-    Raxx.Response.ok("Hello, World!", [{"content-length", "13"}])
-  end
-end
-```
-
-A stream handler and configuration are used to start a worker for every stream.
-
-##### Note
-
-The Raxx handler is provided when simple request -> response usecases.
-Defining a custom handler can support streaming up or down (or both).
+TODO
 
 ### TLS(SSL) credentials
 
@@ -104,32 +83,3 @@ For local development a [self signed certificate](http://how2ssl.com/articles/op
 ##### Note
 
 Store certificates in a projects `priv` directory if they are to be distributed as part of a release.
-
-### Endpoint setup
-
-```elixir
-defmodule MyApp.Application do
-  @moduledoc false
-
-  use Application
-
-  def start(_type, _args) do
-
-    certfile = Application.app_dir(:my_app, "/priv/cert.pem")
-    keyfile = Application.app_dir(:my_app, "/priv/key.pem")
-
-    Ace.HTTP2.Service.start_link(
-      {MyApp.SimpleHandler, :config},
-      port: 8443,
-      certfile: certfile,
-      keyfile: keyfile,
-      connections: 1_000
-    )
-  end
-end
-```
-
-##### Note
-
-`Ace.HTTP2.Service.start_link/2` Can be used to add one or more HTTP2 endpoint to an application supervision tree.
-explain how Ace is good at OTP

@@ -1,4 +1,19 @@
 defmodule Ace.Raxx.Handler do
+  @moduledoc """
+  Using the Raxx handler is the simplest way to get a worker started.
+
+  The Raxx handler is provided when simple request -> response usecases.
+
+  ```elixir
+  defmodule MyApp.SimpleHandler do
+    use Ace.Raxx.Handler
+
+    def handle_request(_request, _config) do
+      Raxx.Response.ok("Hello, World!", [{"content-length", "13"}])
+    end
+  end
+  ```
+  """
   use GenServer
   defmacro __using__(_opts) do
     quote do
