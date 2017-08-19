@@ -365,7 +365,6 @@ defmodule Ace.HTTP2.Connection do
     new_window = state.outbound_window + frame.increment
     # 2^31 - 1
     if new_window <= 2_147_483_647 do
-      {[], %{state | outbound_window: new_window}}
       new_state = %{state | outbound_window: new_window}
       {frames, newer_state} = send_available(new_state)
       {:ok, {frames, newer_state}}
