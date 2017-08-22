@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.12.1](https://github.com/CrowdHailer/Ace/tree/0.12.1) - 2017-08-22
+
+## Fixed
+- Raxx changed from being an optional dependency
+
 ## [0.12.0](https://github.com/CrowdHailer/Ace/tree/0.12.0) - 2017-08-17
 
 ## Added
@@ -15,7 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.HTTP2.Server.send_reset/2`.
 - Inspect protocol implementation for each frame type.
 
-# Changed
+## Changed
 - Server receives request object not raw headers.
 - Server sends with response object not raw headers.
 - Client cannot start a stream with request.
