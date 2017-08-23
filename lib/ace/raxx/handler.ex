@@ -76,9 +76,6 @@ defmodule Ace.Raxx.Handler do
   end
 
   def dispatch_request(request, {mod, config}) do
-    # TODO enforce_keys on raxx request
-    # TODO rename host on raxx
-    # TODO replace internal request object with Raxx
     uri = URI.parse(request.path)
     query = Plug.Conn.Query.decode(uri.query || "")
     path = Raxx.Request.split_path(uri.path)

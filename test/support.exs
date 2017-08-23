@@ -33,24 +33,6 @@ defmodule Support do
     :ssl.send(connection, Ace.HTTP2.Frame.serialize(frame))
   end
 
-  def start_server(application, port \\ 0) do
-    certfile =  Path.expand("ace/tls/cert.pem", __DIR__)
-    keyfile =  Path.expand("ace/tls/key.pem", __DIR__)
-    options = [
-      active: false,
-      mode: :binary,
-      packet: :raw,
-      certfile: certfile,
-      keyfile: keyfile,
-      reuseaddr: true,
-      alpn_preferred_protocols: ["h2", "http/1.1"]
-    ]
-    {:ok, listen_socket} = :ssl.listen(port, options)
-    {:ok, server} = Ace.HTTP2.Server.start_link(listen_socket, application)
-    {:ok, {_, port}} = :ssl.sockname(listen_socket)
-    {server, port}
-  end
-
   def open_connection(port) do
     {:ok, connection} = :ssl.connect('localhost', port, [
       mode: :binary,

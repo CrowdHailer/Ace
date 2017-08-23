@@ -5,12 +5,14 @@ defmodule Ace.HTTP2Test do
     Request,
     Response,
     HTTP2.Client,
-    HTTP2.Server
+    HTTP2.Server,
+    HTTP2.Service,
   }
 
   setup do
-    # TODO change to standard server start
-    {_server, port} = Support.start_server({ForwardTo, [self()]})
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
+    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
+    assert_receive {:listening, ^service, port}
     {:ok, %{port: port}}
   end
 

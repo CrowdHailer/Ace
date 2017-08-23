@@ -9,7 +9,9 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
   }
 
   setup do
-    {_server, port} = Support.start_server({Ace.Raxx.Handler, [RaxxForwarder, self()]})
+    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
+    assert {:ok, service} = Ace.HTTP2.Service.start_link({Ace.Raxx.Handler, [RaxxForwarder, self()]}, opts)
+    assert_receive {:listening, ^service, port}
     connection = Support.open_connection(port)
     payload = [
       Ace.HTTP2.Connection.preface(),

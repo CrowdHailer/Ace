@@ -139,8 +139,8 @@ defmodule Ace.HTTP2.Service do
   def start_link(application, options) do
     case Settings.for_server(Keyword.take(options, [:max_frame_size])) do
       {:ok, settings} ->
-        name = Keyword.get(options, :name, __MODULE__)
         port = Keyword.get(options, :port, 8443)
+        name = Keyword.get(options, :name, :"#{__MODULE__}:#{port}")
         connections = Keyword.get(options, :connections, 100)
         {:ok, supervisor} = Supervisor.start_link(__MODULE__, {application, port, options, settings}, name: name)
 

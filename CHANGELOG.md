@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [next](https://github.com/CrowdHailer/Ace/tree/master) -
+## [0.13.0](https://github.com/CrowdHailer/Ace/tree/0.13.0) - 2017-08-23
 
 ## Changed
 - Request scheme is atom instead of string.
