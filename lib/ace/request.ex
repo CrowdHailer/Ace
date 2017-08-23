@@ -65,7 +65,7 @@ defmodule Ace.Request do
   """
   def new(method, path, headers, body, opts \\ []) do
     scheme = Keyword.get(opts, :scheme, :https)
-    authority = Keyword.get(opts, :scheme, "example.com")
+    authority = Keyword.get(opts, :authority, "example.com")
     %__MODULE__{
       scheme: scheme,
       authority: authority,

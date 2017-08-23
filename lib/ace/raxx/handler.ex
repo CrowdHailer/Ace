@@ -83,9 +83,9 @@ defmodule Ace.Raxx.Handler do
     query = Plug.Conn.Query.decode(uri.query || "")
     path = Raxx.Request.split_path(uri.path)
     request = %Raxx.Request{
-      scheme: String.to_existing_atom(request.scheme),
+      scheme: request.scheme,
       host: request.authority,
-      method: String.to_existing_atom(request.method),
+      method: request.method,
       headers: request.headers,
       path: path,
       query: query,

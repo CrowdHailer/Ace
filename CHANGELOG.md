@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [next](https://github.com/CrowdHailer/Ace/tree/master) -
+
+## Changed
+- Request scheme is atom instead of string.
+- Request method is atom instead of string.
+
 ## [0.12.1](https://github.com/CrowdHailer/Ace/tree/0.12.1) - 2017-08-22
 
 ## Fixed

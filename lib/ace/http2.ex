@@ -11,6 +11,8 @@ defmodule Ace.HTTP2 do
   *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
   """
 
+  @known_methods ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+
   @doc """
   Transform an `Ace.Request` into a generic headers list.
 
@@ -58,8 +60,10 @@ defmodule Ace.HTTP2 do
       # DEBT can sent headers even be empty?
       "" ->
         {:error, {:protocol_error, "scheme must not be empty"}}
-      _ ->
-        build_request(rest, {scheme, authority, method, path})
+      "https" ->
+        build_request(rest, {:https, authority, method, path})
+      "http" ->
+        build_request(rest, {:http, authority, method, path})
     end
   end
   defp build_request([{":authority", authority} | rest], {scheme, :authority, method, path}) do
@@ -74,7 +78,8 @@ defmodule Ace.HTTP2 do
     case method do
       "" ->
         {:error, {:protocol_error, "method must not be empty"}}
-      _ ->
+      method when method in @known_methods ->
+        method = String.to_atom(method)
         build_request(rest, {scheme, authority, method, path})
     end
   end
@@ -100,14 +105,14 @@ defmodule Ace.HTTP2 do
     else
       case read_headers(headers) do
         {:ok, headers} ->
-          request = %Ace.Request{
+          request = Ace.Request.new(
+            method,
+            path,
+            headers,
+            false,
             scheme: scheme,
             authority: authority,
-            method: method,
-            path: path,
-            headers: headers,
-            body: false
-          }
+          )
           {:ok, request}
         {:error, reason} ->
           {:error, reason}
