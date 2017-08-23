@@ -312,7 +312,7 @@ defmodule Ace.HTTP2.Connection do
     max_frame_size = state.local_settings.max_frame_size
     case Frame.parse_from_buffer(buffer, max_length: max_frame_size) do
       {:ok, {raw_frame, unprocessed}} ->
-
+        # Need raw frame step because parse needs to return remaining buffer for unknown frame type
         if raw_frame do
           case Frame.decode(raw_frame) do
             {:ok, frame} ->
