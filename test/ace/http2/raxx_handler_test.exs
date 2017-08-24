@@ -98,6 +98,21 @@ defmodule Ace.HTTP2.RaxxHandlerTest do
     assert [{"content-length", "0"}, {"accept", "*/*"}] = request.headers
   end
 
+  test "content-length 0 has no body", %{client: connection} do
+    encode_context = HPack.new_context(1_000)
+    headers = home_page_headers([{"content-length", "0"}])
+    {:ok, {header_block, _encode_context}} = HPack.encode(headers, encode_context)
+    headers_frame = Frame.Headers.new(1, header_block, true, true)
+    Support.send_frame(connection, headers_frame)
+
+    assert_receive {:"$gen_call", _from, request = %Raxx.Request{}}
+
+    assert :https = request.scheme
+    assert :GET = request.method
+    assert "example.com" = request.host
+    assert [] = request.path
+  end
+
   # test "multiple cookies are handled", %{client: connection} do
   #
   # end

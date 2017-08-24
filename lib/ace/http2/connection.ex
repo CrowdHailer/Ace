@@ -171,13 +171,28 @@ defmodule Ace.HTTP2.Connection do
     headers = Ace.HTTP2.request_to_headers(request)
     {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
     state = %{state | encode_context: new_encode_context}
-    # TODO break up headers frame block
-    promise_frame = Frame.PushPromise.new(original_id, promised_stream.id, header_block, true)
-    :ok = :ssl.send(state.socket, Frame.serialize(promise_frame))
+
+    max_frame_size = state.remote_settings.max_frame_size
+
+    {initial_fragment, tail_block} = case header_block do
+      <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
+        {to_send, remaining_data}
+      to_send ->
+        {to_send, ""}
+    end
+
+    frames = case tail_block do
+      "" ->
+        [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, true)]
+      tail_block ->
+        [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, false) | pack_continuation(tail_block, original_id, max_frame_size)]
+    end
+
+    :ok = do_send_frames(frames, state)
     # SEND PROMISE
     # Then handle response
 
-    {:ok, {_outbound, state}} = case Stream.receive_headers(promised_stream, request) do
+    {:ok, {[], state}} = case Stream.receive_headers(promised_stream, request) do
       {:ok, stream} ->
         state = put_stream(state, stream)
         {:ok, {[], state}}

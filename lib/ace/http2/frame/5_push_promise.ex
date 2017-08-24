@@ -29,7 +29,7 @@ defmodule Ace.HTTP2.Frame.PushPromise do
 
   def serialize(frame) do
     length = 4 + :erlang.iolist_size(frame.header_block_fragment)
-    # TODO padding
+    # DEBT provide way to serialize with padding
     padded_flag = 0
     end_headers_flag = if frame.end_headers, do: 1, else: 0
     flags = <<0::4, padded_flag::1, end_headers_flag::1, 0::2>>

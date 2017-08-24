@@ -50,7 +50,10 @@ defmodule Ace.Raxx.Handler do
     {:noreply, {request, app}}
   end
   def handle_request(request, app, stream, true) do
+    # By this point the request body is always a string.
+    # "" if body == false
     length = :erlang.iolist_size(request.body)
+
     content_length = case :proplists.get_value("content-length", request.headers) do
       :undefined ->
         :undefined
@@ -65,7 +68,6 @@ defmodule Ace.Raxx.Handler do
     # Needs h2spec
     if content_length == :undefined || content_length == length do
       response = dispatch_request(request, app)
-      # TODO handle response with empty body
       Ace.HTTP2.Server.send_response(stream, response)
 
       {:noreply, {request, app}}

@@ -137,7 +137,24 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert 17_000 == :erlang.iolist_size(frame.data)
     assert {:ok, frame = %Frame.Data{end_stream: true}} = Support.read_next(connection)
     assert 17_000 >= :erlang.iolist_size(frame.data)
-  end
-  # TODO test promise headers broken up
 
+    request = Request.get("/bar", [
+      {"bar1", long_value},
+      {"bar2", long_value},
+      {"bar3", long_value},
+      {"bar4", long_value},
+      {"bar5", long_value},
+      {"bar6", long_value},
+      {"bar7", long_value},
+      {"bar8", long_value},
+      {"bar9", long_value},
+    ])
+    Server.send_promise(server_stream, request)
+    assert {:ok, frame = %Frame.PushPromise{end_headers: false}} = Support.read_next(connection)
+    assert 17_000 == :erlang.iolist_size(frame.header_block_fragment)
+    assert {:ok, frame = %Frame.Continuation{end_headers: false}} = Support.read_next(connection)
+    assert 17_000 == :erlang.iolist_size(frame.header_block_fragment)
+    assert {:ok, frame = %Frame.Continuation{end_headers: true}} = Support.read_next(connection)
+    assert 17_000 >= :erlang.iolist_size(frame.header_block_fragment)
+  end
 end
