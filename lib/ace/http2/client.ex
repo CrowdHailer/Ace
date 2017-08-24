@@ -107,7 +107,8 @@ defmodule Ace.HTTP2.Client do
     start_link({host, port}, options)
   end
   def start_link({host, port}, options) do
-    GenServer.start_link(Connection, {:client, {host, port}}, options)
+    {:ok, settings} = Ace.HTTP2.Settings.for_client(options)
+    GenServer.start_link(Connection, {:client, {host, port}, settings}, options)
   end
 
   @doc """

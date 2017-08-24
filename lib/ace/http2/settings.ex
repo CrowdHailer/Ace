@@ -1,6 +1,6 @@
 defmodule Ace.HTTP2.Settings do
 
-  @enforce_keys [:max_frame_size, :initial_window_size]
+  @enforce_keys [:max_frame_size, :initial_window_size, :enable_push]
   defstruct @enforce_keys
 
   @max_frame_size_default 16_384
@@ -11,13 +11,11 @@ defmodule Ace.HTTP2.Settings do
   @initial_window_size_maximum 2_147_483_647
 
   def for_server(values \\ []) do
-    # Difference for server is that push may never be true
-    for_client(values)
+    for_client([{:enable_push, false} | values])
   end
 
   def for_client(values \\ []) do
-    max_frame_size = Keyword.get(values, :max_frame_size, @max_frame_size_default)
-    case max_frame_size do
+    case Keyword.get(values, :max_frame_size, @max_frame_size_default) do
       value when value < @max_frame_size_default ->
         {:error, :max_frame_size_too_small}
       value when @max_frame_size_maximum < value ->
@@ -29,11 +27,14 @@ defmodule Ace.HTTP2.Settings do
           value when @initial_window_size_maximum < value ->
             {:error, :initial_window_size_too_large}
           initial_window_size ->
+            enable_push = Keyword.get(values, :enable_push, true)
             settings = %__MODULE__{
               max_frame_size: max_frame_size,
               initial_window_size: initial_window_size,
+              enable_push: enable_push
             }
             {:ok, settings}
+
         end
     end
   end
@@ -46,6 +47,11 @@ defmodule Ace.HTTP2.Settings do
     end
     changed = if next.initial_window_size != previous.initial_window_size do
       [initial_window_size: next.initial_window_size]
+    else
+      []
+    end ++ changed
+    changed = if next.enable_push != previous.enable_push do
+      [enable_push: next.enable_push]
     else
       []
     end ++ changed

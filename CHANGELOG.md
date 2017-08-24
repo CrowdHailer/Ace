@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Master
 
+## Added
+- Client can start with `:enable_push` option.
+
 ## Fixed
 - PushPromise frames do not exceed maximum frame size.
 - Continuation frames must follow on same stream.

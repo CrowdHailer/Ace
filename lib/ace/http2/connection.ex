@@ -36,7 +36,7 @@ defmodule Ace.HTTP2.Connection do
     # accept_push always false for server but usable in client.
   ]
 
-  def init({:client, {host, port}}) do
+  def init({:client, {host, port}, local_settings}) do
     {:ok, connection} = :ssl.connect(host, port, [
       mode: :binary,
       packet: :raw,
@@ -44,22 +44,19 @@ defmodule Ace.HTTP2.Connection do
       alpn_advertised_protocols: ["h2"]]
     )
     {:ok, "h2"} = :ssl.negotiated_protocol(connection)
-    payload = [
-      Ace.HTTP2.Connection.preface(),
-      Frame.Settings.new() |> Frame.Settings.serialize(),
-    ]
-    :ssl.send(connection, payload)
-    {:ok, default_settings} = Ace.HTTP2.Settings.for_client()
-    :ssl.setopts(connection, [active: :once])
+    {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
+    initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_client_settings)
+
     decode_context = HPack.new_context(4_096)
     encode_context = HPack.new_context(4_096)
+
+    {:ok, default_server_settings} = Ace.HTTP2.Settings.for_client()
     initial_state = %__MODULE__{
       socket: connection,
       outbound_window: 65_535,
-      local_settings: default_settings,
-      # TODO should be the clients settings
-      queued_settings: [default_settings],
-      remote_settings: default_settings,
+      local_settings: default_client_settings,
+      queued_settings: [local_settings],
+      remote_settings: default_server_settings,
       decode_context: decode_context,
       encode_context: encode_context,
       streams: %{},
@@ -68,6 +65,11 @@ defmodule Ace.HTTP2.Connection do
       name: "CLIENT (#{host}:#{port})"
     }
     state = %{initial_state | next: :handshake}
+
+    :ssl.send(connection, Ace.HTTP2.Connection.preface())
+    do_send_frames([initial_settings_frame], state)
+
+    :ssl.setopts(connection, [active: :once])
     {:ok, {"", state}}
   end
   def init({listen_socket, {mod, args}, settings}) do

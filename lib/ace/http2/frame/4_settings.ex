@@ -107,6 +107,12 @@ defmodule Ace.HTTP2.Frame.Settings do
   def setting_parameter(:header_table_size, value) do
     <<1::16, value::32>>
   end
+  def setting_parameter(:enable_push, false) do
+    <<2::16, 0::32>>
+  end
+  def setting_parameter(:enable_push, true) do
+    <<2::16, 1::32>>
+  end
   def setting_parameter(:initial_window_size, value) do
     <<4::16, value::32>>
   end

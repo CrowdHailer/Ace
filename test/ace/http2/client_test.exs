@@ -87,4 +87,12 @@ defmodule Ace.HTTP2.ClientTest do
     assert {:ok, %Response{}} = Client.collect_response(new_stream)
   end
 
+  test "Settings can prevent push promise" do
+    {:ok, client} = Client.start_link("http2.golang.org", enable_push: false)
+    request = Request.get("/serverpush")
+    {:ok, stream} = Client.stream(client)
+    :ok = Client.send_request(stream, request)
+    refute_receive {^stream, {:promise, {_new_stream, _headers}}}, 1_000
+  end
+
 end

@@ -10,7 +10,7 @@ defmodule Ace.HTTP2.StreamTest do
 
   setup do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link({__MODULE__, [1000]}, opts)
+    assert {:ok, service} = Ace.HTTP2.Service.start_link({__MODULE__, [1000]}, opts)
     assert_receive {:listening, ^service, port}
     connection = Support.open_connection(port)
     payload = [
