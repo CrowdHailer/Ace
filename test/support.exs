@@ -14,7 +14,7 @@ defmodule Support do
     Path.expand("ace/tls/key.pem", __DIR__)
   end
 
-  def read_next(connection, timeout \\ :infinity) do
+  def read_next(connection, timeout \\ 5_000) do
     case :ssl.recv(connection, 9, timeout) do
       {:ok, <<length::24, type::8, flags::binary-size(1), 0::1, stream_id::31>>} ->
         case length do

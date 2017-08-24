@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Added
 - Client can start with `:enable_push` option.
+- Server push is only forwarded to client if accepted by client
 
 ## Fixed
 - PushPromise frames do not exceed maximum frame size.

@@ -59,15 +59,13 @@ defmodule Ace.HTTP2.Settings do
   end
 
   def apply_frame(frame, settings) do
-    settings = if new_value = frame.max_frame_size do
-      Map.put(settings, :max_frame_size, new_value)
-    else
-      settings
-    end
-    if new_value = frame.initial_window_size do
-      Map.put(settings, :initial_window_size, new_value)
-    else
-      settings
-    end
+    Enum.reduce(@enforce_keys, settings, fn(key, settings) ->
+      case Map.get(frame, key) do
+        nil ->
+          settings
+        new_value ->
+          Map.put(settings, key, new_value)
+      end
+    end)
   end
 end

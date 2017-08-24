@@ -27,7 +27,7 @@ defmodule Ace.HTTP2.Stream do
     new(stream_id, {:closed, :reserved}, worker, initial_window_size)
   end
 
-  defp new(stream_id, status, worker, initial_window_size) do
+  defp new(stream_id, status, worker, initial_window_size) when is_integer(initial_window_size) do
     monitor = Process.monitor(worker)
     %__MODULE__{
       id: stream_id,

@@ -149,5 +149,21 @@ defmodule Ace.HTTP2Test do
   end
 
   # Server can push on closed, idle streams
-  # Test cannot push to client with push disabled
+
+  test "promise is dropped when push disabled", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port}, enable_push: false)
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Request.get("/", [{"content-type", "text/plain"}])
+    :ok = Client.send_request(client_stream, request)
+
+    request = %{Request.get("/favicon") | authority: "localhost"}
+    assert_receive {server_stream, %Request{}}, 1_000
+    Server.send_promise(server_stream, request)
+
+    refute_receive {_server_pushed_stream, %Request{path: "/favicon"}}, 1_000
+
+    refute_receive {^client_stream, {:promise, {_client_promised_stream, %Request{path: "/favicon"}}}}, 1_000
+  end
+
 end

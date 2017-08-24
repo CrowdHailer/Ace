@@ -47,10 +47,10 @@ defmodule Ace.HTTP2.Connection do
     {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
     initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_client_settings)
 
+    {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
+
     decode_context = HPack.new_context(4_096)
     encode_context = HPack.new_context(4_096)
-
-    {:ok, default_server_settings} = Ace.HTTP2.Settings.for_client()
     initial_state = %__MODULE__{
       socket: connection,
       outbound_window: 65_535,
@@ -79,24 +79,27 @@ defmodule Ace.HTTP2.Connection do
     )
     {:ok, {:listening, listen_socket, stream_supervisor, settings}, 0}
   end
-  def handle_info(:timeout, {:listening, listen_socket, stream_supervisor, settings}) do
+  def handle_info(:timeout, {:listening, listen_socket, stream_supervisor, local_settings}) do
     {:ok, socket} = :ssl.transport_accept(listen_socket)
     :ok = :ssl.ssl_accept(socket)
     {:ok, "h2"} = :ssl.negotiated_protocol(socket)
-    {:ok, default_settings} = Ace.HTTP2.Settings.for_server()
-    initial_settings_frame = Ace.HTTP2.Settings.update_frame(settings, default_settings)
-    :ssl.send(socket, Frame.Settings.serialize(initial_settings_frame))
-    :ssl.setopts(socket, [active: :once])
+
+    {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
+    initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_server_settings)
+
+    {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
+
     # TODO max table size
     decode_context = HPack.new_context(4_096)
     encode_context = HPack.new_context(4_096)
+
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     initial_state = %__MODULE__{
       socket: socket,
       outbound_window: 65_535,
-      local_settings: default_settings,
-      queued_settings: [settings],
-      remote_settings: default_settings,
+      local_settings: default_server_settings,
+      queued_settings: [local_settings],
+      remote_settings: default_client_settings,
       # DEBT set when handshaking settings
       decode_context: decode_context,
       encode_context: encode_context,
@@ -105,6 +108,12 @@ defmodule Ace.HTTP2.Connection do
       next_local_stream_id: 2,
       name: "SERVER (port: #{port})"
     }
+
+    state = %{initial_state | next: :handshake}
+    do_send_frames([initial_settings_frame], state)
+
+    :ssl.setopts(socket, [active: :once])
+
     {:noreply, {:pending, initial_state}}
   end
   def handle_info({:ssl, connection, @preface <> data}, {:pending, state}) do
@@ -169,39 +178,43 @@ defmodule Ace.HTTP2.Connection do
 
   def handle_call({:send_promise, {:stream, _, original_id, _ref}, request}, from, {buffer, state}) do
     GenServer.reply(from, :ok)
-    {promised_stream, state} = next_stream(state)
-    headers = Ace.HTTP2.request_to_headers(request)
-    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-    state = %{state | encode_context: new_encode_context}
+    if state.remote_settings.enable_push do
+      {promised_stream, state} = next_stream(state)
+      headers = Ace.HTTP2.request_to_headers(request)
+      {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+      state = %{state | encode_context: new_encode_context}
 
-    max_frame_size = state.remote_settings.max_frame_size
+      max_frame_size = state.remote_settings.max_frame_size
 
-    {initial_fragment, tail_block} = case header_block do
-      <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
-        {to_send, remaining_data}
-      to_send ->
-        {to_send, ""}
+      {initial_fragment, tail_block} = case header_block do
+        <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
+          {to_send, remaining_data}
+        to_send ->
+          {to_send, ""}
+      end
+
+      frames = case tail_block do
+        "" ->
+          [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, true)]
+        tail_block ->
+          [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, false) | pack_continuation(tail_block, original_id, max_frame_size)]
+      end
+
+      :ok = do_send_frames(frames, state)
+      # SEND PROMISE
+      # Then handle response
+
+      {:ok, {[], state}} = case Stream.receive_headers(promised_stream, request) do
+        {:ok, stream} ->
+          state = put_stream(state, stream)
+          {:ok, {[], state}}
+        {:error, reason} ->
+          {:error, reason}
+      end
+      {:noreply, {buffer, state}}
+    else
+      {:noreply, {buffer, state}}
     end
-
-    frames = case tail_block do
-      "" ->
-        [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, true)]
-      tail_block ->
-        [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, false) | pack_continuation(tail_block, original_id, max_frame_size)]
-    end
-
-    :ok = do_send_frames(frames, state)
-    # SEND PROMISE
-    # Then handle response
-
-    {:ok, {[], state}} = case Stream.receive_headers(promised_stream, request) do
-      {:ok, stream} ->
-        state = put_stream(state, stream)
-        {:ok, {[], state}}
-      {:error, reason} ->
-        {:error, reason}
-    end
-    {:noreply, {buffer, state}}
   end
 
   def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, _from, {buffer, state}) do
