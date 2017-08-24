@@ -1,6 +1,11 @@
 defmodule Ace.HTTP2.Settings do
 
-  @enforce_keys [:max_frame_size, :initial_window_size, :enable_push]
+  @enforce_keys [
+    :enable_push,
+    :max_concurrent_streams,
+    :initial_window_size,
+    :max_frame_size,
+  ]
   defstruct @enforce_keys
 
   @max_frame_size_default 16_384
@@ -27,9 +32,12 @@ defmodule Ace.HTTP2.Settings do
           value when @initial_window_size_maximum < value ->
             {:error, :initial_window_size_too_large}
           initial_window_size ->
+            # DEBT replace max to be unlimited
+            max_concurrent_streams = Keyword.get(values, :max_concurrent_streams, 10_000)
             enable_push = Keyword.get(values, :enable_push, true)
             settings = %__MODULE__{
               max_frame_size: max_frame_size,
+              max_concurrent_streams: max_concurrent_streams,
               initial_window_size: initial_window_size,
               enable_push: enable_push
             }
@@ -52,6 +60,11 @@ defmodule Ace.HTTP2.Settings do
     end ++ changed
     changed = if next.enable_push != previous.enable_push do
       [enable_push: next.enable_push]
+    else
+      []
+    end ++ changed
+    changed = if next.max_concurrent_streams != previous.max_concurrent_streams do
+      [max_concurrent_streams: next.max_concurrent_streams]
     else
       []
     end ++ changed

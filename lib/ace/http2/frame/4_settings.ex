@@ -113,6 +113,9 @@ defmodule Ace.HTTP2.Frame.Settings do
   def setting_parameter(:enable_push, true) do
     <<2::16, 1::32>>
   end
+  def setting_parameter(:max_concurrent_streams, value) do
+    <<3::16, value::32>>
+  end
   def setting_parameter(:initial_window_size, value) do
     <<4::16, value::32>>
   end

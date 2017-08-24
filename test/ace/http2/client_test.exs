@@ -87,6 +87,18 @@ defmodule Ace.HTTP2.ClientTest do
     assert {:ok, %Response{}} = Client.collect_response(new_stream)
   end
 
+  # DEBT note that logs include setup of unused client
+  test "receive only one push promise" do
+    {:ok, client} = Client.start_link("http2.golang.org", max_concurrent_streams: 1)
+    request = Request.get("/serverpush")
+    {:ok, stream} = Client.stream(client)
+    :ok = Client.send_request(stream, request)
+    assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
+    assert {:ok, %Response{}} = Client.collect_response(new_stream)
+    refute_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
+  end
+
+  # DEBT note that logs include setup of unused client
   test "Settings can prevent push promise" do
     {:ok, client} = Client.start_link("http2.golang.org", enable_push: false)
     request = Request.get("/serverpush")

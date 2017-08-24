@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Added
 - Client can start with `:enable_push` option.
+- Client can start with `:max_concurrent_streams` option.
 - Server push is only forwarded to client if accepted by client
 
 ## Fixed
