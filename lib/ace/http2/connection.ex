@@ -489,14 +489,17 @@ defmodule Ace.HTTP2.Connection do
   end
   def consume_frame(continuation = %Frame.Continuation{}, state = %{next: {:continuation, headers_frame = %Frame.Headers{}}}) do
     header_block_fragment = headers_frame.header_block_fragment <> continuation.header_block_fragment
-    # TODO check stream ids
-    headers_frame = %{headers_frame | header_block_fragment: header_block_fragment}
-    if continuation.end_headers do
-      headers_frame = %{headers_frame | end_headers: true}
-      state = %{state | next: :any}
-      consume_frame(headers_frame, state)
+    if headers_frame.stream_id == continuation.stream_id do
+      headers_frame = %{headers_frame | header_block_fragment: header_block_fragment}
+      if continuation.end_headers do
+        headers_frame = %{headers_frame | end_headers: true}
+        state = %{state | next: :any}
+        consume_frame(headers_frame, state)
+      else
+        {:ok, {[], %{state | next: {:continuation, headers_frame}}}}
+      end
     else
-      {:ok, {[], %{state | next: {:continuation, headers_frame}}}}
+      {:error, {:protocol_error, "Continuation had incorrect stream_id"}}
     end
   end
   def consume_frame(frame = %Frame.Data{}, state = %{next: :any}) do

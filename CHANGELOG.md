@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Fixed
 - PushPromise frames do not exceed maximum frame size.
+- Continuation frames must follow on same stream.
 
 ## [0.13.0](https://github.com/CrowdHailer/Ace/tree/0.13.0) - 2017-08-23
 
