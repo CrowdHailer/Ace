@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## Master
+## [0.13.1](https://github.com/CrowdHailer/Ace/tree/0.13.1) - 2017-08-23
 
 ## Added
 - Client can start with `:enable_push` option.
