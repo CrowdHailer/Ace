@@ -29,7 +29,7 @@ defmodule Ace.Mixfile do
   defp deps do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
-      {:raxx, "~> 0.11.1"},
+      {:raxx, path: "../raxx"},
       {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]

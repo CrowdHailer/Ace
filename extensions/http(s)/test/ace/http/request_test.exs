@@ -27,28 +27,6 @@ defmodule Ace.HTTP.RequestTest do
     assert_receive %{query: %{"foo" => ["a b", "a!"]}}
   end
 
-  # DEBT move to general request case
-  test "post simple form encoding", %{port: port} do
-    {:ok, _resp} = HTTPoison.post("localhost:#{port}", {:form, [{"string", "foo"}, {"number", 3}]})
-    assert_receive request = %Raxx.Request{}
-    assert {"application/x-www-form-urlencoded", _} = Raxx.Headers.content_type(request)
-
-    {:ok, form} = URI2.Query.decode(request.body)
-    assert %{"number" => "3", "string" => "foo"} == form
-  end
-
-  # DEBT move to general request case
-  test "post multipart form with file", %{port: port} do
-    body = {:multipart, [{"plain", "string"}, {:file, "test/hello.txt"}]}
-    {:ok, _resp} = HTTPoison.post("localhost:#{port}", body)
-    assert_receive request = %Raxx.Request{}
-    assert {"multipart/form-data", _} = Raxx.Headers.content_type(request)
-    {:ok, parsed} = Raxx.Parsers.Multipart.parse(request)
-    %{"plain" => "string", "file" => upload} = Enum.into(parsed, %{})
-    assert upload.filename == "hello.txt"
-    assert upload.type == "text/plain"
-  end
-
   test "test handles request with split start-line ", %{port: port} do
     request = """
     GET / HTTP/1.1

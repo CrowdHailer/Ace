@@ -135,7 +135,9 @@ defmodule Ace.HTTP2.Connection do
         {:stop, :normal, state}
     end
   end
-  def handle_info({:ssl_closed, _socket}, state) do
+  def handle_info({:ssl_closed, _socket}, {buffer, state}) do
+    # TODO shut down each stream
+    :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
     {:stop, :normal, state}
   end
   def handle_info({:DOWN, ref, :process, _pid, reason}, {buffer, state}) do
