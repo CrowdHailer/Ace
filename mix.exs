@@ -29,7 +29,7 @@ defmodule Ace.Mixfile do
   defp deps do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
-      {:raxx, path: "../raxx"},
+      {:raxx, github: "crowdhailer/raxx", ref: "e6ecd5b6450211138e07d9a3338e4d55128f018d"},
       {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
