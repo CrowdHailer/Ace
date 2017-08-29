@@ -72,9 +72,9 @@ defmodule Ace.HTTP2.Connection do
     :ssl.setopts(connection, [active: :once])
     {:ok, {"", state}}
   end
-  def init({listen_socket, {mod, args}, settings}) do
+  def init({listen_socket, {mod, config}, settings}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
-      [Supervisor.Spec.worker(mod, args, restart: :transient)],
+      [Supervisor.Spec.worker(Ace.HTTP2.Worker, [{mod, config}], restart: :transient)],
       strategy: :simple_one_for_one
     )
     {:ok, {:listening, listen_socket, stream_supervisor, settings}, 0}

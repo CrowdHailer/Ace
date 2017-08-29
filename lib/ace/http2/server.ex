@@ -15,6 +15,7 @@ defmodule Ace.HTTP2.Server do
 
   # Not a server and a stream worker are not the same thing
   @doc false
+  # TODO move back to connection or some other
   def start_link(listen_socket, stream_supervisor, settings \\ nil) do
     settings = if !settings do
       {:ok, default_settings} = Ace.HTTP2.Settings.for_server()
@@ -25,6 +26,7 @@ defmodule Ace.HTTP2.Server do
     GenServer.start_link(Ace.HTTP2.Connection, {listen_socket, stream_supervisor, settings})
   end
 
+  # TODO move these to HTTP2 or even top level Ace
   def send_response(stream = {:stream, pid, _id, _ref}, response) do
     GenServer.call(pid, {:send_response, stream, response})
   end
