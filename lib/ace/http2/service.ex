@@ -18,7 +18,7 @@ defmodule Ace.HTTP2.Service do
           GenServer.start_link(__MODULE__, greeting)
         end
 
-        def handle_info({stream, %Ace.Request{method: :GET, path: "/"}}, greeting) do
+        def handle_info({stream, %Raxx.Request{method: :GET, path: "/"}}, greeting) do
           response = Ace.Response.new(200, [], greeting)
           Server.send_response(stream, response)
           {:stop, greeting, :normal}

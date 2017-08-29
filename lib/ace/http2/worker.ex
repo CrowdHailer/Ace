@@ -7,20 +7,7 @@ defmodule Ace.HTTP2.Worker do
     GenServer.start_link(__MODULE__, {mod, config, nil}, [])
   end
 
-  def handle_info({stream, request = %Ace.Request{}}, {module, state, nil}) do
-    uri = URI.parse(request.path)
-    query = Plug.Conn.Query.decode(uri.query || "")
-    path = Raxx.Request.split_path(uri.path)
-    request = %Raxx.Request{
-      scheme: request.scheme,
-      # TODO rename to authority
-      host: request.authority,
-      method: request.method,
-      headers: request.headers,
-      path: path,
-      query: query,
-      body: request.body
-    }
+  def handle_info({stream, request = %Raxx.Request{}}, {module, state, nil}) do
     module.handle_headers(request, state)
     |> handle_return({module, state, stream})
   end

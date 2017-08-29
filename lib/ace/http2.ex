@@ -41,7 +41,7 @@ defmodule Ace.HTTP2 do
   end
 
   @doc """
-  Build an `Ace.Request` from a decoded list of headers.
+  Build a `Raxx.Request` from a decoded list of headers.
 
   Note the required pseudo-headers must be first.
   Request pseudo-headers are; `:scheme`, `:authority`, `:method` & `:path`.
@@ -117,14 +117,19 @@ defmodule Ace.HTTP2 do
     else
       case read_headers(headers) do
         {:ok, headers} ->
-          request = Ace.Request.new(
-            method,
-            path,
-            headers,
-            false,
+          uri = URI.parse(path)
+          query = Plug.Conn.Query.decode(uri.query || "")
+          segments = Raxx.Request.split_path(uri.path)
+          request = %Raxx.Request{
             scheme: scheme,
             authority: authority,
-          )
+            method: method,
+            mount: [],
+            path: segments,
+            query: query,
+            headers: headers,
+            body: false,
+          }
           {:ok, request}
         {:error, reason} ->
           {:error, reason}
