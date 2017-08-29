@@ -39,6 +39,11 @@ defmodule Ace.HTTP2.Worker do
     end
   end
 
+  def handle_info(other, {module, state}) do
+    module.handle_info(other, state)
+    |> handle_return({module, state})
+  end
+
   def handle_return(response = %Raxx.Response{}, stream, {module, state}) do
     handle_return({[response], state}, stream, {module, state})
   end
