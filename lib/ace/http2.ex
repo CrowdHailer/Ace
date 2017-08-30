@@ -19,17 +19,25 @@ defmodule Ace.HTTP2 do
   This headers list can be encoded via `Ace.HPack`.
   """
   def request_to_headers(request) do
+    # TODO consider default values for required scheme and authority
+    query_string = case Plug.Conn.Query.encode(request.query || %{}) do
+      "" ->
+        ""
+      encoded ->
+        "?" <> encoded
+    end
+    path = "/" <> Enum.join(request.path, "/") <> query_string
     [
       {":scheme", Atom.to_string(request.scheme)},
-      {":authority", "#{request.authority}"},
+      {":authority", request.authority || "example.com"},
       {":method", Atom.to_string(request.method)},
-      {":path", request.path} |
+      {":path", path} |
       request.headers
     ]
   end
 
   @doc """
-  Transform an `Ace.Response` into a generic headers list.
+  Transform a `Raxx.Response` into a generic headers list.
 
   This headers list can be encoded via `Ace.HPack`.
   """
@@ -119,7 +127,7 @@ defmodule Ace.HTTP2 do
         {:ok, headers} ->
           uri = URI.parse(path)
           query = Plug.Conn.Query.decode(uri.query || "")
-          segments = Raxx.Request.split_path(uri.path)
+          segments = Raxx.split_path(uri.path)
           request = %Raxx.Request{
             scheme: scheme,
             authority: authority,
@@ -138,7 +146,7 @@ defmodule Ace.HTTP2 do
   end
 
   @doc """
-  Build an `Ace.Response` from a decoded list of headers.
+  Build a `Raxx.Response` from a decoded list of headers.
 
   Note the required pseudo-headers must be first.
   Response pseudo-headers are; `:status`.
@@ -148,7 +156,8 @@ defmodule Ace.HTTP2 do
     case read_headers(headers) do
       {:ok, headers} ->
         {status, ""} = Integer.parse(status)
-        {:ok, Ace.Response.new(status, headers, !end_stream)}
+        response = %{Raxx.response(status) | headers: headers, body: !end_stream}
+        {:ok, response}
     end
   end
 

@@ -24,7 +24,7 @@ This is true in HTTP/2.0, as it was in HTTP/1.x.
 In HTTP/2.0 the bodies of individual request's and response's are multiplexed in with other streams.
 Ace provides an API that is equally able to handle processing requests/responses as stream, handling each fragment as it arrives, or as an atomic unit.
 
-The `body` attribute of an `Ace.Request` or `Ace.Response` may be one of three types.
+The `body` attribute of an `Raxx.Request` or `Raxx.Response` may be one of three types.
 
 - `:false` - There IS NO body, for example `:GET` requests always have no body.
 - `io_list()` - This body is complete encapsulated in this request/response.
@@ -37,15 +37,14 @@ We can see all of these in action in a simple interaction
 1. *Applications are not required to use `receive` directly; helpers are available for both client and server.*
 
 ```elixir
-alias Ace.Request
-alias Ace.Response
 alias Ace.HTTP2.Client
 alias Ace.HTTP2.Server
 
 # ON CLIENT: prepare and send request.
 
 # This will create a request where there is no body.
-request = Request.get("/", [{"accept", "text/plain"}])
+request = Raxx.request(:GET, "/")
+|> Raxx.set_header("accept", "text/plain")
 Client.send_request(client_stream, request)
 
 # ON SERVER: respond to client
@@ -54,7 +53,7 @@ Client.send_request(client_stream, request)
 receive do
   {server_stream, %Request{method: :GET, path: "/", body: false}} ->
     # This response has been constructed with it's complete body and can be sent as a whole.
-    response = Response.new(200, [{"content-type", "text/plain"}], "Hello, World!")
+    response = Raxx.response(200, [{"content-type", "text/plain"}], "Hello, World!")
     Server.send_response(server_stream, response)
 end
 

@@ -1,7 +1,7 @@
 defmodule Ace.HTTP2.ClientTest do
   use ExUnit.Case
 
-  alias Ace.{
+  alias Raxx.{
     Request,
     Response
   }
@@ -15,7 +15,7 @@ defmodule Ace.HTTP2.ClientTest do
   end
 
   test "sends correct request headers", %{client: client} do
-    request = Request.get("/reqinfo")
+    request = Raxx.request(:GET, "/reqinfo")
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
     assert_receive {^stream, response = %Response{}}, 1_000
@@ -31,7 +31,8 @@ defmodule Ace.HTTP2.ClientTest do
   end
 
   test "bidirectional streaming of data", %{client: client} do
-    request = Request.put("/ECHO", [], true)
+    request = Raxx.request(:PUT, "/ECHO")
+    |> Raxx.set_body(true)
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
     :ok = Client.send_data(stream, "foo")
@@ -47,7 +48,7 @@ defmodule Ace.HTTP2.ClientTest do
   end
 
   test "read response with no body", %{client: client} do
-    request = Request.new(:HEAD, "/", [], false)
+    request = Raxx.request(:HEAD, "/")
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
     assert_receive {^stream, response = %Response{}}, 1_000
@@ -56,14 +57,14 @@ defmodule Ace.HTTP2.ClientTest do
   end
 
   test "send synchronously without a body in response", %{client: client} do
-    request = Request.new(:HEAD, "/", [], false)
+    request = Raxx.request(:HEAD, "/")
     {:ok, response} = Client.send_sync(client, request)
     assert 200 == response.status
     assert false == response.body
   end
 
   test "send synchronously with a body in response", %{client: client} do
-    request = Request.new(:GET, "/", [], false)
+    request = Raxx.request(:GET, "/")
     {:ok, response} = Client.send_sync(client, request)
     assert 200 == response.status
     assert "<html>" <> _ = response.body
@@ -76,7 +77,7 @@ defmodule Ace.HTTP2.ClientTest do
   # end
 
   test "Get a push promise", %{client: client} do
-    request = Request.get("/serverpush")
+    request = Raxx.request(:GET, "/serverpush")
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
     assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
@@ -90,7 +91,7 @@ defmodule Ace.HTTP2.ClientTest do
   # DEBT note that logs include setup of unused client
   test "receive only one push promise" do
     {:ok, client} = Client.start_link("http2.golang.org", max_concurrent_streams: 1)
-    request = Request.get("/serverpush")
+    request = Raxx.request(:GET, "/serverpush")
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
     assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
@@ -101,7 +102,7 @@ defmodule Ace.HTTP2.ClientTest do
   # DEBT note that logs include setup of unused client
   test "Settings can prevent push promise" do
     {:ok, client} = Client.start_link("http2.golang.org", enable_push: false)
-    request = Request.get("/serverpush")
+    request = Raxx.request(:GET, "/serverpush")
     {:ok, stream} = Client.stream(client)
     :ok = Client.send_request(stream, request)
     refute_receive {^stream, {:promise, {_new_stream, _headers}}}, 1_000

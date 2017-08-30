@@ -2,11 +2,11 @@ defmodule Ace.HTTP2.Client do
   @moduledoc """
   Send requests via HTTP/2 to a web service.
 
-  *NB: all examples have this module, `Ace.Request` and `Ace.Response` aliased*
+  *NB: all examples have this module, `Raxx.Request` and `Raxx.Response` aliased*
 
       alias Ace.HTTP2.Client
-      alias Ace.Request
-      alias Ace.Response
+      alias Raxx.Request
+      alias Raxx.Response
 
   ## Establish connection
 
@@ -124,6 +124,8 @@ defmodule Ace.HTTP2.Client do
   Send information over a stream.
   """
   def send_request(stream = {:stream, connection, _, _}, request) do
+    request = request
+    |> Map.put(:scheme, request.scheme || :https)
     GenServer.call(connection, {:send_request, stream, request})
   end
 
@@ -146,7 +148,7 @@ defmodule Ace.HTTP2.Client do
   """
   def collect_response(stream) do
     receive do
-      {^stream, response = %Ace.Response{body: body}} ->
+      {^stream, response = %Raxx.Response{body: body}} ->
         if body == false do
           {:ok, response}
         else
@@ -165,7 +167,7 @@ defmodule Ace.HTTP2.Client do
   NOTE the request must have have body as a binary or `false`.
   """
   def send_sync(connection, request) do
-    if Ace.Request.complete?(request) do
+    if Raxx.complete?(request) do
       {:ok, stream} = stream(connection)
       :ok = send_request(stream, request)
       # send - transmit, publish, dispatch, put, relay, emit, broadcast

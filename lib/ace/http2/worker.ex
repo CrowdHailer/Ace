@@ -26,6 +26,11 @@ defmodule Ace.HTTP2.Worker do
     end
   end
 
+  def handle_info({stream, %{headers: trailers, end_stream: true}}, {module, state, stream}) do
+    module.handle_trailers(trailers, state)
+    |> handle_return({module, state, stream})
+  end
+
   def handle_info({stream, {:reset, reason}}, {module, state, stream}) do
     IO.inspect("quiting because: #{inspect(reason)}")
     {:stop, :normal, {module, state, stream}}
@@ -49,11 +54,18 @@ defmodule Ace.HTTP2.Worker do
     Enum.each(messages, &send_it(&1, stream))
   end
 
-  def send_it(r = %Raxx.Response{}, stream) do
-    response = struct(Ace.Response, [status: r.status, headers: r.headers, body: r.body])
+  def send_it(response = %Raxx.Response{}, stream) do
     Ace.HTTP2.Server.send_response(stream, response)
   end
   def send_it(r = %{data: data, end_stream: end_stream}, stream) do
     Ace.HTTP2.Server.send_data(stream, data, end_stream)
+  end
+  def send_it(r = %{headers: trailers, end_stream: true}, stream) do
+    Ace.HTTP2.Client.send_trailers(stream, trailers)
+  end
+  def send_it({:promise, request}, stream) do
+    request = request
+    |> Map.put(:scheme, request.scheme || :https)
+    Ace.HTTP2.Server.send_promise(stream, request)
   end
 end

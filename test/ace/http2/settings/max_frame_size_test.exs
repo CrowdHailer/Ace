@@ -1,9 +1,11 @@
 defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   use ExUnit.Case
 
-  alias Ace.{
+  alias Raxx.{
     Request,
     Response,
+  }
+  alias Ace.{
     HTTP2.Client,
     HTTP2.Service,
     HTTP2.Server,
@@ -110,7 +112,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
     assert_receive {server_stream, %Request{}}, 1_000
     long_value = Enum.map(1..4_000, fn(_) -> "a" end) |> Enum.join("")
-    response = Response.new(200, [
+    response = Raxx.response(200, [
       {"foo1", long_value},
       {"foo2", long_value},
       {"foo3", long_value},
@@ -138,7 +140,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert {:ok, frame = %Frame.Data{end_stream: true}} = Support.read_next(connection)
     assert 17_000 >= :erlang.iolist_size(frame.data)
 
-    request = Request.get("/bar", [
+    request = Raxx.request(:GET, "/bar", [
       {"bar1", long_value},
       {"bar2", long_value},
       {"bar3", long_value},

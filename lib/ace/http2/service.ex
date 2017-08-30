@@ -19,19 +19,18 @@ defmodule Ace.HTTP2.Service do
         end
 
         def handle_info({stream, %Raxx.Request{method: :GET, path: "/"}}, greeting) do
-          response = Ace.Response.new(200, [], greeting)
+          response = Raxx.Raxx.response(200, [], greeting)
           Server.send_response(stream, response)
           {:stop, greeting, :normal}
         end
         def handle_info({stream, _request}, greeting) do
-          response = Ace.Response.new(404, [], false)
+          response = Raxx.Raxx.response(404, [], false)
           Server.send_response(stream, response)
           {:stop, greeting, :normal}
         end
       end
 
   - *See `Ace.HTTP2.Server` for all functionality available to a stream worker.*
-  - *See `Ace.Raxx.Handler` for help with a concise stream worker.*
 
   This module has a `start_link/1` function and so can be started by as a service as follows.
 
