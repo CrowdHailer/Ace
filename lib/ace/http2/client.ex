@@ -43,16 +43,17 @@ defmodule Ace.HTTP2.Client do
 
       request = Request.new(:GET, "/", [{"accept", "application/json"}], false)
       {:ok, stream} = Client.stream(client)
-      :ok = Client.send_request(stream, request)
+      :ok = Ace.HTTP2.send(stream, request)
 
       request = Request.new(:POST, "/", [{"content-length", "13"}], "Hello, World!")
       {:ok, stream} = Client.stream(client)
-      :ok = Client.send_request(stream, request)
+      :ok = Ace.HTTP2.send(stream, request)
 
-      request = Request.new(:POST, "/", [{"content-length", "13"}], true)
       {:ok, stream} = Client.stream(client)
-      :ok = Client.send_request(stream, request)
-      {:ok, _} = Client.send_data(stream, "Hello, World!", end_stream: true)
+      request = Request.new(:POST, "/", [{"content-length", "13"}], true)
+      :ok = Ace.HTTP2.send(stream, request)
+      fragment = Raxx.fragment("Hello, World!", true)
+      {:ok, _} = Ace.HTTP2.send(stream, fragment)
 
   ## Receiving a response
 
@@ -121,29 +122,6 @@ defmodule Ace.HTTP2.Client do
   end
 
   @doc """
-  Send information over a stream.
-  """
-  def send_request(stream = {:stream, connection, _, _}, request) do
-    request = request
-    |> Map.put(:scheme, request.scheme || :https)
-    GenServer.call(connection, {:send_request, stream, request})
-  end
-
-  @doc """
-  Add data to an open stream.
-  """
-  def send_data(stream = {:stream, connection, _, _}, data, end_stream \\ false) do
-    :ok = GenServer.call(connection, {:send_data, stream, %{data: data, end_stream: end_stream}})
-  end
-
-  @doc """
-  End a stream with trailers
-  """
-  def send_trailers(stream = {:stream, connection, _, _}, trailers) do
-    GenServer.call(connection, {:send_trailers, stream, trailers})
-  end
-
-  @doc """
   Collect all the parts streamed to a client as a single response.
   """
   def collect_response(stream) do
@@ -169,10 +147,11 @@ defmodule Ace.HTTP2.Client do
   def send_sync(connection, request) do
     if Raxx.complete?(request) do
       {:ok, stream} = stream(connection)
-      :ok = send_request(stream, request)
+      :ok = Ace.HTTP2.send(stream, request)
       # send - transmit, publish, dispatch, put, relay, emit, broadcast
       if is_binary(request.body) do
-        send_data(stream, request.body, true)
+        fragment = Raxx.fragment(request.body, true)
+        :ok = Ace.HTTP2.send(stream, fragment)
       end
       collect_response(stream)
     else

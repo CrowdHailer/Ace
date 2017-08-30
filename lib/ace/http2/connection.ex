@@ -160,18 +160,18 @@ defmodule Ace.HTTP2.Connection do
     {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, {buffer, state}}
   end
 
-  def handle_call({:send_request, {:stream, _, stream_id, _}, request}, _from, {buffer, state}) do
+  def handle_call({:send, {:stream, _, stream_id, _}, item}, _from, {buffer, state}) do
     {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, new_stream} = Stream.send_request(stream, request)
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
-  end
-
-  def handle_call({:send_response, {:stream, _, stream_id, _}, response}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, new_stream} = Stream.send_response(stream, response)
+    {:ok, new_stream} = case item do
+      request = %Raxx.Request{} ->
+        Stream.send_request(stream, request)
+      response = %Raxx.Response{} ->
+        Stream.send_response(stream, response)
+      fragment = %Raxx.Fragment{} ->
+        Stream.send_data(stream, fragment.data, fragment.end_stream)
+      %Raxx.Trailer{headers: trailers} ->
+        Stream.send_trailers(stream, trailers)
+    end
     state = put_stream(state, new_stream)
     {frames, state} = send_available(state)
     :ok = do_send_frames(frames, state)
@@ -217,33 +217,6 @@ defmodule Ace.HTTP2.Connection do
     else
       {:noreply, {buffer, state}}
     end
-  end
-
-  def handle_call({:send_data, {:stream, _, stream_id, _}, %{data: data, end_stream: end_stream}}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, new_stream} = Stream.send_data(stream, data, end_stream)
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
-  end
-
-  def handle_call({:send_trailers, {:stream, _, stream_id, _}, trailers}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, new_stream} = Stream.send_trailers(stream, trailers)
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
-  end
-
-  def handle_call({:send_reset, {:stream, _, stream_id, _}, error}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, new_stream} = Stream.send_reset(stream, error)
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
   end
 
   def send_available(connection) do

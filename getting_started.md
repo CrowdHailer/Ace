@@ -45,7 +45,7 @@ alias Ace.HTTP2.Server
 # This will create a request where there is no body.
 request = Raxx.request(:GET, "/")
 |> Raxx.set_header("accept", "text/plain")
-Client.send_request(client_stream, request)
+Ace.HTTP2.send(client_stream, request)
 
 # ON SERVER: respond to client
 

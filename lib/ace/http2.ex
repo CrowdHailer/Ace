@@ -11,10 +11,20 @@ defmodule Ace.HTTP2 do
   *Quote from [rfc 7540](https://tools.ietf.org/html/rfc7540).*
   """
 
+  import Kernel, except: [send: 2]
+
   @known_methods ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
 
+  def send(stream, request = %{scheme: nil}) do
+    send(stream, %{request | scheme: :https})
+  end
+  def send(stream, item = %type{}) when type in [Raxx.Request, Raxx.Response, Raxx.Fragment, Raxx.Trailer] do
+    {:stream, pid, _id, _ref} = stream
+    GenServer.call(pid, {:send, stream, item})
+  end
+
   @doc """
-  Transform an `Ace.Request` into a generic headers list.
+  Transform an `Raxx.Request` into a generic headers list.
 
   This headers list can be encoded via `Ace.HPack`.
   """

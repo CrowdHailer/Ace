@@ -7,7 +7,6 @@ defmodule Ace.HTTP2Test do
   }
   alias Ace.{
     HTTP2.Client,
-    HTTP2.Server,
     HTTP2.Service,
   }
 
@@ -26,7 +25,7 @@ defmodule Ace.HTTP2Test do
 
     request = Raxx.request(:GET, "https://example.com:1234/foo/bar?var=1")
     |> Raxx.set_header("content-type", "text/plain")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
     assert_receive {:"$gen_call", from, {:headers, received, state}}, 1_000
 
     assert received.scheme == :https
@@ -46,17 +45,19 @@ defmodule Ace.HTTP2Test do
     request = Raxx.request(:POST, "/")
     |> Raxx.set_header("content-type", "text/plain")
     |> Raxx.set_body(true)
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, received, state}}, 1_000
     GenServer.reply(from, {[], state})
     assert received.path == request.path
 
-    :ok = Client.send_data(client_stream, "Hello, World!")
+    fragment = Raxx.fragment("Hello, World!")
+    :ok = Ace.HTTP2.send(client_stream, fragment)
     assert_receive {:"$gen_call", from, {:fragment, "Hello, World!", state}}, 1_000
     GenServer.reply(from, {[], state})
 
-    :ok = Client.send_trailers(client_stream, [{"x-foo", "bar"}])
+    trailer = Raxx.trailer([{"x-foo", "bar"}])
+    :ok = Ace.HTTP2.send(client_stream, trailer)
     assert_receive {:"$gen_call", from, {:trailers, [{"x-foo", "bar"}], state}}, 1_000
     GenServer.reply(from, {[], state})
   end
@@ -68,7 +69,7 @@ defmodule Ace.HTTP2Test do
     request = Raxx.request(:POST, "/")
     |> Raxx.set_header("content-type", "text/plain")
     |> Raxx.set_body("This is all the content.")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, received, state}}, 1_000
     GenServer.reply(from, {[], state})
@@ -87,7 +88,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Raxx.request(:GET, "/")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1_000
     response = Raxx.response(:no_content)
@@ -105,7 +106,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Raxx.request(:GET, "/")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1_000
     response = Raxx.response(200)
@@ -126,14 +127,14 @@ defmodule Ace.HTTP2Test do
 
     request = Raxx.request(:GET, "/")
     |> Raxx.set_header("content-type", "text/plain")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1_000
 
     reply = [
       Raxx.response(200) |> Raxx.set_header("content-type", "text/plain") |> Raxx.set_body(true),
-      %{data: "For the client", end_stream: false},
-      %{headers: [{"x-foo", "bar"}], end_stream: true}
+      Raxx.fragment("For the client"),
+      Raxx.trailer([{"x-foo", "bar"}])
     ]
     GenServer.reply(from, {reply, state})
 
@@ -150,7 +151,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Raxx.request(:GET, "/")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1_000
 
@@ -177,7 +178,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Raxx.request(:GET, "/")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1_000
 
@@ -199,7 +200,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Raxx.request(:GET, "/")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", {pid, _}, {:headers, %Request{}, _state}}, 1_000
     Process.exit(pid, :abnormal)
@@ -214,7 +215,7 @@ defmodule Ace.HTTP2Test do
     {:ok, client_stream} = Client.stream(client)
 
     request = Raxx.request(:GET, "/")
-    :ok = Client.send_request(client_stream, request)
+    :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from = {pid, _ref}, {:headers, request, state}}, 1_000
     response = Raxx.response(200)

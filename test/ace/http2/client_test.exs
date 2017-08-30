@@ -17,7 +17,7 @@ defmodule Ace.HTTP2.ClientTest do
   test "sends correct request headers", %{client: client} do
     request = Raxx.request(:GET, "/reqinfo")
     {:ok, stream} = Client.stream(client)
-    :ok = Client.send_request(stream, request)
+    :ok = Ace.HTTP2.send(stream, request)
     assert_receive {^stream, response = %Response{}}, 1_000
     assert 200 == response.status
     assert true == response.body
@@ -34,13 +34,15 @@ defmodule Ace.HTTP2.ClientTest do
     request = Raxx.request(:PUT, "/ECHO")
     |> Raxx.set_body(true)
     {:ok, stream} = Client.stream(client)
-    :ok = Client.send_request(stream, request)
-    :ok = Client.send_data(stream, "foo")
+    :ok = Ace.HTTP2.send(stream, request)
+    fragment = Raxx.fragment("foo")
+    :ok = Ace.HTTP2.send(stream, fragment)
     assert_receive {^stream, response = %Response{}}, 1_000
     assert 200 == response.status
     assert true == response.body
     assert_receive {^stream, %{data: "FOO", end_stream: false}}, 1_000
-    :ok = Client.send_data(stream, "bar")
+    fragment = Raxx.fragment("bar")
+    :ok = Ace.HTTP2.send(stream, fragment)
     assert_receive {^stream, %{data: "BAR", end_stream: false}}, 1_000
     # I do not think the remote closes stream if you do
     # :ok = Client.send_data(stream, "fin", true)
@@ -50,7 +52,7 @@ defmodule Ace.HTTP2.ClientTest do
   test "read response with no body", %{client: client} do
     request = Raxx.request(:HEAD, "/")
     {:ok, stream} = Client.stream(client)
-    :ok = Client.send_request(stream, request)
+    :ok = Ace.HTTP2.send(stream, request)
     assert_receive {^stream, response = %Response{}}, 1_000
     assert 200 == response.status
     assert false == response.body
@@ -79,7 +81,7 @@ defmodule Ace.HTTP2.ClientTest do
   test "Get a push promise", %{client: client} do
     request = Raxx.request(:GET, "/serverpush")
     {:ok, stream} = Client.stream(client)
-    :ok = Client.send_request(stream, request)
+    :ok = Ace.HTTP2.send(stream, request)
     assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
     assert {:ok, %Response{}} = Client.collect_response(new_stream)
     assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
@@ -93,7 +95,7 @@ defmodule Ace.HTTP2.ClientTest do
     {:ok, client} = Client.start_link("http2.golang.org", max_concurrent_streams: 1)
     request = Raxx.request(:GET, "/serverpush")
     {:ok, stream} = Client.stream(client)
-    :ok = Client.send_request(stream, request)
+    :ok = Ace.HTTP2.send(stream, request)
     assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
     assert {:ok, %Response{}} = Client.collect_response(new_stream)
     refute_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
@@ -104,7 +106,7 @@ defmodule Ace.HTTP2.ClientTest do
     {:ok, client} = Client.start_link("http2.golang.org", enable_push: false)
     request = Raxx.request(:GET, "/serverpush")
     {:ok, stream} = Client.stream(client)
-    :ok = Client.send_request(stream, request)
+    :ok = Ace.HTTP2.send(stream, request)
     refute_receive {^stream, {:promise, {_new_stream, _headers}}}, 1_000
   end
 

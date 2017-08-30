@@ -55,13 +55,13 @@ defmodule Ace.HTTP2.Worker do
   end
 
   def send_it(response = %Raxx.Response{}, stream) do
-    Ace.HTTP2.Server.send_response(stream, response)
+    Ace.HTTP2.send(stream, response)
   end
-  def send_it(r = %{data: data, end_stream: end_stream}, stream) do
-    Ace.HTTP2.Server.send_data(stream, data, end_stream)
+  def send_it(fragment = %Raxx.Fragment{}, stream) do
+    Ace.HTTP2.send(stream, fragment)
   end
-  def send_it(r = %{headers: trailers, end_stream: true}, stream) do
-    Ace.HTTP2.Client.send_trailers(stream, trailers)
+  def send_it(trailer = %Raxx.Trailer{}, stream) do
+    Ace.HTTP2.send(stream, trailer)
   end
   def send_it({:promise, request}, stream) do
     request = request
