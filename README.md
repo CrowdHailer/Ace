@@ -5,6 +5,8 @@
 - [Install from Hex](https://hex.pm/packages/ace)
 - [Documentation available on hexdoc](https://hexdocs.pm/ace)
 
+*Want to dive straight in? see `Ace.HTTP2.Service` or `Ace.HTTP2.Client`.*
+
 ## Features
 
 - Consistent server and client interfaces
@@ -17,12 +19,6 @@
 - Simple request/response interactions; [Raxx](https://github.com/crowdhailer/raxx) interface
 
 *For more view the [features board](https://github.com/CrowdHailer/Ace/projects/1).*
-
-## Guides
-
-- **[Getting started](getting_started.md)**
-
-*For TCP/TLS server see [previous version](https://github.com/CrowdHailer/Ace/tree/0.9.x).*
 
 ## Testing
 

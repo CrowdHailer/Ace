@@ -1,108 +1,80 @@
 defmodule Ace.HTTP2.Service do
   @moduledoc """
-  Run a supervised tree of HTTP/2.0 servers, all available on a single port.
+  Serve a `Raxx.Server` application over HTTP/2.
 
-  The task associated with each client request is processed by an application level worker.
-  To start workers a module and start arguments are required.
+  ## Hello World
 
-  For example, given `{MyProject.WWW, ["foo"]}`, Ace will start workers by executing the following.
-  `MyProject.WWW.start_link("foo")`
-
-  Example application:
-
+  *Server specification*
       defmodule MyProject.WWW do
-        use GenServer
-        alias Ace.HTTP2.Server
+        use Raxx.Server
 
-        def start_link(greeting) do
-          GenServer.start_link(__MODULE__, greeting)
-        end
-
-        def handle_info({stream, %Raxx.Request{method: :GET, path: "/"}}, greeting) do
-          response = Raxx.Raxx.response(200, [], greeting)
-          Server.send_response(stream, response)
-          {:stop, greeting, :normal}
-        end
-        def handle_info({stream, _request}, greeting) do
-          response = Raxx.Raxx.response(404, [], false)
-          Server.send_response(stream, response)
-          {:stop, greeting, :normal}
+        def handle_headers(%Raxx.Request{method: :GET, path: []}, greeting) do
+          Raxx.response(:ok)
+          |> Raxx.set_header("content-type", "text/plain")
+          |> Raxx.set_body(greeting)
         end
       end
 
-  - *See `Ace.HTTP2.Server` for all functionality available to a stream worker.*
+  *Server startup*
+      application = {MyProject.WWW, "Hello, World!"}
 
-  This module has a `start_link/1` function and so can be started by as a service as follows.
-
-      application = {MyProject.WWW, ["Hello, World!"]}
       options = [
         port: 8443,
         certfile: "path/to/certfile"
         keyfile: "path/to/keyfile"
       ]
-
       {:ok, pid} = Ace.HTTP2.Service.start_link(application, options)
 
-  - *See `start_link/2` for the full list of options available when starting a service*
+  **Ace use the `Raxx.Server` interface to describe server actions,
+  see the `Raxx.Server` [documentation](https://hexdocs.pm/raxx/Raxx.Server.html)
+  for full details**
 
-  Each client request defines an independant stream.
-  Each stream is handled by an isolated worker process running the application.
+  ## Supervised services
 
-  ## Supervising services
+  It is best practise start processes in an application supervision tree.
+  To supervise an `Ace.HTTP2.Service` start a new mix project with the `--sup` flag
 
-  Ace makes it easy to start multiple services in a single Mix project.
-  Starting a service returns the service supervisor.
+      $ mix new my_project --sup
 
-  This supervisor may act as the application supervisor if it is the only one started.
-
-      defmodule MyProject.Application do
-        @moduledoc false
-
-        use Application
-
-        def start(_type, _args) do
-
-          certfile = Application.app_dir(:my_project, "/priv/cert.pem")
-          keyfile = Application.app_dir(:my_project, "/priv/key.pem")
-
-          Ace.HTTP2.Service.start_link(
-            {MyProject.WWW, ["Hello, World!"]},
-            port: 8443,
-            certfile: certfile,
-            keyfile: keyfile
-          )
-        end
-      end
-
-  An `Ace.HTTP2.Service` can also exist as one of a group of supervisors.
+  Then add one or more service to the projects list of supervised processes
+  in `lib/my_project/application.ex`.
 
       defmodule MyProject.Application do
-        @moduledoc false
-
         use Application
 
         def start(_type, _args) do
           import Supervisor.Spec, warn: false
 
-          www_certfile = Application.app_dir(:my_project, "/priv/www/cert.pem")
-          www_keyfile = Application.app_dir(:my_project, "/priv/www/key.pem")
+          application = {MyProject.WWW, "Hello, World!"}
 
-          www_app = {MyProject.WWW, ["Hello, World!"]}
-          www_opts = [port: 8443, certfile: www_certfile, keyfile: www_keyfile]
-
-          api_certfile = Application.app_dir(:my_project, "/priv/api/cert.pem")
-          api_keyfile = Application.app_dir(:my_project, "/priv/api/key.pem")
-
-          api_app = {MyProject.WWW, ["Hello, World!"]}
-          api_opts = [port: 8443, certfile: api_certfile, keyfile: api_keyfile]
-
-          children = [
-            supervisor(Ace.HTTP2.Service, [www_app, www_opts]),
-            supervisor(Ace.HTTP2.Service, [api_app, api_opts]),
-            worker(MyProject.worker, [arg1, arg2, arg3]),
+          options = [
+            port: 8443,
+            certfile: Application.app_dir(:my_project, "/priv/www/cert.pem")
+            keyfile: Application.app_dir(:my_project, "/priv/www/key.pem")
           ]
+
+          # List all child processes to be supervised
+          children = [
+            supervisor(Ace.HTTP2.Service, [application, options]),
+          ]
+
+          # See https://hexdocs.pm/elixir/Supervisor.html
+          # for other strategies and supported options
+          opts = [strategy: :one_for_one, name: MyProject.Supervisor]
+          Supervisor.start_link(children, opts)
         end
       end
+
+  ## TLS(SSL) credentials
+
+  Ace.HTTP2 only supports using a secure transport layer.
+  Therefore a certificate and certificate_key are needed to serve an application.
+
+  For local development a [self signed certificate](http://how2ssl.com/articles/openssl_commands_and_tips/) can be used.
+
+  ##### Note
+
+  Store certificates in a projects `priv` directory if they are to be distributed as part of a release.
 
   ## Testing endpoints
 

@@ -1,28 +1,22 @@
 defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   use ExUnit.Case
 
-  alias Raxx.{
-    Request,
-    Response,
-  }
   alias Ace.{
-    HTTP2.Client,
     HTTP2.Service,
-    HTTP2.Server,
     HTTP2.Frame
   }
 
   test "service cannot be started with max_frame_size less than default value" do
-    assert {:error, _} = Service.start_link({ForwardTo, [self()]}, port: 0, max_frame_size: 16_383)
+    assert {:error, _} = Service.start_link({Raxx.Forwarder, %{test: self()}}, port: 0, max_frame_size: 16_383)
   end
 
   test "service cannot be started with max_frame_size greater than default value" do
-    assert {:error, _} = Service.start_link({ForwardTo, [self()]}, port: 0, max_frame_size: 16_777_216)
+    assert {:error, _} = Service.start_link({Raxx.Forwarder, %{test: self()}}, port: 0, max_frame_size: 16_777_216)
   end
 
   test "max_frame_size setting is sent in handshake" do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
-    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
     assert_receive {:listening, ^service, port}
     connection = Support.open_connection(port)
     assert {:ok, Frame.Settings.new(max_frame_size: 20_000)} == Support.read_next(connection)
@@ -30,7 +24,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
   test "sending oversized frame is a connection error of type frame_size_error" do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
-    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -54,7 +48,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
   test "Service uses default setting until client has acknowledged" do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
-    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -80,7 +74,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   # Call things waiting in stream blocks
   test "client cannot request max_frame_size less than default" do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -88,13 +82,13 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     :ok = :ssl.send(connection, Ace.HTTP2.Connection.preface())
     :ok = Support.send_frame(connection, Frame.Settings.new(max_frame_size: 16_383))
     assert {:ok, Frame.Settings.new()} == Support.read_next(connection)
-    assert {:ok, %{error: protocol_error, debug: message}} = Support.read_next(connection)
+    assert {:ok, %{error: :protocol_error, debug: message}} = Support.read_next(connection)
     assert "invalid value for max_frame_size setting" = message
   end
 
   test "large response blocks from server are broken into multiple fragments" do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link({ForwardTo, [self()]}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
     assert_receive {:listening, ^service, port}
 
     connection = Support.open_connection(port)
@@ -110,20 +104,34 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     headers_frame = Frame.Headers.new(1, header_block, true, true)
     Support.send_frame(connection, headers_frame)
 
-    assert_receive {server_stream, %Request{}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, _received, state}}, 1_000
     long_value = Enum.map(1..4_000, fn(_) -> "a" end) |> Enum.join("")
-    response = Raxx.response(200, [
-      {"foo1", long_value},
-      {"foo2", long_value},
-      {"foo3", long_value},
-      {"foo4", long_value},
-      {"foo5", long_value},
-      {"foo6", long_value},
-      {"foo7", long_value},
-      {"foo8", long_value},
-      {"foo9", long_value},
-    ], true)
-    Server.send_response(server_stream, response)
+    response = Raxx.response(200)
+    |> Raxx.set_header("foo1", long_value)
+    |> Raxx.set_header("foo2", long_value)
+    |> Raxx.set_header("foo3", long_value)
+    |> Raxx.set_header("foo4", long_value)
+    |> Raxx.set_header("foo5", long_value)
+    |> Raxx.set_header("foo6", long_value)
+    |> Raxx.set_header("foo7", long_value)
+    |> Raxx.set_header("foo8", long_value)
+    |> Raxx.set_header("foo9", long_value)
+    |> Raxx.set_body(true)
+
+    fragment = Raxx.fragment(Enum.map(1..10, fn(_) -> long_value end) |> Enum.join(""), true)
+
+    request = Raxx.request(:GET, "/bar")
+    |> Raxx.set_header("bar1", long_value)
+    |> Raxx.set_header("bar2", long_value)
+    |> Raxx.set_header("bar3", long_value)
+    |> Raxx.set_header("bar4", long_value)
+    |> Raxx.set_header("bar5", long_value)
+    |> Raxx.set_header("bar6", long_value)
+    |> Raxx.set_header("bar7", long_value)
+    |> Raxx.set_header("bar8", long_value)
+    |> Raxx.set_header("bar9", long_value)
+
+    GenServer.reply(from, {[response, fragment, {:promise, request}], state})
 
     assert {:ok, frame = %Frame.Headers{end_headers: false}} = Support.read_next(connection)
     assert 17_000 == :erlang.iolist_size(frame.header_block_fragment)
@@ -132,7 +140,6 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert {:ok, frame = %Frame.Continuation{end_headers: true}} = Support.read_next(connection)
     assert 17_000 >= :erlang.iolist_size(frame.header_block_fragment)
 
-    Server.send_data(server_stream, Enum.map(1..10, fn(_) -> long_value end) |> Enum.join(""), true)
     assert {:ok, frame = %Frame.Data{end_stream: false}} = Support.read_next(connection)
     assert 17_000 == :erlang.iolist_size(frame.data)
     assert {:ok, frame = %Frame.Data{end_stream: false}} = Support.read_next(connection)
@@ -140,18 +147,6 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert {:ok, frame = %Frame.Data{end_stream: true}} = Support.read_next(connection)
     assert 17_000 >= :erlang.iolist_size(frame.data)
 
-    request = Raxx.request(:GET, "/bar", [
-      {"bar1", long_value},
-      {"bar2", long_value},
-      {"bar3", long_value},
-      {"bar4", long_value},
-      {"bar5", long_value},
-      {"bar6", long_value},
-      {"bar7", long_value},
-      {"bar8", long_value},
-      {"bar9", long_value},
-    ])
-    Server.send_promise(server_stream, request)
     assert {:ok, frame = %Frame.PushPromise{end_headers: false}} = Support.read_next(connection)
     assert 17_000 == :erlang.iolist_size(frame.header_block_fragment)
     assert {:ok, frame = %Frame.Continuation{end_headers: false}} = Support.read_next(connection)

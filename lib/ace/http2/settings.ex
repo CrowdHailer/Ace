@@ -1,4 +1,5 @@
 defmodule Ace.HTTP2.Settings do
+  @moduledoc false
 
   @enforce_keys [
     :enable_push,

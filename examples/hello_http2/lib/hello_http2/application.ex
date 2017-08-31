@@ -9,7 +9,7 @@ defmodule HelloHTTP2.Application do
     keyfile = Application.app_dir(:hello_http2, "/priv/key.pem")
 
     Ace.HTTP2.Service.start_link(
-      {HelloHTTP2.WWW, [:config]},
+      {HelloHTTP2.WWW, "Hello, World!"},
       port: 8443,
       certfile: certfile,
       keyfile: keyfile,

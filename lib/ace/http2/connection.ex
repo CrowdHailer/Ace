@@ -138,7 +138,7 @@ defmodule Ace.HTTP2.Connection do
   def handle_info({:ssl_closed, _socket}, {buffer, state}) do
     # TODO shut down each stream
     :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
-    {:stop, :normal, state}
+    {:stop, :normal, {buffer, state}}
   end
   def handle_info({:DOWN, ref, :process, _pid, reason}, {buffer, state}) do
     {_id, stream} = Enum.find(state.streams, fn
@@ -160,25 +160,7 @@ defmodule Ace.HTTP2.Connection do
     {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, {buffer, state}}
   end
 
-  def handle_call({:send, {:stream, _, stream_id, _}, item}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
-    {:ok, new_stream} = case item do
-      request = %Raxx.Request{} ->
-        Stream.send_request(stream, request)
-      response = %Raxx.Response{} ->
-        Stream.send_response(stream, response)
-      fragment = %Raxx.Fragment{} ->
-        Stream.send_data(stream, fragment.data, fragment.end_stream)
-      %Raxx.Trailer{headers: trailers} ->
-        Stream.send_trailers(stream, trailers)
-    end
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
-  end
-
-  def handle_call({:send_promise, {:stream, _, original_id, _ref}, request}, from, {buffer, state}) do
+  def handle_call({:send, {:stream, _, original_id, _ref}, {:promise, request}}, from, {buffer, state}) do
     GenServer.reply(from, :ok)
     if state.remote_settings.enable_push do
       {promised_stream, state} = next_stream(state)
@@ -217,6 +199,23 @@ defmodule Ace.HTTP2.Connection do
     else
       {:noreply, {buffer, state}}
     end
+  end
+  def handle_call({:send, {:stream, _, stream_id, _}, item}, _from, {buffer, state}) do
+    {:ok, stream} = Map.fetch(state.streams, stream_id)
+    {:ok, new_stream} = case item do
+      request = %Raxx.Request{} ->
+        Stream.send_request(stream, request)
+      response = %Raxx.Response{} ->
+        Stream.send_response(stream, response)
+      fragment = %Raxx.Fragment{} ->
+        Stream.send_data(stream, fragment.data, fragment.end_stream)
+      %Raxx.Trailer{headers: trailers} ->
+        Stream.send_trailers(stream, trailers)
+    end
+    state = put_stream(state, new_stream)
+    {frames, state} = send_available(state)
+    :ok = do_send_frames(frames, state)
+    {:reply, :ok, {buffer, state}}
   end
 
   def send_available(connection) do

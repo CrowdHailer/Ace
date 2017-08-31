@@ -17,6 +17,7 @@ defmodule Ace.HTTP2.Frame do
   +---------------------------------------------------------------+
   ```
   """
+  @moduledoc false
 
   @data 0
   @headers 1

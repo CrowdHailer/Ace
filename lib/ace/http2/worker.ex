@@ -45,7 +45,7 @@ defmodule Ace.HTTP2.Worker do
     # TODO close here
     handle_return({[response], state}, {module, state, stream})
   end
-  def handle_return({messages, new_state}, {module, state, stream}) do
+  def handle_return({messages, new_state}, {module, _old_state, stream}) do
     send_messages(messages, stream)
     {:noreply, {module, new_state, stream}}
   end
@@ -66,6 +66,6 @@ defmodule Ace.HTTP2.Worker do
   def send_it({:promise, request}, stream) do
     request = request
     |> Map.put(:scheme, request.scheme || :https)
-    Ace.HTTP2.Server.send_promise(stream, request)
+    Ace.HTTP2.send(stream, {:promise, request})
   end
 end

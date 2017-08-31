@@ -2,7 +2,6 @@ defmodule Ace.HTTP2.ClientTest do
   use ExUnit.Case
 
   alias Raxx.{
-    Request,
     Response
   }
   alias Ace.HTTP2.{
@@ -98,7 +97,7 @@ defmodule Ace.HTTP2.ClientTest do
     :ok = Ace.HTTP2.send(stream, request)
     assert_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
     assert {:ok, %Response{}} = Client.collect_response(new_stream)
-    refute_receive {^stream, {:promise, {new_stream, _headers}}}, 1_000
+    refute_receive {^stream, {:promise, {_new_stream, _headers}}}, 1_000
   end
 
   # DEBT note that logs include setup of unused client

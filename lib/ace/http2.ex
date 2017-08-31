@@ -22,6 +22,10 @@ defmodule Ace.HTTP2 do
     {:stream, pid, _id, _ref} = stream
     GenServer.call(pid, {:send, stream, item})
   end
+  def send(stream, item = {:promise, %Raxx.Request{}}) do
+    {:stream, pid, _id, _ref} = stream
+    GenServer.call(pid, {:send, stream, item})
+  end
 
   @doc """
   Transform an `Raxx.Request` into a generic headers list.

@@ -10,10 +10,9 @@ defmodule Ace.Mixfile do
     deps: deps(),
     description: description(),
     docs: [
-      main: "getting_started",
+      main: "readme",
       source_url: "https://github.com/crowdhailer/ace",
       extras: [
-        "getting_started.md",
         "README.md"
       ],
     ],
@@ -29,7 +28,7 @@ defmodule Ace.Mixfile do
   defp deps do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
-      {:raxx, path: "../raxx"},
+      {:raxx, "~> 0.12.0"},
       {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]

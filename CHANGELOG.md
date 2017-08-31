@@ -4,12 +4,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.13.1](https://github.com/CrowdHailer/Ace/tree/0.13.1) - 2017-08-23
+## master
+
+## Added
+- Send any Raxx message using `Ace.HTTP2.send/2`.
+
+## Changed
+- Start services with `{hander, config}` instead of `{worker, args}`
+- All use of `Ace.Request` has been replaced with `Raxx.Request`.
+- All use of `Ace.Response` has been replaced with `Raxx.Response`.
+
+## Removed
+- `Ace.Raxx.Handler` all applications are assumed to be raxx applications
+- `Ace.HTTP2.Client.send_request/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Client.send_data/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Client.send_trailers/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_request/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_data/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_promise/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_reset/2` server should exit instead.
+
+## [0.13.1](https://github.com/CrowdHailer/Ace/tree/0.13.1) - 2017-08-26
 
 ## Added
 - Client can start with `:enable_push` option.
 - Client can start with `:max_concurrent_streams` option.
-- Server push is only forwarded to client if accepted by client
+- Server push is only forwarded to client if accepted by client.
 
 ## Fixed
 - PushPromise frames do not exceed maximum frame size.

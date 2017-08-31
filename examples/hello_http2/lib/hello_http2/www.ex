@@ -1,11 +1,18 @@
 defmodule HelloHTTP2.WWW do
-  use Ace.Raxx.Handler
-  alias Raxx.Response
-  require Raxx.Static
+  use Raxx.Server
+  # TODO static
 
-  Raxx.Static.serve_dir("./public")
+  def handle_headers(_request, greeting) do
+    # TODO add content length
+    Raxx.response(:ok)
+    |> Raxx.set_body(greeting)
+  end
 
-  def handle_request(request, _) do
-    Response.ok("Hello, World!", [{"content-length", "13"}])
+  def handle_fragment(_, state) do
+    {[], state}
+  end
+  
+  def handle_trailers(_, state) do
+    {[], state}
   end
 end
