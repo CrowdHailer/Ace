@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## master
+## [0.14.0](https://github.com/CrowdHailer/Ace/tree/0.14.0) - 2017-08-31
 
 ## Added
 - Send any Raxx message using `Ace.HTTP2.send/2`.
