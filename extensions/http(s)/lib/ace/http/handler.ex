@@ -84,16 +84,14 @@ defmodule Ace.HTTP.Handler do
         # e.g. localhost:8080//
         path = path || "/"
         {:ok, query} = URI2.Query.decode(query_string || "")
-        path = Raxx.Request.split_path(path)
+        path = split_path(path)
         scheme = case conn_info.transport do
           :tcp -> "http"
           :ssl -> "https" # DEBT remove
           :tls -> "https"
         end
-        peer = conn_info.peer
         request = %Raxx.Request{
           scheme: scheme,
-          peer: peer,
           method: method,
           path: path,
           query: query,
@@ -122,7 +120,7 @@ defmodule Ace.HTTP.Handler do
   end
   def process_buffer(buffer, {:body, request = %{headers: headers}}) do
     case :proplists.get_value("content-length", headers) do
-      :undefined ->
+      content_length when content_length in [:undefined, 0] ->
         {:ok, request, buffer}
       raw ->
         length = :erlang.binary_to_integer(raw)
@@ -143,16 +141,25 @@ defmodule Ace.HTTP.Handler do
   end
 
   def add_header(request = %{headers: headers}, :Host, location) do
-    [host, port] = case String.split(location, ":") do
-      [host, port] -> [host, :erlang.binary_to_integer(port)]
-      [host] -> [host, 80]
-    end
     headers = headers ++ [{"host", location}]
-    %{request | headers: headers, host: host, port: port}
+    %{request | headers: headers, authority: location}
   end
   def add_header(request = %{headers: headers}, key, value) do
     key = String.downcase("#{key}")
     headers = headers ++ [{key, value}]
     %{request | headers: headers}
+  end
+
+  defp split_path(path_string) do
+    path_string
+    |> String.split("/")
+    |> Enum.reject(&empty_string?/1)
+  end
+
+  defp empty_string?("") do
+    true
+  end
+  defp empty_string?(str) when is_binary(str) do
+    false
   end
 end
