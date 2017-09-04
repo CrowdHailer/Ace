@@ -4,7 +4,7 @@ defmodule Ace.HTTP.RequestTest do
   import ExUnit.CaptureLog, only: [capture_log: 1]
 
   setup do
-    raxx_app = {Raxx.Verify.Forwarder, %{target: self()}}
+    raxx_app = {Raxx.Forwarder, %{target: self()}}
     capture_log fn() ->
       {:ok, endpoint} = Ace.HTTP.start_link(raxx_app, port: 0)
       {:ok, port} = Ace.HTTP.port(endpoint)
@@ -133,5 +133,22 @@ defmodule Ace.HTTP.RequestTest do
     {:ok, client} = :inet.sockname(socket)
     assert_receive %{host: "www.raxx.com", path: [], body: nil, peer: ^client}
     assert_receive %{host: "www.raxx.com", path: [], body: nil, peer: ^client}
+  end
+
+  test "can send response even when request headers are sent, content-length is non-zero but entire body is not sent", %{port: port} do
+    content = "Hello, World!\r\n"
+    {first, second} = Enum.split(content |> String.split(""), 7)
+    head = """
+    GET / HTTP/1.1
+    Host: www.raxx.com
+    Content-Length: #{:erlang.iolist_size(content)}
+
+    """
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :gen_tcp.send(socket, head <> Enum.join(first))
+    :timer.sleep(10)
+    assert_receive %{host: "www.raxx.com", path: [], body: ^content}
+
+    # TODO: Write the actual test
   end
 end
