@@ -1,3 +1,5 @@
+# TODO this module should not exist,
+# functionality to be moved to private function in handler
 defmodule Ace.Chunk do
   @moduledoc """
   Single part of a chunked response.

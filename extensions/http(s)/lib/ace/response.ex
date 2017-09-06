@@ -1,3 +1,5 @@
+# TODO this module should not exist,
+# functionality to be moved to private function in handler
 defmodule Ace.Response do
   @moduledoc false
   # This module is not part of the public API.

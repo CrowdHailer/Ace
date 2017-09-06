@@ -17,11 +17,7 @@ defmodule Ace.HTTP.Handler do
         {:nosend, {app, partial, buffer, conn_info}, @packet_timeout}
       {:ok, request, buffer} ->
         {mod, state} = app
-        case mod.handle_request(request, state) do
-          chunked_response = %Ace.ChunkedResponse{} ->
-            to_write = Ace.Response.serialize(chunked_response)
-            app = chunked_response.app || app
-            {:send, to_write, {:streaming, app}}
+        case mod.handle_headers(request, state) do
           basic_response = %{body: _, headers: _, status: _} ->
             raw = Ace.Response.serialize(basic_response)
             {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
