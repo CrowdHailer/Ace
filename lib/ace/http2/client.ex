@@ -2,11 +2,9 @@ defmodule Ace.HTTP2.Client do
   @moduledoc """
   Send requests via HTTP/2 to a web service.
 
-  *NB: all examples have this module, `Raxx.Request` and `Raxx.Response` aliased*
+  *NB: all examples have this module aliased*
 
       alias Ace.HTTP2.Client
-      alias Raxx.Request
-      alias Raxx.Response
 
   ## Establish connection
 
@@ -41,16 +39,21 @@ defmodule Ace.HTTP2.Client do
   A client will accept a request with a binary value for the body.
   In this case the body is assumed complete with no further data to stream
 
-      request = Request.new(:GET, "/", [{"accept", "application/json"}], false)
-      {:ok, stream} = Client.stream(client)
-      :ok = Ace.HTTP2.send(stream, request)
-
-      request = Request.new(:POST, "/", [{"content-length", "13"}], "Hello, World!")
-      {:ok, stream} = Client.stream(client)
-      :ok = Ace.HTTP2.send(stream, request)
 
       {:ok, stream} = Client.stream(client)
-      request = Request.new(:POST, "/", [{"content-length", "13"}], true)
+      request = Raxx.request(:GET, "/")
+      |> Raxx.set_header("accept", "application/json")
+      :ok = Ace.HTTP2.send(stream, request)
+
+      {:ok, stream} = Client.stream(client)
+      request = Raxx.request(:POST, "/")
+      |> Raxx.set_header("content-length", "13")
+      |> Raxx.set_body("Hello, World!")
+      :ok = Ace.HTTP2.send(stream, request)
+
+      request = Raxx.request(:POST, "/")
+      |> Raxx.set_header("content-length", "13")
+      |> Raxx.set_body(true)
       :ok = Ace.HTTP2.send(stream, request)
       fragment = Raxx.fragment("Hello, World!", true)
       {:ok, _} = Ace.HTTP2.send(stream, fragment)
@@ -61,11 +64,11 @@ defmodule Ace.HTTP2.Client do
   The owner is the process that initiated the stream.
 
       receive do
-        {^stream, %Response{body: true}} ->
+        {^stream, %Raxx.Response{body: true}} ->
           :ok
       end
       receive do
-        {^stream, %{data: "Hello, World!", end_stream: end_stream}} ->
+        {^stream, %Raxx.Fragment{data: "Hello, World!", end_stream: end_stream}} ->
           :ok
       end
 
@@ -73,7 +76,7 @@ defmodule Ace.HTTP2.Client do
 
   A complete response may be built using the `collect_response/1`
 
-      {:ok, %Response{status: 200, body: "Hello, World!"}} = Client.collect_response(stream)
+      {:ok, %Raxx.Response{status: 200, body: "Hello, World!"}} = Client.collect_response(stream)
 
   ## Simple request response
 
