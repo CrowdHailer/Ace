@@ -36,12 +36,12 @@ defmodule Ace.HTTP2.Connection do
     # accept_push always false for server but usable in client.
   ]
 
-  def init({:client, {host, port}, local_settings}) do
+  def init({:client, {host, port}, local_settings, ssl_options}) do
     {:ok, connection} = :ssl.connect(host, port, [
       mode: :binary,
       packet: :raw,
       active: :false,
-      alpn_advertised_protocols: ["h2"]]
+      alpn_advertised_protocols: ["h2"]] ++ ssl_options
     )
     {:ok, "h2"} = :ssl.negotiated_protocol(connection)
     {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
