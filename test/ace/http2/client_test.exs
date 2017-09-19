@@ -109,4 +109,9 @@ defmodule Ace.HTTP2.ClientTest do
     refute_receive {^stream, {:promise, {_new_stream, _headers}}}, 1_000
   end
 
+  test "Send a ping" do
+    {:ok, connection} = Client.start_link("http2.golang.org", enable_push: false)
+    assert {:ok, <<1::64>>} = Ace.HTTP2.ping(connection, <<1::64>>)
+  end
+
 end

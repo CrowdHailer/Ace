@@ -28,6 +28,13 @@ defmodule Ace.HTTP2 do
   end
 
   @doc """
+  Send a ping frame over an HTTP/2 connection.
+  """
+  def ping(connection, identifier) when bit_size(identifier) == 64 do
+    GenServer.call(connection, {:ping, identifier})
+  end
+
+  @doc """
   Transform an `Raxx.Request` into a generic headers list.
 
   This headers list can be encoded via `Ace.HPack`.

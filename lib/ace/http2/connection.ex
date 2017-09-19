@@ -32,45 +32,51 @@ defmodule Ace.HTTP2.Connection do
     stream_supervisor: nil,
     max_peer_stream_id: 0,
     next_local_stream_id: nil,
-    name: nil
+    name: nil,
+    pings: %{}
     # accept_push always false for server but usable in client.
   ]
 
   def init({:client, {host, port}, local_settings, ssl_options}) do
-    {:ok, connection} = :ssl.connect(host, port, [
+    case :ssl.connect(host, port, [
       mode: :binary,
       packet: :raw,
       active: :false,
       alpn_advertised_protocols: ["h2"]] ++ ssl_options
-    )
-    {:ok, "h2"} = :ssl.negotiated_protocol(connection)
-    {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
-    initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_client_settings)
+    ) do
+      {:ok, connection} ->
+        {:ok, "h2"} = :ssl.negotiated_protocol(connection)
+        {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
+        initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_client_settings)
 
-    {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
+        {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
 
-    decode_context = HPack.new_context(4_096)
-    encode_context = HPack.new_context(4_096)
-    initial_state = %__MODULE__{
-      socket: connection,
-      outbound_window: 65_535,
-      local_settings: default_client_settings,
-      queued_settings: [local_settings],
-      remote_settings: default_server_settings,
-      decode_context: decode_context,
-      encode_context: encode_context,
-      streams: %{},
-      stream_supervisor: :client,
-      next_local_stream_id: 1,
-      name: "CLIENT (#{host}:#{port})"
-    }
-    state = %{initial_state | next: :handshake}
+        decode_context = HPack.new_context(4_096)
+        encode_context = HPack.new_context(4_096)
+        initial_state = %__MODULE__{
+          socket: connection,
+          outbound_window: 65_535,
+          local_settings: default_client_settings,
+          queued_settings: [local_settings],
+          remote_settings: default_server_settings,
+          decode_context: decode_context,
+          encode_context: encode_context,
+          streams: %{},
+          stream_supervisor: nil,
+          next_local_stream_id: 1,
+          name: "CLIENT (#{host}:#{port})"
+        }
+        state = %{initial_state | next: :handshake}
 
-    :ssl.send(connection, Ace.HTTP2.Connection.preface())
-    do_send_frames([initial_settings_frame], state)
+        :ssl.send(connection, Ace.HTTP2.Connection.preface())
+        do_send_frames([initial_settings_frame], state)
 
-    :ssl.setopts(connection, [active: :once])
-    {:ok, {"", state}}
+        :ssl.setopts(connection, [active: :once])
+        {:ok, {"", state}}
+      {:error, reason} ->
+        {:stop, reason}
+    end
+
   end
   def init({listen_socket, {mod, config}, settings}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
@@ -135,10 +141,12 @@ defmodule Ace.HTTP2.Connection do
         {:stop, :normal, state}
     end
   end
-  def handle_info({:ssl_closed, _socket}, {buffer, state}) do
-    # TODO shut down each stream
-    :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
-    {:stop, :normal, {buffer, state}}
+  def handle_info({:ssl_closed, _socket}, {buffer_or_pending, state}) do
+    if state.stream_supervisor do
+      # TODO shut down each stream
+      :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
+    end
+    {:stop, :normal, {buffer_or_pending, state}}
   end
   def handle_info({:DOWN, ref, :process, _pid, reason}, {buffer, state}) do
     {_id, stream} = Enum.find(state.streams, fn
@@ -216,6 +224,13 @@ defmodule Ace.HTTP2.Connection do
     {frames, state} = send_available(state)
     :ok = do_send_frames(frames, state)
     {:reply, :ok, {buffer, state}}
+  end
+  def handle_call({:ping, identifier}, from, {buffer, state}) do
+    pings = Map.put(state.pings, identifier, from)
+    ping_frame = Ace.HTTP2.Frame.Ping.new(identifier)
+    state = %{state | pings: pings}
+    :ok = do_send_frames([ping_frame], state)
+    {:noreply, {buffer, state}}
   end
 
   def send_available(connection) do
@@ -359,7 +374,12 @@ defmodule Ace.HTTP2.Connection do
   def consume_frame(frame = %Frame.Ping{ack: false}, state = %{next: :any}) do
     {:ok, {[Frame.Ping.ack(frame)], state}}
   end
-  def consume_frame(%Frame.Ping{ack: true}, state = %{next: :any}) do
+  def consume_frame(%Frame.Ping{identifier: identifier, ack: true}, state = %{next: :any}) do
+    {from, pings} = Map.pop(state.pings, identifier)
+    if from do
+      :ok = GenServer.reply(from, {:ok, identifier})
+    end
+    state = %{state | pings: pings}
     {:ok, {[], state}}
   end
   def consume_frame(%Frame.GoAway{error: :no_error}, _state = %{next: :any}) do
