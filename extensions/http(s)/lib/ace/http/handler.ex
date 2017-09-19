@@ -11,16 +11,52 @@ defmodule Ace.HTTP.Handler do
     {:nosend, {app, partial, buffer, conn_info}}
   end
 
+  def handle_packet(packet, {:streaming, remaining, request, app, buffer, conn_info}) do
+    buffer = buffer <> packet
+    <<data::binary-size(remaining), buffer::binary>> = buffer
+    {mod, state} = app
+    case mod.handle_fragment(data, state) do
+      {[], new_state} ->
+        :ok
+    end
+    # {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
+  end
+  # def process_headers(buffer, {:body, request = %{headers: headers}}) do
+  #   case :proplists.get_value("content-length", headers) do
+  #     content_length when content_length in [:undefined, 0] ->
+  #       {:ok, request, buffer}
+  #     raw ->
+  #       length = :erlang.binary_to_integer(raw)
+  #       case length < @max_body_size do
+  #         true ->
+  #           case buffer do
+  #             <<body :: binary-size(length)>> <> rest ->
+  #               {:ok, %{request | body: body}, rest}
+  #             _ ->
+  #               {:more, {:body, request}, buffer}
+  #           end
+  #         false ->
+  #           reason = {:body_too_large, length}
+  #           # TODO exceptions to include what to do next
+  #           {:error, reason, :close}
+  #       end
+  #   end
+  # end
   def handle_packet(packet, {app, partial, buffer, conn_info}) do
-    case process_buffer(buffer <> packet, partial) do
+    case process_headers(buffer <> packet, partial) do
       {:more, partial, buffer} ->
         {:nosend, {app, partial, buffer, conn_info}, @packet_timeout}
       {:ok, request, buffer} ->
         {mod, state} = app
         case mod.handle_headers(request, state) do
-          basic_response = %{body: _, headers: _, status: _} ->
-            raw = Ace.Response.serialize(basic_response)
-            {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
+          {actions, new_state} when is_list(actions) ->
+            app = {mod, new_state}
+            remaining = :proplists.get_value("content-length", request.headers, "0")
+            {remaining, ""} = Integer.parse(remaining)
+            handle_packet(buffer, {:streaming, remaining, request, app, "", conn_info})
+          # basic_response = %{body: _, headers: _, status: _} ->
+          #   raw = Ace.Response.serialize(basic_response)
+          #   {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
         end
       {:error, reason, buffer} ->
         {mod, state} = app
@@ -62,7 +98,7 @@ defmodule Ace.HTTP.Handler do
     :ok
   end
 
-  def process_buffer(buffer, {:start_line, conn_info}) when byte_size(buffer) < @max_line_buffer do
+  def process_headers(buffer, {:start_line, conn_info}) when byte_size(buffer) < @max_line_buffer do
     case :erlang.decode_packet(:http_bin, buffer, []) do
       {:more, :undefined} ->
         {:more, {:start_line, conn_info}, buffer}
@@ -80,64 +116,56 @@ defmodule Ace.HTTP.Handler do
         # e.g. localhost:8080//
         path = path || "/"
         {:ok, query} = URI2.Query.decode(query_string || "")
-        path = split_path(path)
+        path = Raxx.split_path(path)
         scheme = case conn_info.transport do
-          :tcp -> "http"
-          :ssl -> "https" # DEBT remove
-          :tls -> "https"
+          :tcp ->
+            :http
+          :tls ->
+            :https
         end
         request = %Raxx.Request{
           scheme: scheme,
           method: method,
           path: path,
           query: query,
-          headers: []
+          headers: [],
+          body: false
         }
-        process_buffer(rest, {:headers, request})
+        process_headers(rest, {:headers, request})
       {:ok, {:http_error, line}, rest} ->
         {:error, {:invalid_request_line, line}, rest}
     end
   end
-  def process_buffer(buffer, {:start_line, conn_info}) when byte_size(buffer) >= 2048 do
+  def process_headers(buffer, {:start_line, conn_info}) when byte_size(buffer) >= 2048 do
     {:error, :start_line_too_long, :no_recover}
   end
-  def process_buffer(buffer, {:headers, request}) do
+  def process_headers(buffer, {:headers, request}) do
     case :erlang.decode_packet(:httph_bin, buffer, []) do
       {:more, :undefined} ->
         {:more, {:headers, request}, buffer}
       # Key values is binary for unknown headers, atom and capitalised for known.
       {:ok, {:http_header, _, key, _, value}, rest} ->
-        process_buffer(rest, {:headers, add_header(request, key, value)})
+        process_headers(rest, {:headers, add_header(request, key, value)})
       {:ok, {:http_error, line}, rest} ->
         {:error, {:invalid_header_line, line}, rest}
       {:ok, :http_eoh, rest} ->
-        process_buffer(rest, {:body, request})
-    end
-  end
-  def process_buffer(buffer, {:body, request = %{headers: headers}}) do
-    case :proplists.get_value("content-length", headers) do
-      content_length when content_length in [:undefined, 0] ->
-        {:ok, request, buffer}
-      raw ->
-        length = :erlang.binary_to_integer(raw)
-        case length < @max_body_size do
-          true ->
-            case buffer do
-              <<body :: binary-size(length)>> <> rest ->
-                {:ok, %{request | body: body}, rest}
-              _ ->
-                {:more, {:body, request}, buffer}
-            end
-          false ->
-            reason = {:body_too_large, length}
-            # TODO exceptions to include what to do next
-            {:error, reason, :close}
-        end
+        request = Raxx.set_body(request, has_content?(request))
+        {:ok, request, rest}
+        # process_headers(rest, {:body, request})
     end
   end
 
+  defp has_content?(request = %{headers: headers}) do
+    case :proplists.get_value("content-length", headers) do
+      content_length when content_length in [:undefined, "0"] ->
+        false
+      _ ->
+        true
+    end
+  end
+
+
   def add_header(request = %{headers: headers}, :Host, location) do
-    headers = headers ++ [{"host", location}]
     %{request | headers: headers, authority: location}
   end
   def add_header(request = %{headers: headers}, key, value) do
@@ -146,16 +174,4 @@ defmodule Ace.HTTP.Handler do
     %{request | headers: headers}
   end
 
-  defp split_path(path_string) do
-    path_string
-    |> String.split("/")
-    |> Enum.reject(&empty_string?/1)
-  end
-
-  defp empty_string?("") do
-    true
-  end
-  defp empty_string?(str) when is_binary(str) do
-    false
-  end
 end
