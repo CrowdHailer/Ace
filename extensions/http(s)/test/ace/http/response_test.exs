@@ -38,7 +38,6 @@ defmodule Ace.HTTP.ResponseTest do
     assert response == "HTTP/1.1 200 OK\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
-  @tag :skip
   test "server can stream response with a predetermined size", %{port: port} do
     http1_request = """
     GET / HTTP/1.1
@@ -61,7 +60,12 @@ defmodule Ace.HTTP.ResponseTest do
     assert response_head == "HTTP/1.1 200 OK\r\ncontent-length: 15\r\nx-test: Value\r\n\r\n"
 
     {server, _ref} = from
-    IO.inspect(server)
+    send(server, {[Raxx.fragment("Hello, ")], state})
+
+    assert_receive {:tcp, ^socket, "Hello, "}, 1_000
+    send(server, {[Raxx.fragment("World!\r\n", true)], state})
+
+    assert_receive {:tcp, ^socket, "World!\r\n"}, 1_000
   end
 
   test "content-length will be added for a complete response", %{port: port} do

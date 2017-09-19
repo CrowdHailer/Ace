@@ -1,9 +1,7 @@
 defmodule Ace.HTTP.Handler do
   use Ace.Application
   @moduledoc false
-  @max_line_buffer 2048
   @packet_timeout 10_000
-  @max_body_size 10_000_000 # 10MB
 
   # states
   # {:request, :response}
@@ -41,27 +39,12 @@ defmodule Ace.HTTP.Handler do
     end
   end
 
-  # def process_data(data, {%{status: :done}, %{status: }}) do
-  #
-  # end
-
-  # def handle_packet(packet, {:streaming, remaining, request, app, buffer, conn_info}) do
-  #   buffer = buffer <> packet
-  #   <<data::binary-size(remaining), buffer::binary>> = buffer
-  #   {mod, state} = app
-  #   case mod.handle_fragment(data, state) do
-  #     {[], new_state} ->
-  #       :ok
-  #   end
-  #   # {:send, raw, {app, {:start_line, conn_info}, buffer, conn_info}}
-  # end
   # # def process_headers(buffer, {:body, request = %{headers: headers}}) do
   # #   case :proplists.get_value("content-length", headers) do
   # #     content_length when content_length in [:undefined, 0] ->
   # #       {:ok, request, buffer}
   # #     raw ->
   # #       length = :erlang.binary_to_integer(raw)
-  # #       case length < @max_body_size do
   # #         true ->
   # #           case buffer do
   # #             <<body :: binary-size(length)>> <> rest ->
@@ -150,15 +133,39 @@ defmodule Ace.HTTP.Handler do
           (remaining = content_length(partial) || 0) == 0 ->
             {Raxx.set_body(partial, false), {:complete, :response}}
         end
-        :ok = forward_request(request, state)
-        new_state = %{state | status: new_status}
-        handle_data(rest, new_state)
+        {actions, app} = forward_request(request, state.config)
+        {outbound, newer_status} = Enum.reduce(actions, {[], new_status}, &process_response/2)
+        newer_state = %{state | status: newer_status, config: app}
+        case newer_status do
+          {_, :complete} ->
+            {outbound, :stopped, newer_state}
+          _other ->
+            {outbound2, rest2, newer_state2} = handle_data(rest, newer_state)
+            {outbound ++ outbound2, rest2, newer_state}
+        end
+
     end
   end
 
+  def process_response(response = %Raxx.Response{}, {acc, {receiving, :response}}) do
+    if Raxx.complete?(response) do
+      {acc ++ [Ace.HTTP1.serialize_response(response)], {receiving, :complete}}
+    else
+      remaining = content_length(response)
+      {acc ++ [Ace.HTTP1.serialize_response(response)], {receiving, {:body, remaining}}}
+    end
+  end
+  def process_response(%Raxx.Fragment{data: data, end_stream: false}, {acc, {receiving, {:body, remaining}}}) when byte_size(data) < remaining do
+    {acc ++ [data], {receiving, {:body, remaining - :erlang.iolist_size(data)}}}
+  end
+  def process_response(%Raxx.Fragment{data: data, end_stream: true}, {acc, {receiving, {:body, remaining}}}) when byte_size(data) == remaining do
+    {acc ++ [data], {receiving, :complete}}
+  end
+
+  # TODO broken data
   def handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) >= remaining do
     <<data::binary-size(remaining), rest::binary>> = packet
-    forward_fragment(data, true, state)
+    forward_fragment(data, true, state.config)
     new_status = {:complete, :response}
     new_state = %{state | status: new_status}
     {"", rest, new_state}
@@ -173,46 +180,56 @@ defmodule Ace.HTTP.Handler do
         case outbound do
           "" ->
             {:nosend, {unprocessed, state}}
-          data when is_binary(data) ->
-            {:send, data, {unprocessed, state}}
+          iodata when is_binary(iodata) or is_list(iodata) ->
+            {:send, iodata, {unprocessed, state}}
         end
     end
   end
 
-  def forward_request(request, %{config: {mod, state}}) do
-    mod.handle_headers(request, state)
-    :ok
+  def handle_info(message, {buffer, state}) do
+    {mod, app_state} = state.config
+    {actions, app_state} = mod.handle_info(message, app_state)
+    |> normalise_reaction(mod)
+    {outbound, newer_status} = Enum.reduce(actions, {[], state.status}, &process_response/2)
+    newer_state = %{state | status: newer_status}
+    case newer_status do
+      {_, :complete} ->
+        {outbound, :stopped, newer_state}
+      _other ->
+        {outbound, buffer, newer_state}
+    end
+    |> case do
+      {outbound, unprocessed, state} ->
+        case outbound do
+          "" ->
+            {:nosend, {unprocessed, state}}
+          iodata when is_binary(iodata) or is_list(iodata) ->
+            {:send, iodata, {unprocessed, state}}
+        end
+    end
   end
 
-  def forward_fragment(data, end_stream, %{config: {mod, state}}) do
+  def forward_request(request, {mod, state}) do
+    mod.handle_headers(request, state)
+    |> normalise_reaction(mod)
+  end
+
+  def forward_fragment(data, end_stream, {mod, state}) do
     mod.handle_fragment(data, state)
     if end_stream do
       mod.handle_trailers([], state)
     end
   end
 
-  def handle_info(:timeout, state = {app = {mod, _config}, partial, _buffer, conn_info}) do
-    error = case partial do
-      {:body, _} ->
-        :body_timeout
-    end
-    case mod.handle_error(error) do
-      binary_response when is_binary(binary_response) ->
-        {:send, binary_response, state}
-      basic_response = %{body: _, headers: _, status: _} ->
-        raw = Ace.Response.serialize(basic_response)
-        {:send, raw, state}
+  def normalise_reaction(response = %Raxx.Response{}, mod) do
+    if Raxx.complete?(response) do
+      normalise_reaction({[response], :stop}, mod)
+    else
+      raise "Do not send like this unless complete response"
     end
   end
-  def handle_info(message, {:streaming, {mod, state}}) do
-    chunks = mod.handle_info(message, state)
-    case chunks do
-      [] ->
-        {:nosend, {:streaming, {mod, state}}}
-      data when is_list(data) ->
-        chunks = Enum.map(data, &Ace.Chunk.serialize/1)
-        {:send, chunks, {:streaming, {mod, state}}}
-    end
+  def normalise_reaction({actions, app_state}, mod) when is_list(actions) do
+    {actions, {mod, app_state}}
   end
 
   def handle_disconnect(_reason, _) do
