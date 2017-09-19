@@ -158,9 +158,8 @@ defmodule Ace.HTTP.RequestTest do
 
     assert "Hello, World!\n" == fragment
 
-    # TODO assert that trailers are received
-    # assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
-    # GenServer.reply(from, {[], state})
+    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
+    GenServer.reply(from, {[], state})
   end
 
   test "application will be invoked as content is received" do
