@@ -35,7 +35,7 @@ defmodule Ace.HTTP.ResponseTest do
 
     assert_receive {:tcp, ^socket, response}, 1_000
 
-    assert response == "HTTP/1.1 200 OK\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
   test "server can stream response with a predetermined size", %{port: port} do
@@ -57,7 +57,7 @@ defmodule Ace.HTTP.ResponseTest do
 
     assert_receive {:tcp, ^socket, response_head}, 1_000
 
-    assert response_head == "HTTP/1.1 200 OK\r\ncontent-length: 15\r\nx-test: Value\r\n\r\n"
+    assert response_head == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 15\r\nx-test: Value\r\n\r\n"
 
     {server, _ref} = from
     send(server, {[Raxx.fragment("Hello, ")], state})
@@ -86,7 +86,7 @@ defmodule Ace.HTTP.ResponseTest do
 
     assert_receive {:tcp, ^socket, response}, 1_000
 
-    assert response == "HTTP/1.1 200 OK\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
   test "content-length will be added for a response with no body", %{port: port} do
@@ -107,6 +107,6 @@ defmodule Ace.HTTP.ResponseTest do
 
     assert_receive {:tcp, ^socket, response}, 1_000
 
-    assert response == "HTTP/1.1 200 OK\r\ncontent-length: 0\r\nx-test: Value\r\n\r\n"
+    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 0\r\nx-test: Value\r\n\r\n"
   end
 end

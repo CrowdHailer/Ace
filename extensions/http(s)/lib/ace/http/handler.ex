@@ -38,7 +38,8 @@ defmodule Ace.HTTP.Handler do
     :conn_info,
     :status, # request, headers, streamed_body, chunked_body
     :worker,
-    :ref
+    :ref,
+    :keep_alive
   ]
 
   def handle_connect(conn_info, app) do
@@ -48,7 +49,8 @@ defmodule Ace.HTTP.Handler do
       conn_info: conn_info,
       status: {:request, :response},
       worker: pid,
-      ref: ref
+      ref: ref,
+      keep_alive: false
     }
     {"", "", state}
   end
@@ -95,10 +97,19 @@ defmodule Ace.HTTP.Handler do
       {:more, :undefined} ->
         {"", packet, state}
       {:ok, {:http_header, _, key, _, value}, rest} ->
-        new_partial = add_header(partial, key, value)
-        new_status = {{:request_headers, new_partial}, :response}
-        new_state = %{state | status: new_status}
-        handle_data(rest, new_state)
+        case key do
+          :Connection ->
+            if value != "close" do
+              IO.puts("received 'connection: #{value}', Ace will always close connection")
+            end
+            new_state = %{state | keep_alive: false}
+            handle_data(rest, new_state)
+          _other ->
+            new_partial = add_header(partial, key, value)
+            new_status = {{:request_headers, new_partial}, :response}
+            new_state = %{state | status: new_status}
+            handle_data(rest, new_state)
+        end
       {:ok, {:http_error, line}, rest} ->
         {:error, {:invalid_header_line, line}, rest}
         send(self(), {:exit, :normal})
@@ -154,7 +165,10 @@ defmodule Ace.HTTP.Handler do
 
   def handle_info({ref = {:http1, _, _}, part}, {buffer, state}) do
     ^ref = state.ref
-    {:send, serialize_part(part), {buffer, state}}
+    if final_part?(part) do
+      send(self(), {:exit, :normal})
+    end
+    {:send, serialize_part(part, state), {buffer, state}}
   end
   def handle_info(:timeout, {buffer, state}) do
     send(self(), {:exit, :normal})
@@ -164,11 +178,27 @@ defmodule Ace.HTTP.Handler do
     exit(reason)
   end
 
-  defp serialize_part(response = %Raxx.Response{}) do
-    Ace.HTTP1.serialize_response(response)
+  defp serialize_part(response = %Raxx.Response{}, state) do
+    Ace.HTTP1.serialize_response(response, state)
   end
-  defp serialize_part(fragment = %Raxx.Fragment{}) do
+  defp serialize_part(fragment = %Raxx.Fragment{}, _state) do
     fragment.data
+  end
+
+  defp final_part?(%Raxx.Fragment{end_stream: true}) do
+    true
+  end
+  defp final_part?(%Raxx.Fragment{end_stream: false}) do
+    false
+  end
+  defp final_part?(%Raxx.Response{body: false}) do
+    true
+  end
+  defp final_part?(%Raxx.Response{body: body}) when is_binary(body) do
+    true
+  end
+  defp final_part?(%Raxx.Response{body: true}) do
+    false
   end
 
   def handle_disconnect(_reason, _) do

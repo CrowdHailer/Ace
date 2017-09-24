@@ -1,14 +1,23 @@
 defmodule Ace.HTTP1 do
   @moduledoc false
 
-  def serialize_response(response) do
+  def serialize_response(response, %{keep_alive: keep_alive}) do
     response = add_message_framing(response)
+    response = add_connection_header(response, %{keep_alive: keep_alive})
     [
       HTTPStatus.status_line(response.status),
       header_lines(response.headers),
       "\r\n",
       response.body
     ]
+  end
+
+  defp add_connection_header(response = %{headers: headers}, %{keep_alive: false}) do
+    if :proplists.is_defined("connection", headers) do
+      raise "Should not expose connection state in application"
+    end
+    headers = [{"connection", "close"} | headers]
+    %{response | headers: headers}
   end
 
   defp add_message_framing(response) do
