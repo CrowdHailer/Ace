@@ -191,14 +191,4 @@ defmodule Ace.HTTP.RequestTest do
     assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
     GenServer.reply(from, {[], state})
   end
-
-
-  @tag :skip
-  test "will handle two requests over the same connection", %{port: port} do
-    # DEBT leave pipelining as rarely used in by modern browsers
-  end
-
-  @tag :skip
-  test "can send response even when request headers are sent, content-length is non-zero but entire body is not sent", %{port: port} do
-  end
 end

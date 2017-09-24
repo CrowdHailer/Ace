@@ -1,6 +1,7 @@
 defmodule Ace.HTTP.Handler do
   use Ace.Application
   @moduledoc false
+
   @packet_timeout 10_000
 
   # states
@@ -9,6 +10,29 @@ defmodule Ace.HTTP.Handler do
   # {{:streamed_body, remaining}, :response || :steaming_body || :streaming_chunks}
   # {:chunked_body, :response || :steaming_body || :streaming_chunks}
   # {:complete, :response || :steaming_body || :streaming_chunks}
+
+  @max_line_length 2048
+
+  @bad_request """
+  HTTP/1.1 400 Bad Request
+  connection: close
+  content-length: 0
+
+  """ |> String.replace("\n", "\r\n")
+
+  @start_line_too_long """
+  HTTP/1.1 414 URI Too Long
+  connection: close
+  content-length: 0
+
+  """ |> String.replace("\n", "\r\n")
+
+  @request_timeout """
+  HTTP/1.1 408 Request Timeout
+  connection: close
+  content-length: 0
+
+  """ |> String.replace("\n", "\r\n")
 
   defstruct [
     :conn_info,
@@ -36,21 +60,28 @@ defmodule Ace.HTTP.Handler do
       {outbound, unprocessed, state} ->
         case outbound do
           "" ->
-            {:nosend, {unprocessed, state}}
+            {:nosend, {unprocessed, state}, @packet_timeout}
           data ->
-            {:send, data, {unprocessed, state}}
+            {:send, data, {unprocessed, state}, @packet_timeout}
         end
     end
   end
 
-  def handle_data("", state) do
+  defp handle_data("", state) do
     {"", "", state}
   end
 
-  def handle_data(packet, state = %{status: {:request, :response}}) do
-    case :erlang.decode_packet(:http_bin, packet, []) do
+  defp handle_data(packet, state = %{status: {:request, :response}}) do
+    case :erlang.decode_packet(:http_bin, packet, [line_length: @max_line_length]) do
       {:more, :undefined} ->
         {"", packet, state}
+      {:ok, {:http_error, line}, rest} ->
+        {:error, {:invalid_start_line, line}, rest}
+        send(self(), {:exit, :normal})
+        {@bad_request, rest, state}
+      {:error, :invalid} ->
+        send(self(), {:exit, :normal})
+        {@start_line_too_long, "", state}
       {:ok, raw_request = {:http_request, _method, _http_uri, _version}, rest} ->
         partial = build_partial_request(raw_request, state.conn_info)
         new_status = {{:request_headers, partial}, :response}
@@ -59,7 +90,7 @@ defmodule Ace.HTTP.Handler do
     end
   end
 
-  def handle_data(packet, state = %{status: {{:request_headers, partial}, :response}}) do
+  defp handle_data(packet, state = %{status: {{:request_headers, partial}, :response}}) do
     case :erlang.decode_packet(:httph_bin, packet, []) do
       {:more, :undefined} ->
         {"", packet, state}
@@ -70,6 +101,8 @@ defmodule Ace.HTTP.Handler do
         handle_data(rest, new_state)
       {:ok, {:http_error, line}, rest} ->
         {:error, {:invalid_header_line, line}, rest}
+        send(self(), {:exit, :normal})
+        {@bad_request, rest, state}
       {:ok, :http_eoh, rest} ->
         {request, new_status} = cond do
           transfer_encoding(partial) != nil ->
@@ -82,19 +115,10 @@ defmodule Ace.HTTP.Handler do
         send(state.worker, {state.ref, request})
         new_state = %{state | status: new_status}
         handle_data(rest, new_state)
-        # {outbound, newer_status} = Enum.reduce(actions, {[], new_status}, &process_response/2)
-        # case newer_status do
-        #   {_, :complete} ->
-        #     {outbound, :stopped, newer_state}
-        #   _other ->
-        #     {outbound2, rest2, newer_state2} = handle_data(rest, newer_state)
-        #     {outbound ++ outbound2, rest2, newer_state}
-        # end
-
     end
   end
 
-  def handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) >= remaining do
+  defp handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) >= remaining do
     <<data::binary-size(remaining), rest::binary>> = packet
     fragment = Raxx.fragment(data, true)
     send(state.worker, {state.ref, fragment})
@@ -103,7 +127,7 @@ defmodule Ace.HTTP.Handler do
     {"", rest, new_state}
   end
 
-  def handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) < remaining do
+  defp handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) < remaining do
     fragment = Raxx.fragment(packet, false)
     new_status = {{:body, remaining - byte_size(packet)}, :response}
     new_state = %{state | status: new_status}
@@ -121,9 +145,9 @@ defmodule Ace.HTTP.Handler do
       {outbound, unprocessed, state} ->
         case outbound do
           "" ->
-            {:nosend, {unprocessed, state}}
+            {:nosend, {unprocessed, state}, @packet_timeout}
           iodata when is_binary(iodata) or is_list(iodata) ->
-            {:send, iodata, {unprocessed, state}}
+            {:send, iodata, {unprocessed, state}, @packet_timeout}
         end
     end
   end
@@ -132,30 +156,26 @@ defmodule Ace.HTTP.Handler do
     ^ref = state.ref
     {:send, serialize_part(part), {buffer, state}}
   end
+  def handle_info(:timeout, {buffer, state}) do
+    send(self(), {:exit, :normal})
+    {:send, @request_timeout, {buffer, state}}
+  end
+  def handle_info({:exit, reason}, _state) do
+    exit(reason)
+  end
 
-  def serialize_part(response = %Raxx.Response{}) do
+  defp serialize_part(response = %Raxx.Response{}) do
     Ace.HTTP1.serialize_response(response)
   end
-  def serialize_part(fragment = %Raxx.Fragment{}) do
+  defp serialize_part(fragment = %Raxx.Fragment{}) do
     fragment.data
-  end
-
-  def normalise_reaction(response = %Raxx.Response{}, mod) do
-    if Raxx.complete?(response) do
-      normalise_reaction({[response], :stop}, mod)
-    else
-      raise "Do not send like this unless complete response"
-    end
-  end
-  def normalise_reaction({actions, app_state}, mod) when is_list(actions) do
-    {actions, {mod, app_state}}
   end
 
   def handle_disconnect(_reason, _) do
     :ok
   end
 
-  def build_partial_request({:http_request, method, http_uri, _version}, conn_info) do
+  defp build_partial_request({:http_request, method, http_uri, _version}, conn_info) do
     path_string = case http_uri do
       {:abs_path, path_string} ->
         path_string
@@ -203,10 +223,10 @@ defmodule Ace.HTTP.Handler do
     end
   end
 
-  def add_header(request = %{headers: headers}, :Host, location) do
+  defp add_header(request = %{headers: headers}, :Host, location) do
     %{request | headers: headers, authority: location}
   end
-  def add_header(request = %{headers: headers}, key, value) do
+  defp add_header(request = %{headers: headers}, key, value) do
     key = String.downcase("#{key}")
     headers = headers ++ [{key, value}]
     %{request | headers: headers}
