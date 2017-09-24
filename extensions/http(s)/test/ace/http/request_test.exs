@@ -162,8 +162,34 @@ defmodule Ace.HTTP.RequestTest do
     GenServer.reply(from, {[], state})
   end
 
-  test "application will be invoked as content is received" do
-    # TODO send content in two parts
+  test "application will be invoked as content is received", %{port: port} do
+    request_head = """
+    GET /foo/bar?var=1 HTTP/1.1
+    host: example.com:1234
+    content-length: 14
+
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, request_head)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.body == true
+
+    :ok = :gen_tcp.send(socket, "Hello, ")
+    Process.sleep(100)
+    :ok = :gen_tcp.send(socket, "World!\n")
+
+    assert_receive {:"$gen_call", from, {:fragment, "Hello, ", state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert_receive {:"$gen_call", from, {:fragment, "World!\n", state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
+    GenServer.reply(from, {[], state})
   end
 
 

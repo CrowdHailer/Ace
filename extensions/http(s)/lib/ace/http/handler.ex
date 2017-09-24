@@ -12,7 +12,6 @@ defmodule Ace.HTTP.Handler do
 
   defstruct [
     :conn_info,
-    :config,
     :status, # request, headers, streamed_body, chunked_body
     :worker,
     :ref
@@ -23,7 +22,6 @@ defmodule Ace.HTTP.Handler do
     {:ok, pid} = Ace.HTTP1.Worker.start_link(ref, app)
     state = %__MODULE__{
       conn_info: conn_info,
-      config: app,
       status: {:request, :response},
       worker: pid,
       ref: ref
@@ -71,17 +69,15 @@ defmodule Ace.HTTP.Handler do
         new_state = %{state | status: new_status}
         handle_data(rest, new_state)
       {:ok, {:http_error, line}, rest} ->
-        :todo
-        # {:error, {:invalid_header_line, line}, rest}
+        {:error, {:invalid_header_line, line}, rest}
       {:ok, :http_eoh, rest} ->
         {request, new_status} = cond do
-          false ->
-            # Need to check if encoding is chunked
-            :todo
-          (remaining = content_length(partial) || 0) > 0 ->
-            {Raxx.set_body(partial, true), {{:body, remaining}, :response}}
-          (remaining = content_length(partial) || 0) == 0 ->
+          transfer_encoding(partial) != nil ->
+            raise "Transfer encoding not supported by Ace.HTTP1 (beta)"
+          content_length(partial) in [0, nil] ->
             {Raxx.set_body(partial, false), {:complete, :response}}
+          (remaining = content_length(partial)) > 0 ->
+            {Raxx.set_body(partial, true), {{:body, remaining}, :response}}
         end
         send(state.worker, {state.ref, request})
         new_state = %{state | status: new_status}
@@ -98,7 +94,6 @@ defmodule Ace.HTTP.Handler do
     end
   end
 
-  # TODO broken data
   def handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) >= remaining do
     <<data::binary-size(remaining), rest::binary>> = packet
     fragment = Raxx.fragment(data, true)
@@ -106,6 +101,16 @@ defmodule Ace.HTTP.Handler do
     new_status = {:complete, :response}
     new_state = %{state | status: new_status}
     {"", rest, new_state}
+  end
+
+  def handle_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) < remaining do
+    fragment = Raxx.fragment(packet, false)
+    new_status = {{:body, remaining - byte_size(packet)}, :response}
+    new_state = %{state | status: new_status}
+
+    send(state.worker, {state.ref, fragment})
+
+    {"", "", new_state}
   end
 
   def handle_packet("", x) do
@@ -180,7 +185,15 @@ defmodule Ace.HTTP.Handler do
     }
   end
 
-  defp content_length(request = %{headers: headers}) do
+  defp transfer_encoding(%{headers: headers}) do
+    case :proplists.get_value("transfer-encoding", headers) do
+      :undefined ->
+        nil
+      binary ->
+        binary
+    end
+  end
+  defp content_length(%{headers: headers}) do
     case :proplists.get_value("content-length", headers) do
       :undefined ->
         nil

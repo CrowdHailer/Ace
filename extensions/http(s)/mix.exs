@@ -23,7 +23,6 @@ defmodule Ace.HTTP.Mixfile do
       {:http_status, "~> 0.2.0"},
       {:ace, "~> 0.9.2"},
       {:ex_doc, ">= 0.0.0", only: :dev},
-      {:httpoison, "~> 0.13.0"}
     ]
   end
 
