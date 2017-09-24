@@ -1,41 +1,48 @@
 defmodule Ace.HTTP1 do
   @moduledoc false
 
-  def serialize_response(response, %{keep_alive: keep_alive}) do
-    response = add_message_framing(response)
-    response = add_connection_header(response, %{keep_alive: keep_alive})
+  def serialize_response(status_code, headers, body) do
     [
-      HTTPStatus.status_line(response.status),
-      header_lines(response.headers),
+      HTTPStatus.status_line(status_code),
+      header_lines(headers),
       "\r\n",
-      response.body
+      body
     ]
   end
 
-  defp add_connection_header(response = %{headers: headers}, %{keep_alive: false}) do
-    if :proplists.is_defined("connection", headers) do
-      raise "Should not expose connection state in application"
+  def pop_chunk(buffer) do
+    case String.split(buffer, "\r\n", parts: 2) do
+      [base_16_size, rest] ->
+        size = base_16_size
+        |> :erlang.binary_to_list
+        |> :erlang.list_to_integer(16)
+        case rest do
+          <<chunk::binary-size(size), "\r\n", rest::binary>> ->
+            {chunk, rest}
+          _incomplete_chunk ->
+            {nil, buffer}
+        end
+      [rest] ->
+        {nil, rest}
     end
-    headers = [{"connection", "close"} | headers]
-    %{response | headers: headers}
   end
 
-  defp add_message_framing(response) do
-    # Always assume no transfer-encoding
-    # Best practise to add content-length so that HEAD requests can work
-    case {:proplists.get_value("content-length", response.headers), response.body} do
-      {length, true} when is_binary(length) ->
-        %{response | body: ""}
-      {length, _body} when is_binary(length) ->
-        response
-      {:undefined, false} ->
-        headers = [{"content-length", "0"} | response.headers]
-        %{response | headers: headers, body: ""}
-      {:undefined, body} ->
-        content_length = :erlang.iolist_size(body) |> to_string
-        headers = [{"content-length", content_length} | response.headers]
-        %{response | headers: headers}
-    end
+  @doc """
+  Serialize io_data as a single chunk to be streamed.
+
+  ## Example
+
+      iex> Ace.HTTP1.serialize_chunk("hello")
+      ...> |> to_string()
+      "5\\r\\nhello\\r\\n"
+
+      iex> Ace.HTTP1.serialize_chunk("")
+      ...> |> to_string()
+      "0\\r\\n\\r\\n"
+  """
+  def serialize_chunk(data) do
+    size = :erlang.iolist_size(data)
+    [:erlang.integer_to_list(size, 16), "\r\n", data, "\r\n"]
   end
 
   defp header_lines(headers) do

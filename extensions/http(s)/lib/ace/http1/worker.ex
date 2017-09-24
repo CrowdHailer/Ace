@@ -23,6 +23,11 @@ defmodule Ace.HTTP1.Worker do
         end
     end
   end
+  # DEBT I think that the worker should expect to explicitly receive a tail message
+  def handle_info({client, trailer = %Raxx.Trailer{}}, {mod, state, client}) do
+    mod.handle_trailers(trailer.headers, state)
+    |> normalise_reaction({mod, state, client})
+  end
 
   def handle_info(other, {mod, state, client}) do
     mod.handle_info(other, state)

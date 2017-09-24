@@ -1,16 +1,14 @@
 defmodule Ace.HTTP.Handler do
-  use Ace.Application
   @moduledoc false
+  use Ace.Application
+
+  alias Raxx.{
+    Response,
+    Fragment
+  }
+  alias Ace.HTTP1
 
   @packet_timeout 10_000
-
-  # states
-  # {:request, :response}
-  # {{:request_headers, partial}, :response}
-  # {{:streamed_body, remaining}, :response || :steaming_body || :streaming_chunks}
-  # {:chunked_body, :response || :steaming_body || :streaming_chunks}
-  # {:complete, :response || :steaming_body || :streaming_chunks}
-
   @max_line_length 2048
 
   @bad_request """
@@ -44,7 +42,7 @@ defmodule Ace.HTTP.Handler do
 
   def handle_connect(conn_info, app) do
     ref = {:http1, self(), 1}
-    {:ok, pid} = Ace.HTTP1.Worker.start_link(ref, app)
+    {:ok, pid} = HTTP1.Worker.start_link(ref, app)
     state = %__MODULE__{
       conn_info: conn_info,
       status: {:request, :response},
@@ -115,9 +113,12 @@ defmodule Ace.HTTP.Handler do
         send(self(), {:exit, :normal})
         {@bad_request, rest, state}
       {:ok, :http_eoh, rest} ->
+        {transfer_encoding, partial} = pop_transfer_encoding(partial)
         {request, new_status} = cond do
-          transfer_encoding(partial) != nil ->
-            raise "Transfer encoding not supported by Ace.HTTP1 (beta)"
+          transfer_encoding == "chunked" ->
+            {Raxx.set_body(partial, true), {:chunked_body, :response}}
+          transfer_encoding != nil ->
+            raise "Transfer encoding '#{transfer_encoding}' not supported by Ace.HTTP1 (beta)"
           content_length(partial) in [0, nil] ->
             {Raxx.set_body(partial, false), {:complete, :response}}
           (remaining = content_length(partial)) > 0 ->
@@ -148,6 +149,21 @@ defmodule Ace.HTTP.Handler do
     {"", "", new_state}
   end
 
+  defp handle_data(packet, state = %{status: {:chunked_body, :response}}) do
+    {chunk, rest} = HTTP1.pop_chunk(packet)
+    case chunk do
+      nil ->
+        {"", rest, state}
+      "" ->
+        send(state.worker, {state.ref, Raxx.trailer([])})
+        {"", rest, state}
+      chunk ->
+        fragment = Raxx.fragment(chunk, false)
+        send(state.worker, {state.ref, fragment})
+        {"", rest, state}
+    end
+  end
+
   def handle_packet("", x) do
     {:nosend, x}
   end
@@ -165,10 +181,14 @@ defmodule Ace.HTTP.Handler do
 
   def handle_info({ref = {:http1, _, _}, part}, {buffer, state}) do
     ^ref = state.ref
-    if final_part?(part) do
-      send(self(), {:exit, :normal})
+    {outbound, new_state} = case send_part(part, state) do
+      {outbound, :stop} ->
+        send(self(), {:exit, :normal})
+        {outbound, state}
+      {outbound, new_state} ->
+        {outbound, new_state}
     end
-    {:send, serialize_part(part, state), {buffer, state}}
+    {:send, outbound, {buffer, new_state}}
   end
   def handle_info(:timeout, {buffer, state}) do
     send(self(), {:exit, :normal})
@@ -178,27 +198,61 @@ defmodule Ace.HTTP.Handler do
     exit(reason)
   end
 
-  defp serialize_part(response = %Raxx.Response{}, state) do
-    Ace.HTTP1.serialize_response(response, state)
+  defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
+    case content_length(response) do
+      nil ->
+        headers = [{"connection", "close"}, {"transfer-encoding", "chunked"} | response.headers]
+        new_status = {up, :chunked_body}
+        new_state = %{state | status: new_status}
+        {HTTP1.serialize_response(response.status, headers, ""), new_state}
+      content_length when content_length > 0 ->
+        headers = [{"connection", "close"} | response.headers]
+        new_status = {up, {:body, content_length}}
+        new_state = %{state | status: new_status}
+        {HTTP1.serialize_response(response.status, headers, ""), new_state}
+    end
   end
-  defp serialize_part(fragment = %Raxx.Fragment{}, _state) do
-    fragment.data
+  defp send_part(response = %Response{body: false}, state = %{status: {up, :response}}) do
+    case content_length(response) do
+      nil ->
+        headers = [{"connection", "close"}, {"content-length", "0"} | response.headers]
+        new_status = {up, :complete}
+        new_state = %{state | status: new_status}
+        new_state # Not used
+        {HTTP1.serialize_response(response.status, headers, ""), :stop}
+    end
   end
+  defp send_part(response = %Response{body: body}, state = %{status: {up, :response}}) when is_binary(body) do
+    case content_length(response) do
+      nil ->
+        content_length = :erlang.iolist_size(body) |> to_string
+        headers = [{"connection", "close"}, {"content-length", content_length} | response.headers]
+        new_status = {up, :complete}
+        new_state = %{state | status: new_status}
+        new_state # Not used
+        {HTTP1.serialize_response(response.status, headers, response.body), :stop}
+      _content_length ->
+        headers = [{"connection", "close"} | response.headers]
+        new_status = {up, :complete}
+        new_state = %{state | status: new_status}
+        new_state # Not used
+        {HTTP1.serialize_response(response.status, headers, response.body), :stop}
+    end
+  end
+  defp send_part(fragment = %Fragment{}, state = %{status: {up, {:body, remaining}}}) do
+    remaining = remaining - :erlang.iolist_size(fragment.data)
+    new_status = {up, {:body, remaining}}
+    new_state = %{state | status: new_status}
+    {[fragment.data], new_state}
+  end
+  defp send_part(fragment = %Fragment{end_stream: false}, state = %{status: {_up, :chunked_body}}) do
+    chunk = HTTP1.serialize_chunk(fragment.data)
+    {[chunk], state}
+  end
+  defp send_part(fragment = %Fragment{end_stream: true}, %{status: {_up, :chunked_body}}) do
+    chunk = HTTP1.serialize_chunk(fragment.data)
 
-  defp final_part?(%Raxx.Fragment{end_stream: true}) do
-    true
-  end
-  defp final_part?(%Raxx.Fragment{end_stream: false}) do
-    false
-  end
-  defp final_part?(%Raxx.Response{body: false}) do
-    true
-  end
-  defp final_part?(%Raxx.Response{body: body}) when is_binary(body) do
-    true
-  end
-  defp final_part?(%Raxx.Response{body: true}) do
-    false
+    {[chunk, HTTP1.serialize_chunk("")], :stop}
   end
 
   def handle_disconnect(_reason, _) do
@@ -235,12 +289,13 @@ defmodule Ace.HTTP.Handler do
     }
   end
 
-  defp transfer_encoding(%{headers: headers}) do
+  defp pop_transfer_encoding(request = %{headers: headers}) do
     case :proplists.get_value("transfer-encoding", headers) do
       :undefined ->
-        nil
+        {nil, request}
       binary ->
-        binary
+        headers = :proplists.delete("transfer-encoding", headers)
+        {binary, %{request | headers: headers}}
     end
   end
   defp content_length(%{headers: headers}) do
