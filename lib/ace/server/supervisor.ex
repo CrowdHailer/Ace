@@ -1,10 +1,13 @@
 defmodule Ace.Server.Supervisor do
-  @moduledoc """
-  Supervise a collection of servers, that are listening or handling connections.
-
-  Individual server processes can be stared from a supervisor,
-  however recommended is to provide a constant sized number of accepting servers use a governor pool.
-  """
+  @moduledoc false
+  # NOTE documentation hidden until HTTP/1.x merged into master.
+  
+  # @moduledoc """
+  # Supervise a collection of servers, that are listening or handling connections.
+  #
+  # Individual server processes can be stared from a supervisor,
+  # however recommended is to provide a constant sized number of accepting servers use a governor pool.
+  # """
   use Supervisor
 
   @doc """

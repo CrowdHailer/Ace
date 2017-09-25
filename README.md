@@ -1,133 +1,35 @@
 # Ace
-**Easy TCP and TLS(ssl) servers.**
 
-- [Install from hex](https://hex.pm/packages/ace)
-- [Documentation on hexdoc](https://hexdocs.pm/ace)
+**HTTP/2 server and client for Elixir**
 
-*For a HTTP webserver see [Ace.HTTP](https://hex.pm/packages/ace_http).*
+- [Install from Hex](https://hex.pm/packages/ace)
+- [Documentation available on hexdoc](https://hexdocs.pm/ace)
 
-## Application
+*Want to dive straight in? see `Ace.HTTP2.Service` or `Ace.HTTP2.Client`.*
 
-An `Ace.Application` module defines a servers behaviour.
+## Features
 
+- Consistent server and client interfaces
+- Stream isolation; one process per stream
+- Bidirectional streaming; send and receive streamed data
+- Server push; to reduce latency
+- Automatic flow control; at stream and connection level
+- Secure data transport; TLS(SSL) support via ALPN
+- Verified against [h2spec](https://github.com/summerwind/h2spec) (*143/146*)
+- Simple request/response interactions; [Raxx](https://github.com/crowdhailer/raxx) interface
 
-```elixir
-defmodule MyApp do
-  # MyApp is a server application.
-  use Ace.Application
+*For more view the [features board](https://github.com/CrowdHailer/Ace/projects/1).*
 
-  # Handle client opening a new connection.
-  def handle_connect(_connection, state = {:greeting, greeting}) do
-    {:send, greeting, state}
-  end
+## Testing
 
-  # React to a message that was sent from the client.
-  def handle_packet(inbound, state) do
-    {:send, "ECHO: #{String.strip(inbound)}\n", state}
-  end
+Run [h2spec](https://github.com/summerwind/h2spec) against the example `hello_http2` application.
 
-  # React to a message recieved from the application.
-  def handle_info({:notify, notification}, state) do
-    {:send, "#{notification}\n", state}
-  end
-
-  # Response to the client closing the connection.
-  def handle_disconnect(_reason, _state) do
-    IO.puts("Socket connection closed")
-  end
-
-  # Define start_link to `MyApp` can be added to supervision tree.
-  def start_link(greeting, options \\ []) do
-    config = {:greeting, greeting}
-    app = {__MODULE__, config}
-    Ace.TCP.start_link(app, options)
-  end
-end
-```
-
-#### Quick start
-
-From the console, start mix.
-
-```shell
-iex -S mix
-```
-
-In the `iex` console, start a TCP endpoint.
-```elixir
-{:ok, pid} = MyApp.start_link("WELCOME", port: 8080)
-```
-
-#### Connect
-Use telnet to communicate with the server.
-
-```
-telnet localhost 8080
-```
-
-Wihin the telnet terminal.
-
-```
-# once connected
-WELCOME
-hi
-ECHO: hi
-```
-
-In the iex session.
-
-```
-send(server, {:notify, "BOO!"})
-```
-
-back in telnet terminal.
-
-```
-BOO!
-```
-
-#### Embedded endpoints
-
-It is not a good idea to start unsupervised processes.
-Ace endpoints should be added to you application supervision tree.
-
-```elixir
-@tcp_options [
-  port: 8080
-]
-
-@tls_options [
-  port: 8443,
-  certificate: "path/to/cert.pm",
-  certificate_key: "path/to/key.pm"
-]
-
-children = [
-  worker(Ace.TCP, [{MyApp, {:greeting, "WELCOME"}}, @tcp_options])
-  worker(Ace.TLS, [{MyApp, {:greeting, "WELCOME"}}, @tls_options])
-]
-Supervisor.start_link(children, opts)
-```
-
-See "01 Quote of the Day" for an example setup.
-
-### Ace 0.1 (TCP echo)
-
-The simplest TCP echo server that works.
-Checkout the source of [version 0.1.0](https://github.com/CrowdHailer/Ace/blob/0.1.0/server.ex).
-The [change log](https://github.com/CrowdHailer/Ace/blob/master/CHANGELOG.md) documents all enhancements to this prototype server.
-
-## Contributing
-
-Before opening a pull request, please open an issue first.
-
-Once we've decided how to move forward with a pull request:
-
-    $ git clone git@github.com:CrowdHailer/Ace.git
-    $ cd Ace
-    $ mix deps.get
-    $ mix test
-    $ mix dialyzer.plt
-    $ mix dialyzer
-
-Once you've made your additions, `mix test` passes and `mix dialyzer` reports no warnings, go ahead and open a PR!
+1. Start the example app.
+  ```
+  cd examples/hello_http2
+  iex -S mix
+  ```
+2. Run h2spec from docker
+  ```
+  sudo docker run --net="host" summerwind/h2spec --port 8443 -t -k -S
+  ```

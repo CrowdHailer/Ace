@@ -29,7 +29,7 @@ defmodule Ace.ServerTest do
     end
 
     def handle_packet(inbound, state) do
-      {:send, "ECHO: #{String.strip(inbound)}\n", state}
+      {:send, "ECHO: #{String.trim(inbound)}\n", state}
     end
 
     def handle_info(_info, state) do
@@ -72,7 +72,7 @@ defmodule Ace.ServerTest do
 
   def handle_connect(
     _info,
-    %{test: :"test writing data on connect", pid: pid})
+    %{test: :"test writing data on connect", pid: _pid})
   do
     {:send, "WELCOME", :no_state}
   end

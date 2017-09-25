@@ -4,16 +4,135 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.3](https://github.com/CrowdHailer/Ace/tree/0.14.3) - 2017-09-25
+
+## Fixed
+- Fixes made in `0.9.2` and `0.9.3` added to lastest
+
+## [0.14.2](https://github.com/CrowdHailer/Ace/tree/0.14.2) - 2017-09-19
+
+## Added
+- `Ace.HTTP2.ping/2` for checking a connection.
+
+## [0.14.1](https://github.com/CrowdHailer/Ace/tree/0.14.1) - 2017-09-08
+
+## Added
+- Client certificate options added to `Ace.HTTP2.Client.start_link`.
+
+## [0.14.0](https://github.com/CrowdHailer/Ace/tree/0.14.0) - 2017-08-31
+
+## Added
+- Send any Raxx message using `Ace.HTTP2.send/2`.
+
+## Changed
+- Start services with `{hander, config}` instead of `{worker, args}`
+- All use of `Ace.Request` has been replaced with `Raxx.Request`.
+- All use of `Ace.Response` has been replaced with `Raxx.Response`.
+
+## Removed
+- `Ace.Raxx.Handler` all applications are assumed to be raxx applications
+- `Ace.HTTP2.Client.send_request/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Client.send_data/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Client.send_trailers/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_request/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_data/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_promise/2` use `Ace.HTTP2.send/2`.
+- `Ace.HTTP2.Server.send_reset/2` server should exit instead.
+
+## [0.13.1](https://github.com/CrowdHailer/Ace/tree/0.13.1) - 2017-08-26
+
+## Added
+- Client can start with `:enable_push` option.
+- Client can start with `:max_concurrent_streams` option.
+- Server push is only forwarded to client if accepted by client.
+
+## Fixed
+- PushPromise frames do not exceed maximum frame size.
+- Continuation frames must follow on same stream.
+
+## [0.13.0](https://github.com/CrowdHailer/Ace/tree/0.13.0) - 2017-08-23
+
+## Changed
+- Request scheme is atom instead of string.
+- Request method is atom instead of string.
+
+## [0.12.1](https://github.com/CrowdHailer/Ace/tree/0.12.1) - 2017-08-22
+
+## Fixed
+- Raxx changed from being an optional dependency
+
 ## [0.9.3](https://github.com/CrowdHailer/Ace/tree/0.9.3) - 2017-08-20
 
 ## Changed
 - Discard down messages from unknown monitors.
 - Accept request with absolute URL's in request line.
 
+## [0.12.0](https://github.com/CrowdHailer/Ace/tree/0.12.0) - 2017-08-17
+
+## Added
+- Client can fetch an idle stream using `Ace.HTTP2.Client.stream/1`.
+- Forward stream resets with reason to worker processes.
+- `Ace.HTTP2.Client.send_request/2`.
+- `Ace.HTTP2.Client.send_trailers/2`.
+- `Ace.HTTP2.Server.send_response/2`.
+- `Ace.HTTP2.Server.send_reset/2`.
+- Inspect protocol implementation for each frame type.
+
+## Changed
+- Server receives request object not raw headers.
+- Server sends with response object not raw headers.
+- Client cannot start a stream with request.
+- `Ace.HTTP2.Stream.RaxxHandler` renamed to `Ace.Raxx.Handler`
+
 ## [0.9.2](https://github.com/CrowdHailer/Ace/tree/0.9.2) - 2017-08-4
 
 ## Fixed
 - Governor to correctly demonitor started servers.
+
+## [0.11.1](https://github.com/CrowdHailer/Ace/tree/0.11.1) - 2017-08-03
+
+## Added
+- Client for HTTP/2.0.
+
+## [0.11.0](https://github.com/CrowdHailer/Ace/tree/0.11.0) - 2017-08-01
+
+## Added
+- Casting for accepted values for each known setting.
+- Flow control for outbound data.
+
+## Changed
+- Creating priority frame requires exclusive value.
+
+## Fixed
+- Graceful handling of closed connections.
+- Correctly keep state for multiple connection frames.
+- Discard trailers sent to Raxx handler.
+- Frames of unknown type are discarded.
+- Ignores unknown flags for each frame type.
+- Ignores value of reserved bit in frame head.
+- Ensure only continuation frames can be sent after end_headers is false.
+- Return protocol error for invalid priority frame.
+- Return protocol error for invalid rst_stream frame.
+- Recognise reseting idle stream as a protocol error.
+- Decoding of acked ping frame.
+- Correct error codes for invalid window updates.
+- Handle unknown error code from client.
+- Limit pseudo-headers to those defined in RFC7540.
+- All pseudo-headers must be sent before other headers.
+- Header keys must be lowercase.
+- Pseudo header values cannot be empty.
+- Fix off by one error for maximum size of frames.
+- Return protocol error for header or data sent after a stream reset.
+- Forbid unknown frames to be present in a continuation stream.
+- Treat incorrect content length as protocol error.
+- Trailing header block must end the stream.
+- Protocol error if starting new stream with lower stream_id.
+- Disallow flow control windows from exceeding maximum value.
+
+## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
+
+## Added
+- HTTP/2.0 support via `Ace.HTTP2`
 
 ## [0.9.1](https://github.com/CrowdHailer/Ace/tree/0.9.1) - 2017-06-14
 
