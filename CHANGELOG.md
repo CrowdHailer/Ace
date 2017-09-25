@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.3](https://github.com/CrowdHailer/Ace/tree/0.14.3) - 2017-09-25
+
+## Fixed
+- Fixes made in `0.9.2` and `0.9.3` added to lastest
+
 ## [0.14.2](https://github.com/CrowdHailer/Ace/tree/0.14.2) - 2017-09-19
 
 ## Added
@@ -56,6 +61,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Fixed
 - Raxx changed from being an optional dependency
 
+## [0.9.3](https://github.com/CrowdHailer/Ace/tree/0.9.3) - 2017-08-20
+
+## Changed
+- Discard down messages from unknown monitors.
+- Accept request with absolute URL's in request line.
+
 ## [0.12.0](https://github.com/CrowdHailer/Ace/tree/0.12.0) - 2017-08-17
 
 ## Added
@@ -72,6 +83,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Server sends with response object not raw headers.
 - Client cannot start a stream with request.
 - `Ace.HTTP2.Stream.RaxxHandler` renamed to `Ace.Raxx.Handler`
+
+## [0.9.2](https://github.com/CrowdHailer/Ace/tree/0.9.2) - 2017-08-4
+
+## Fixed
+- Governor to correctly demonitor started servers.
 
 ## [0.11.1](https://github.com/CrowdHailer/Ace/tree/0.11.1) - 2017-08-03
 
@@ -121,7 +137,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.9.1](https://github.com/CrowdHailer/Ace/tree/0.9.1) - 2017-06-14
 
 ## Changed
-- Reduced noise from errors of prematurely closed connections
+- Reduced noise from errors of prematurely closed connections.
 
 ## [0.9.0](https://github.com/CrowdHailer/Ace/tree/0.9.0) - 2017-04-16
 

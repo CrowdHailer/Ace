@@ -92,7 +92,6 @@ defmodule Ace.HTTP2Test do
     :ok = Ace.HTTP2.send(client_stream, request)
 
     assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1_000
-    GenServer.reply(from, {[], state})
     response = Raxx.response(:no_content)
     |> Raxx.set_header("content-length", "0")
     GenServer.reply(from, response)

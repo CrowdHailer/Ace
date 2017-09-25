@@ -33,6 +33,27 @@ defmodule Ace.GovernorTest do
     assert_receive {:EXIT, ^governor, :abnormal}
   end
 
+  def handle_connect(_, :normal) do
+    exit(:normal)
+  end
+
+  test "governor will start new server that exits normally before establishing connection" do
+    Process.flag(:trap_exit, true)
+    {:ok, supervisor} = Server.Supervisor.start_link({__MODULE__, :normal})
+    {:ok, socket} = :gen_tcp.listen(0, @socket_options)
+    {:ok, port} = :inet.port(socket) # listen_socket
+    socket = {:tcp, socket}
+
+    {:ok, _governor} = Governor.start_link(socket, supervisor)
+    [{_name, server1, :worker, _args}] = Supervisor.which_children(supervisor)
+    ref = Process.monitor(server1)
+    {:ok, _client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
+    assert_receive {:DOWN, ^ref, :process, ^server1, :normal}
+    Process.sleep(1_000)
+    [{_name, server2, :worker, _args}] = Supervisor.which_children(supervisor)
+    assert server2 != server1
+  end
+
   test "governor will exit if server fails to establish connection" do
     Process.flag(:trap_exit, true)
     {:ok, supervisor} = Server.Supervisor.start_link({__MODULE__, :explode})
@@ -42,7 +63,7 @@ defmodule Ace.GovernorTest do
 
     {:ok, governor} = Governor.start_link(socket, supervisor)
     {:ok, _client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
-    assert_receive {:EXIT, ^governor, {:undef, _}}
+    assert_receive {:EXIT, ^governor, {:function_clause, _}}
   end
 
   test "governor will not exit if server exits after establishing connection" do
@@ -52,13 +73,16 @@ defmodule Ace.GovernorTest do
     socket = {:tcp, socket}
     {:ok, port} = Connection.port(socket)
 
-    {:ok, governor} = Governor.start_link(socket, supervisor)
+    {:ok, _governor} = Governor.start_link(socket, supervisor)
     [{_name, server, :worker, _args}] = Supervisor.which_children(supervisor)
     {:ok, client} = :gen_tcp.connect({127, 0, 0, 1}, port, [{:active, false}, :binary])
     :ok = :gen_tcp.send(client, "blob\n")
     assert {:ok, "ECHO: blob\n"} = :gen_tcp.recv(client, 0)
 
+    Process.sleep(500)
+
     Process.exit(server, :abnormal)
-    refute_receive {:EXIT, ^governor, :abnormal}
+    # Do not receive any message exit or monitor.
+    refute_receive _
   end
 end
