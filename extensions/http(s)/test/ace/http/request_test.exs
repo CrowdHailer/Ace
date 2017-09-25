@@ -19,7 +19,7 @@ defmodule Ace.HTTP.RequestTest do
   test "header information is added to request", %{port: port} do
     http1_request = """
     GET /foo/bar?var=1 HTTP/1.1
-    host: www.raxx.com
+    host: example.com:1234
     x-test: Value
 
     """
@@ -42,60 +42,153 @@ defmodule Ace.HTTP.RequestTest do
   test "Header keys in request are cast to lowercase", %{port: port} do
     http1_request = """
     GET /foo/bar?var=1 HTTP/1.1
-    Host: www.raxx.com
+    Host: example.com:1234
     X-test: Value
 
     """
 
-    # Should have exactly the same asserts as above
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.scheme == :http
+    assert request.authority == "example.com:1234"
+    assert request.method == :GET
+    assert request.mount == []
+    assert request.path == ["foo", "bar"]
+    assert request.query == %{"var" => "1"}
+    assert request.headers == [{"x-test", "Value"}]
+    assert request.body == false
   end
 
   test "handles request with split start-line ", %{port: port} do
-    http1_request = """
-    GET /foo/bar?var=1 HTTP/1.1
-    host: www.raxx.com
+    part_1 = "GET /foo/bar?var"
+    part_2 = """
+    =1 HTTP/1.1
+    host: example.com:1234
     x-test: Value
 
     """
 
-    # Send over socket in two chunks with break in first line
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, part_1)
+    :ok = Process.sleep(100)
+    :ok = :gen_tcp.send(socket, part_2)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.scheme == :http
+    assert request.authority == "example.com:1234"
+    assert request.method == :GET
+    assert request.mount == []
+    assert request.path == ["foo", "bar"]
+    assert request.query == %{"var" => "1"}
+    assert request.headers == [{"x-test", "Value"}]
+    assert request.body == false
   end
 
   test "handles request with split headers ", %{port: port} do
-    http1_request = """
+    part_1 = """
     GET /foo/bar?var=1 HTTP/1.1
-    host: www.raxx.com
+    host: example.com:1234
+    """
+    part_2 = """
     x-test: Value
 
     """
 
-    # Send over socket in two chunks with break in headers
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, part_1)
+    :ok = Process.sleep(100)
+    :ok = :gen_tcp.send(socket, part_2)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.scheme == :http
+    assert request.authority == "example.com:1234"
+    assert request.method == :GET
+    assert request.mount == []
+    assert request.path == ["foo", "bar"]
+    assert request.query == %{"var" => "1"}
+    assert request.headers == [{"x-test", "Value"}]
+    assert request.body == false
   end
 
-  test "request stream will end when length of content has been read" do
-    # Send request with content length
-    # assert_receive head with body true
-    # Send part of body
-    # assert_receive fragment with endstream false
-    # Send rest of body
-    # assert_receive fragment with endstream true
+  test "request with content-length 0 has no body", %{port: port} do
+    http1_request = """
+    GET /foo/bar?var=1 HTTP/1.1
+    host: example.com:1234
+    content-length: 0
+
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.body == false
   end
 
-  test "truncates body to required length ", %{port: port} do
-    # Send request with content length
-    # assert_receive head with body true
-    # Send part of body
-    # assert_receive fragment with endstream false
-    # Send rest of body and start of next request
-    # assert_receive fragment with only content and none of next request
+  test "request stream will end when all content has been read", %{port: port} do
+    http1_request = """
+    GET /foo/bar?var=1 HTTP/1.1
+    host: example.com:1234
+    content-length: 14
+
+    Hello, World!
+    And a bunch more content
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.body == true
+
+    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert "Hello, World!\n" == fragment
+
+    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
+    GenServer.reply(from, {[], state})
   end
 
-  @tag :skip
-  test "will handle two requests over the same connection", %{port: port} do
-    # DEBT leave pipelining as rarely used in by modern browsers
-  end
+  test "application will be invoked as content is received", %{port: port} do
+    request_head = """
+    GET /foo/bar?var=1 HTTP/1.1
+    host: example.com:1234
+    content-length: 14
 
-  @tag :skip
-  test "can send response even when request headers are sent, content-length is non-zero but entire body is not sent", %{port: port} do
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, request_head)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.body == true
+
+    :ok = :gen_tcp.send(socket, "Hello, ")
+    Process.sleep(100)
+    :ok = :gen_tcp.send(socket, "World!\n")
+
+    assert_receive {:"$gen_call", from, {:fragment, "Hello, ", state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert_receive {:"$gen_call", from, {:fragment, "World!\n", state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
+    GenServer.reply(from, {[], state})
   end
 end

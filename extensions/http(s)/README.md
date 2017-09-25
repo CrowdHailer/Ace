@@ -7,18 +7,13 @@
 
 ## Raxx interface
 
+**NOTE: release 0.5.0 uses streaming interface for Raxx,
+see [blog post](https://hexdocs.pm/tokumei/interface-design-for-http-streaming.html) for details**
+
 `Ace.HTTP` and `Ace.HTTPS` will serve [Raxx](https://hexdocs.pm/raxx) applications.
 For instruction on developing applications see the Raxx documentation:
 
 - https://hexdocs.pm/raxx
-
-## Request errors
-
-When a the data sent over a socket cannot be cast to a request in time then the applications `handle_error/1` callback will be invoked.
-
-TODO - list possible errors
-
-## Development
 
 ### Requirements
 
