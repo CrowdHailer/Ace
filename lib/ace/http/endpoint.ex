@@ -6,6 +6,17 @@ defmodule Ace.HTTP.Endpoint do
 
   defstruct [:worker_supervisor, :settings, :socket]
 
+  def child_spec({worker_supervisor, settings}) do
+    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [worker_supervisor, settings]},
+      type: :worker,
+      restart: :temporary,
+      shutdown: 500
+    }
+  end
+
   # server
   def start_link(worker_supervisor, opts \\ []) when is_pid(worker_supervisor) do
     # Options consist of all connection settings.
@@ -26,8 +37,8 @@ defmodule Ace.HTTP.Endpoint do
   # end
 
   def accept_connection(endpoint, listen_socket) do
-    # Genserver.become Ace.HTTP2.Endpoint
-    # OR Genserver.become Ace.HTTP1.Endpoint
+    # GenServer.become Ace.HTTP2.Endpoint
+    # OR GenServer.become Ace.HTTP1.Endpoint
     GenServer.call(endpoint, {:accept, listen_socket}, :infinity)
   end
 
@@ -62,6 +73,8 @@ defmodule Ace.HTTP.Endpoint do
             GenServer.reply(from, {:ok, self()})
             :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
         end
+      {:error, :closed} ->
+        {:reply, {:error, :closed}, state}
     end
     # {:reply, :ok, %{state | socket: socket}}
   end

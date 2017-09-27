@@ -2,29 +2,15 @@ defmodule Ace.HTTP1.ServerTest do
   use ExUnit.Case, async: true
 
   setup do
-    tls_options = [certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
 
-    socket_options = [
-      active: false,
-      mode: :binary,
-      packet: :raw,
-      reuseaddr: true,
-      alpn_preferred_protocols: ["h2"]
-    ]
-
-    {:ok, listen_socket} = :ssl.listen(0, socket_options ++ tls_options)
-    {:ok, {_, port}} = :ssl.sockname(listen_socket)
-
-    {:ok, worker_supervisor} = Supervisor.start_link(
-      [{Ace.HTTP.Worker, {Raxx.Forwarder, %{test: self()}}}],
-      [strategy: :simple_one_for_one]
+    {:ok, service} = Ace.HTTP.Service.start_link(
+      {Raxx.Forwarder, %{test: self()}},
+      port: 0,
+      certfile: Support.test_certfile(),
+      keyfile: Support.test_keyfile()
     )
 
-    {:ok, server} = Ace.HTTP.Endpoint.start_link(worker_supervisor)
-    # If we were just sending messages here that be better, wouldnt need to wrap this in a task
-    task = Task.async(fn() ->
-      Ace.HTTP.Endpoint.accept_connection(server, listen_socket)
-    end)
+    {:ok, port} = Ace.HTTP.Service.port(service)
     {:ok, %{port: port}}
   end
 
