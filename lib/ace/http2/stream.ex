@@ -100,7 +100,9 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
-  def send_data(stream, data, end_stream) do
+  # DEBT would be good to serialize data if not in correct format.
+  # However it might be good practise for ace to force users to be explicit in what is passed in.
+  def send_data(stream, data, end_stream) when is_binary(data) do
     case stream.status do
       {:open, _remote} ->
         queue = [%{data: data, end_stream: end_stream}]

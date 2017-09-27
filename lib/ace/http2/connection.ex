@@ -310,6 +310,7 @@ defmodule Ace.HTTP2.Connection do
     [Frame.Data.new(stream_id, block, end_stream)]
   end
   def pack_data(long_block, stream_id, end_stream, max_frame_size) do
+    # DEBT it would be efficient if there was a way to pass io_lists here.
     <<next_block::binary-size(max_frame_size), remaining_block::binary>> = long_block
     [Frame.Data.new(stream_id, next_block, false) | pack_data(remaining_block, stream_id, end_stream, max_frame_size)]
   end

@@ -1,6 +1,6 @@
 # Ace
 
-**HTTP server and client for Elixir**
+**HTTP web server and client, supports http1 and http2**
 
 - [Install from Hex](https://hex.pm/packages/ace)
 - [Documentation available on hexdoc](https://hexdocs.pm/ace)

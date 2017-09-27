@@ -4,10 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.4](https://github.com/CrowdHailer/Ace/tree/0.14.4) - 2017-09-27
+
+## Fixed
+- Stream will not queue data to send that is not a binary.
+
 ## [0.14.3](https://github.com/CrowdHailer/Ace/tree/0.14.3) - 2017-09-25
 
 ## Fixed
-- Fixes made in `0.9.2` and `0.9.3` added to lastest
+- Fixes made in `0.9.2` and `0.9.3` added to lastest.
 
 ## [0.14.2](https://github.com/CrowdHailer/Ace/tree/0.14.2) - 2017-09-19
 

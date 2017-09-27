@@ -3,7 +3,7 @@ defmodule Ace.Mixfile do
 
   def project do
     [app: :ace,
-    version: "0.14.3",
+    version: "0.14.4",
     elixir: "~> 1.4",
     build_embedded: Mix.env == :prod,
     start_permanent: Mix.env == :prod,
@@ -36,7 +36,7 @@ defmodule Ace.Mixfile do
 
   defp description do
     """
-    HTTP2 server and client
+    HTTP web server and client, supports http1 and http2
     """
   end
 
