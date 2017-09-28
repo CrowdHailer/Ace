@@ -137,8 +137,9 @@ defmodule Ace.HTTP1.Endpoint do
   end
   defp receive_data(packet, state = %{status: {{:body, remaining}, :response}}) when byte_size(packet) >= remaining do
     <<data::binary-size(remaining), rest::binary>> = packet
-    fragment = Raxx.fragment(data, true)
+    fragment = Raxx.fragment(data, false)
     send(state.worker, {state.channel, fragment})
+    send(state.worker, {state.channel, Raxx.trailer([])})
     new_status = {:complete, :response}
     new_state = %{state | status: new_status}
     {:ok, {rest, new_state}}

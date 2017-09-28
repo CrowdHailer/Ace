@@ -1,4 +1,5 @@
 defmodule Ace.HTTP.Worker do
+  @moduledoc false
   use GenServer
 
   def child_spec({module, config}) do
@@ -12,37 +13,21 @@ defmodule Ace.HTTP.Worker do
     }
   end
 
-  # Onward routing is an interesting challenge.
-  # HTTP requests do not have a sensible target.
-  # HTTP being stateless is a feature which means you are always calling a new worker
-  # A Raxx Server cannont exist unless it is in the context of a channel
-  # A HTTP server can start a worker before connection and map its channel reference to streams
-  # For 1.0 just start workers as needed.
   def start_link({module, config}, channel) do
     GenServer.start_link(__MODULE__, {module, config, nil}, [])
   end
 
   ## Server Callbacks
 
-  # conn = stream
   def handle_info({client, request = %Raxx.Request{}}, {mod, state, nil}) do
     mod.handle_headers(request, state)
     |> normalise_reaction({mod, state, client})
   end
   def handle_info({client, fragment = %Raxx.Fragment{}}, {mod, state, client}) do
+    false = fragment.end_stream
     mod.handle_fragment(fragment.data, state)
     |> normalise_reaction({mod, state, client})
-    |> case do
-      {:noreply, {mod, state, client}} ->
-        if fragment.end_stream do
-          mod.handle_trailers([], state)
-          |> normalise_reaction({mod, state, client})
-        else
-          {:noreply, {mod, state, client}}
-        end
-    end
   end
-  # DEBT I think that the worker should expect to explicitly receive a tail message
   def handle_info({client, trailer = %Raxx.Trailer{}}, {mod, state, client}) do
     mod.handle_trailers(trailer.headers, state)
     |> normalise_reaction({mod, state, client})

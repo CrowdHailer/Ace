@@ -1,11 +1,10 @@
-defmodule Ace.HTTP.Endpoint do
+defmodule Ace.HTTP.Server do
   @moduledoc false
   use GenServer
 
   defstruct [:worker_supervisor, :settings, :socket]
 
   def child_spec({worker_supervisor, settings}) do
-    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
     %{
       id: __MODULE__,
       start: {__MODULE__, :start_link, [worker_supervisor, settings]},
@@ -15,28 +14,16 @@ defmodule Ace.HTTP.Endpoint do
     }
   end
 
-  # server
-  def start_link(worker_supervisor, opts \\ []) when is_pid(worker_supervisor) do
-    # Options consist of all connection settings.
-    # can think of any required for HTTP1.1
+  def start_link(worker_supervisor, settings \\ []) when is_pid(worker_supervisor) do
     state = %__MODULE__{
       worker_supervisor: worker_supervisor,
-      settings: opts,
+      settings: settings,
       socket: nil
     }
     GenServer.start_link(__MODULE__, state)
   end
-  # client
-  # def start_link({module, config}, :connection, opts \\ []) do
-  #   if connection == :h2 do
-  #     GenServer.start_link(Ace.HTTP2.Endpoint, {module, config, nil}, opts)
-  #   else
-  #   end
-  # end
 
   def accept_connection(endpoint, listen_socket) do
-    # GenServer.become Ace.HTTP2.Endpoint
-    # OR GenServer.become Ace.HTTP1.Endpoint
     GenServer.call(endpoint, {:accept, listen_socket}, :infinity)
   end
 
@@ -72,7 +59,6 @@ defmodule Ace.HTTP.Endpoint do
       {:error, :closed} ->
         {:reply, {:error, :closed}, state}
     end
-    # {:reply, :ok, %{state | socket: socket}}
   end
 
   defp accept_connection(listen_socket, from, state = %{socket: nil}) do
@@ -89,21 +75,5 @@ defmodule Ace.HTTP.Endpoint do
       {:error, reason} ->
         {:error, reason}
     end
-  end
-
-  # Could rename worker channel
-  # except channel is to connection as worker is to endpoint
-  # Instead of below consider worker process as expendenble and minions to the connection/endpoint process
-  def parse() do
-    # Take HTTP part and make local
-  end
-
-  def serialize do
-
-  end
-
-  def lookup(part) do
-    # Find pid that should receive the message
-    # This can live in a worker if we consider isolating failures to be reason enough
   end
 end

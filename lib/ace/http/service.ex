@@ -48,6 +48,8 @@ defmodule Ace.HTTP.Service do
   ## SERVER CALLBACKS
 
   defmodule Governor do
+    @moduledoc false
+    
     def child_spec({endpoint_supervisor, listen_socket}) do
       # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
       %{
@@ -70,7 +72,7 @@ defmodule Ace.HTTP.Service do
 
     def handle_info(:start, state = {listen_socket, endpoint_supervisor}) do
       {:ok, server} = Supervisor.start_child(endpoint_supervisor, [])
-      Ace.HTTP.Endpoint.accept_connection(server, listen_socket)
+      Ace.HTTP.Server.accept_connection(server, listen_socket)
       handle_info(:start, state)
     end
   end
@@ -92,7 +94,7 @@ defmodule Ace.HTTP.Service do
       [strategy: :simple_one_for_one]
     )
     {:ok, endpoint_supervisor} = Supervisor.start_link(
-      [{Ace.HTTP.Endpoint, {worker_supervisor, options}}],
+      [{Ace.HTTP.Server, {worker_supervisor, options}}],
       [strategy: :simple_one_for_one]
     )
     {:ok, governor_supervisor} = Supervisor.start_link(
