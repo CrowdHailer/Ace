@@ -1,6 +1,5 @@
 defmodule Ace.HTTP1.Endpoint do
-  @moduledoc """
-  """
+  @moduledoc false
 
   @packet_timeout 10_000
   @max_line_length 2048
