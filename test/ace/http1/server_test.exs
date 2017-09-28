@@ -77,7 +77,7 @@ defmodule Ace.HTTP1.ServerTest do
     packet: :raw,
     active: false,
     alpn_advertised_protocols: ["http/1.1"]])
-    :ssl.negotiated_protocol(socket)
+    assert {:ok, "http/1.1"} = :ssl.negotiated_protocol(socket)
     :ok = :ssl.send(socket, http1_request)
 
     assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000

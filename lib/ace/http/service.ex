@@ -49,7 +49,7 @@ defmodule Ace.HTTP.Service do
 
   defmodule Governor do
     @moduledoc false
-    
+
     def child_spec({endpoint_supervisor, listen_socket}) do
       # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
       %{
