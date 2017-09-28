@@ -66,6 +66,33 @@ defmodule Ace.HTTP1.ServerTest do
     assert response == "HTTP/1.1 408 Request Timeout\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
 
+  test "can connect with alpn preferences", %{port: port} do
+    http1_request = """
+    GET /foo/bar?var=1 HTTP/1.1
+    host: example.com:1234
+    x-test: Value
+
+    """
+    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [mode: :binary,
+    packet: :raw,
+    active: false,
+    alpn_advertised_protocols: ["http/1.1"]])
+    :ssl.negotiated_protocol(socket)
+    :ok = :ssl.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    GenServer.reply(from, {[], state})
+
+    assert request.scheme == :https
+    assert request.authority == "example.com:1234"
+    assert request.method == :GET
+    assert request.mount == []
+    assert request.path == ["foo", "bar"]
+    assert request.query == %{"var" => "1"}
+    assert request.headers == [{"x-test", "Value"}]
+    assert request.body == false
+  end
+
   ## Request tests
 
   test "header information is added to request", %{port: port} do

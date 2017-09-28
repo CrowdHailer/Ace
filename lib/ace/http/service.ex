@@ -30,7 +30,9 @@ defmodule Ace.HTTP.Service do
     # A detailed explaination is given at http://hea-www.harvard.edu/~fine/Tech/addrinuse.html
     # This setting is a security vulnerability only on multi-user machines.
     # It is NOT a vulnerability from outside the machine.
-    {:reuseaddr, true}
+    {:reuseaddr, true},
+
+    {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
   def start_link(app = {module, config}, options) do

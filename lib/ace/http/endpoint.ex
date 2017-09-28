@@ -1,7 +1,5 @@
 defmodule Ace.HTTP.Endpoint do
-  @moduledoc """
-
-  """
+  @moduledoc false
   use GenServer
 
   defstruct [:worker_supervisor, :settings, :socket]
@@ -59,9 +57,7 @@ defmodule Ace.HTTP.Endpoint do
             # Can become a function later if that is needed
             # Match on preface or frame in handle info
             :gen_server.enter_loop(Ace.HTTP2.Endpoint, [], state)
-          {:ok, "http/1.1"} ->
-            :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
-          {:error, :protocol_not_negotiated} ->
+          response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
             state = %Ace.HTTP1.Endpoint{
               status: {:request, :response},
