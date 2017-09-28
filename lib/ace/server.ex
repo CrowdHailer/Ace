@@ -113,6 +113,7 @@ defmodule Ace.Server do
   end
   def handle_info({transport, _socket}, {mod, state, _connection}) when transport in [:tcp_closed, :ssl_closed] do
     # If the socket is closed call the `handle_disconnect` action.
+    # Just Exit
     mod.handle_disconnect(transport, state)
     |> case do
       :ok ->

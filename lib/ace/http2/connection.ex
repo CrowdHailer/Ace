@@ -41,7 +41,7 @@ defmodule Ace.HTTP2.Connection do
     case :ssl.connect(host, port, [
       mode: :binary,
       packet: :raw,
-      active: :false,
+      active: false,
       alpn_advertised_protocols: ["h2"]] ++ ssl_options
     ) do
       {:ok, connection} ->
