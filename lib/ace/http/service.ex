@@ -39,12 +39,23 @@ defmodule Ace.HTTP.Service do
     # {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
+  @doc """
+  Start a HTTP web application.
+  """
   def start_link(app = {module, config}, options) do
     # TODO test that module implements `Raxx.Server`
     service_options = Keyword.take(options, [:name])
     GenServer.start_link(__MODULE__, {app, options}, service_options)
   end
 
+  @doc """
+  Fetch the port number of a running service.
+
+  **OS assigned ports:**
+  If an endpoint is started with port number `0` it will be assigned a port by the underlying system.
+  This can be used to start many endpoints simultaneously.
+  It can be useful running parallel tests.
+  """
   def port(endpoint) do
     GenServer.call(endpoint, :port)
   end
@@ -81,6 +92,7 @@ defmodule Ace.HTTP.Service do
     end
   end
 
+  @doc false
   def init({app, options}) do
     port = case Keyword.fetch(options, :port) do
       {:ok, port} when is_integer(port) ->
@@ -124,6 +136,7 @@ defmodule Ace.HTTP.Service do
     {:ok, {listen_socket, worker_supervisor, endpoint_supervisor, governor_supervisor}}
   end
 
+  @doc false
   def handle_call(:port, _from, state = {{:tcp, listen_socket}, _, _, _}) do
     {:reply, :inet.port(listen_socket), state}
   end
