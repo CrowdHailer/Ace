@@ -42,32 +42,32 @@ defmodule Ace.HTTP1.Endpoint do
     :keep_alive
   ]
 
-  def handle_info({:ssl, _socket, packet}, {buffer, state}) do
+  def handle_info({transport, _socket, packet}, {buffer, state}) when transport in [:tcp, :ssl] do
     case receive_data(buffer <> packet, state) do
       {:ok, {rest, state}} ->
         case state.status do
           {:complete, _} ->
-            :ok = :ssl.setopts(state.socket, active: :once)
+            :ok = set_active(state.socket)
             {:noreply, {rest, state}}
           {_incomplete, _} ->
-            :ok = :ssl.setopts(state.socket, active: :once)
+            :ok = set_active(state.socket)
             {:noreply, {rest, state}, @packet_timeout}
         end
       {:error, {:invalid_start_line, _line}} ->
-        :ssl.send(state.socket, @bad_request)
+        send_packet(state.socket, @bad_request)
         {:stop, :normal, state}
       {:error, {:invalid_header_line, _line}} ->
-        :ssl.send(state.socket, @bad_request)
+        send_packet(state.socket, @bad_request)
         {:stop, :normal, state}
       {:error, :start_line_too_long} ->
-        :ssl.send(state.socket, @start_line_too_long)
+        send_packet(state.socket, @start_line_too_long)
         {:stop, :normal, state}
     end
   end
   def handle_info({channel = {:http1, _, _}, part}, {buffer, state}) do
     ^channel = state.channel
     {:ok, {outbound, state}} = send_part(part, state)
-    :ssl.send(state.socket, outbound)
+    send_packet(state.socket, outbound)
     case state.status do
       {_, :complete} ->
         {:stop, :normal, {buffer, state}}
@@ -76,8 +76,22 @@ defmodule Ace.HTTP1.Endpoint do
     end
   end
   def handle_info(:timeout, {_buffer, state}) do
-    :ssl.send(state.socket, @request_timeout)
+    send_packet(state.socket, @request_timeout)
     {:stop, :normal, state}
+  end
+
+  defp send_packet({:tcp, socket}, packet) do
+    :gen_tcp.send(socket, packet)
+  end
+  defp send_packet(socket, packet) do
+    :ssl.send(socket, packet)
+  end
+
+  defp set_active({:tcp, socket}) do
+    :inet.setopts(socket, active: :once)
+  end
+  defp set_active(socket) do
+    :ssl.setopts(socket, active: :once)
   end
 
   defp receive_data("", state) do

@@ -2,7 +2,6 @@ defmodule Ace.HTTP1.ServerTest do
   use ExUnit.Case, async: true
 
   setup do
-
     {:ok, service} = Ace.HTTP.Service.start_link(
       {Raxx.Forwarder, %{test: self()}},
       port: 0,
@@ -12,6 +11,37 @@ defmodule Ace.HTTP1.ServerTest do
 
     {:ok, port} = Ace.HTTP.Service.port(service)
     {:ok, %{port: port}}
+  end
+
+  ## Connection setup
+
+  test "server can handle cleartext exchange" do
+    {:ok, service} = Ace.HTTP.Service.start_link(
+      {Raxx.Forwarder, %{test: self()}},
+      port: 0,
+      cleartext: true
+    )
+
+    {:ok, port} = Ace.HTTP.Service.port(service)
+
+    http1_request = """
+    GET / HTTP/1.1
+    host: example.com
+
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1_000
+    response = Raxx.response(:ok)
+    |> Raxx.set_header("x-test", "Value")
+    |> Raxx.set_body("OK")
+    GenServer.reply(from, response)
+
+    assert_receive {:tcp, ^socket, response}, 1_000
+
+    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
   # Connection level errors

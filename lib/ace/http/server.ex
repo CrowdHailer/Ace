@@ -27,22 +27,33 @@ defmodule Ace.HTTP.Server do
     GenServer.call(endpoint, {:accept, listen_socket}, :infinity)
   end
 
+  def handle_call({:accept, {:tcp, listen_socket}}, from, state) do
+    case :gen_tcp.accept(listen_socket) do
+      {:ok, socket} ->
+        :ok = :inet.setopts(socket, active: :once)
+        state = %{state | socket: socket}
+        {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+        state = %Ace.HTTP1.Endpoint{
+          status: {:request, :response},
+          socket: {:tcp, socket},
+          # Worker and channel could live on same key, there is no channel without a worker
+          channel: {:http1, self(), 1},
+          worker: worker
+        }
+        GenServer.reply(from, {:ok, self()})
+        :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
+      {:error, reason} ->
+        {:stop, :normal, {:error, reason}, state}
+    end
+  end
   def handle_call({:accept, listen_socket}, from, state) do
-    case accept_connection(listen_socket, from, state) do
+    case ssl_accept_connection(listen_socket, from, state) do
       {:ok, socket} ->
         :ok = :ssl.setopts(socket, active: :once)
         state = %{state | socket: socket}
         case :ssl.negotiated_protocol(socket) do
+          # TODO atm only http/1.1 is an accepted protocol
           {:ok, "h2"} ->
-            # Change state to HTTP2
-            # Possible an install function possible
-            # Pull name from socket port
-            # Just GET ON with the rewrite that should happen
-            # %Ace.HTTP2.Endpoint{
-            #
-            # }
-            # Can become a function later if that is needed
-            # Match on preface or frame in handle info
             :gen_server.enter_loop(Ace.HTTP2.Endpoint, [], state)
           response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
@@ -61,7 +72,7 @@ defmodule Ace.HTTP.Server do
     end
   end
 
-  defp accept_connection(listen_socket, from, state = %{socket: nil}) do
+  defp ssl_accept_connection(listen_socket, from, state = %{socket: nil}) do
     case :ssl.transport_accept(listen_socket) do
       {:ok, socket} ->
         case :ssl.ssl_accept(socket) do

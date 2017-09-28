@@ -16,6 +16,8 @@ defmodule Ace.HTTP.Service do
   Raxx specifies early abortion of an exchange can be achieved by causing the worker process to exit.
   """
 
+  require Logger
+
   @socket_options [
     # Received packets are delivered as a binary("string").
     {:mode, :binary},
@@ -32,7 +34,9 @@ defmodule Ace.HTTP.Service do
     # It is NOT a vulnerability from outside the machine.
     {:reuseaddr, true},
 
-    {:alpn_preferred_protocols, ["h2", "http/1.1"]}
+    # TODO change for HTTP/2 support
+    {:alpn_preferred_protocols, ["http/1.1"]}
+    # {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
   def start_link(app = {module, config}, options) do
@@ -87,7 +91,17 @@ defmodule Ace.HTTP.Service do
 
     acceptors = Keyword.get(options, :acceptors, 100)
 
-    {:ok, listen_socket} = :ssl.listen(port, @socket_options ++ options)
+    listen_socket = case Keyword.fetch(options, :cleartext) do
+      {:ok, true} ->
+        tcp_options = Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr])
+        {:ok, listen_socket} = :gen_tcp.listen(port, tcp_options)
+        Logger.info("Serving cleartext using HTTP/1")
+        {:tcp, listen_socket}
+      _ ->
+        {:ok, listen_socket} = :ssl.listen(port, @socket_options ++ options)
+        Logger.info("Serving securly using HTTP/1, for HTTP/2 use Ace.HTTP2.Service directly")
+        listen_socket
+    end
 
     {:ok, worker_supervisor} = Supervisor.start_link(
       [{Ace.HTTP.Worker, app}],
@@ -110,6 +124,9 @@ defmodule Ace.HTTP.Service do
     {:ok, {listen_socket, worker_supervisor, endpoint_supervisor, governor_supervisor}}
   end
 
+  def handle_call(:port, _from, state = {{:tcp, listen_socket}, _, _, _}) do
+    {:reply, :inet.port(listen_socket), state}
+  end
   def handle_call(:port, _from, state = {listen_socket, _, _, _}) do
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:reply, {:ok, port}, state}
