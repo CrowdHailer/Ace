@@ -78,6 +78,12 @@ defmodule Ace.HTTP1.Endpoint do
     send_packet(state.socket, @request_timeout)
     {:stop, :normal, state}
   end
+  def handle_info({transport, _socket}, {buffer, state}) when transport in [:tcp_closed, :ssl_closed] do
+    # Sending an exit :normal signal will do nothing. maybe the correct behaviour is to send a message
+    # Or probably to have a two way monitor
+    Process.exit(state.worker, :shutdown)
+    {:stop, :normal, {buffer, state}}
+  end
 
   defp send_packet({:tcp, socket}, packet) do
     :gen_tcp.send(socket, packet)

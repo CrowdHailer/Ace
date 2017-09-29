@@ -44,6 +44,24 @@ defmodule Ace.HTTP1.ServerTest do
     assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
+  test "exits normal when client closes connection", %{port: port} do
+    http1_request = """
+    GET / HTTP/1.1
+    host: example.com
+
+    """
+
+    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    :ok = :ssl.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", _from = {worker, _ref}, {:headers, _request, _state}}, 1_000
+
+    monitor = Process.monitor(worker)
+    Process.sleep(500)
+    :ok = :ssl.close(socket)
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :shutdown}, 1_000
+  end
+
   # Connection level errors
   # TODO test with :gen_tcp
 
