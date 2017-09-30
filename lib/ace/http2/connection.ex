@@ -80,7 +80,7 @@ defmodule Ace.HTTP2.Connection do
   end
   def init({listen_socket, {mod, config}, settings}) do
     {:ok, stream_supervisor} = Supervisor.start_link(
-      [Supervisor.Spec.worker(Ace.HTTP2.Worker, [{mod, config}], restart: :transient)],
+      [Supervisor.Spec.worker(Ace.HTTP.Worker, [{mod, config}, :todo], restart: :transient)],
       strategy: :simple_one_for_one
     )
     {:ok, {:listening, listen_socket, stream_supervisor, settings}, 0}
@@ -217,6 +217,7 @@ defmodule Ace.HTTP2.Connection do
         Stream.send_response(stream, response)
       fragment = %Raxx.Fragment{} ->
         Stream.send_data(stream, fragment.data, fragment.end_stream)
+        # Stream.send_fragment(stream, fragment)
       %Raxx.Trailer{headers: trailers} ->
         Stream.send_trailers(stream, trailers)
     end
@@ -296,7 +297,7 @@ defmodule Ace.HTTP2.Connection do
         "" ->
           rest
         data ->
-          [%{data: data, end_stream: fragment.end_stream} | rest]
+          [%Raxx.Fragment{data: data, end_stream: fragment.end_stream} | rest]
       end
       max_frame_size = connection.remote_settings.max_frame_size
       frames = pack_data(to_send, stream.id, end_stream, max_frame_size)

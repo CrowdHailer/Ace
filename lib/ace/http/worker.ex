@@ -54,4 +54,13 @@ defmodule Ace.HTTP.Worker do
   defp send_client(ref = {:http1, pid, _count}, part) do
     send(pid, {ref, part})
   end
+  # TODO remove this special case
+  defp send_client(stream = {:stream, _, _, _}, {:promise, request}) do
+    request = request
+    |> Map.put(:scheme, request.scheme || :https)
+    Ace.HTTP2.send(stream, {:promise, request})
+  end
+  defp send_client(stream = {:stream, _, _, _}, part) do
+    Ace.HTTP2.send(stream, part)
+  end
 end
