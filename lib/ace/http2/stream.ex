@@ -61,7 +61,7 @@ defmodule Ace.HTTP2.Stream do
   def send_request(stream, request = %{body: body}) do
     case send_request(stream, %{request | body: true}) do
       {:ok, stream_with_headers} ->
-        send_data(stream_with_headers, body, true)
+        send_fragment(stream_with_headers, Raxx.fragment(body, true))
       {:error, reason} ->
         {:error, reason}
     end
@@ -94,7 +94,7 @@ defmodule Ace.HTTP2.Stream do
   def send_response(stream, response = %{body: body}) do
     case send_response(stream, %{response | body: true}) do
       {:ok, stream_with_headers} ->
-        send_data(stream_with_headers, body, true)
+        send_fragment(stream_with_headers, Raxx.fragment(body, true))
       {:error, reason} ->
         {:error, reason}
     end

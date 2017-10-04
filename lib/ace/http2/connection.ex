@@ -216,8 +216,7 @@ defmodule Ace.HTTP2.Connection do
       response = %Raxx.Response{} ->
         Stream.send_response(stream, response)
       fragment = %Raxx.Fragment{} ->
-        Stream.send_data(stream, fragment.data, fragment.end_stream)
-        # Stream.send_fragment(stream, fragment)
+        Stream.send_fragment(stream, fragment)
       %Raxx.Trailer{headers: trailers} ->
         Stream.send_trailers(stream, trailers)
     end
