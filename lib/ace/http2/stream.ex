@@ -103,11 +103,16 @@ defmodule Ace.HTTP2.Stream do
   # DEBT would be good to serialize data if not in correct format.
   # However it might be good practise for ace to force users to be explicit in what is passed in.
   def send_data(stream, data, end_stream) when is_binary(data) do
+    # TODO remove
+    IO.inspect("use send_fragment instead")
+    send_fragment(stream, %Raxx.Fragment{data: data, end_stream: end_stream})
+  end
+  def send_fragment(stream, fragment = %Raxx.Fragment{}) do
     case stream.status do
       {:open, _remote} ->
-        queue = [%{data: data, end_stream: end_stream}]
+        queue = [fragment]
         new_stream = %{stream | queue: stream.queue ++ queue}
-        final_stream = if end_stream do
+        final_stream = if fragment.end_stream do
           process_send_end_stream(new_stream)
         else
           new_stream
@@ -168,6 +173,7 @@ defmodule Ace.HTTP2.Stream do
         # check end_stream
         if end_stream do
           trailers = Ace.HTTP2.headers_to_trailers(headers)
+          trailers = %Raxx.Trailer{headers: trailers.headers}
           forward(stream, trailers)
           # Open but will be closed by handle process_received_end_stream
           {:ok, {local, :open}}
@@ -200,7 +206,7 @@ defmodule Ace.HTTP2.Stream do
   def receive_data(stream, data, end_stream) do
     new_status = case stream.status do
       {local, :open} ->
-        forward(stream, %{data: data, end_stream: end_stream})
+        forward(stream, %Raxx.Fragment{data: data, end_stream: end_stream})
         {local, :open}
       # errors
       {:idle, :idle} ->
@@ -254,6 +260,10 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  defp forward(stream, %Raxx.Fragment{data: data, end_stream: true}) do
+    forward(stream, %Raxx.Fragment{data: data, end_stream: false})
+    forward(stream, %Raxx.Trailer{headers: []})
+  end
   defp forward(stream, message) do
     stream_ref = {:stream, self(), stream.id, stream.monitor}
     # # Maybe send with same ref as used for reply

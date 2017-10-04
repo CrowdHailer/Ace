@@ -165,13 +165,11 @@ defmodule Ace.HTTP2.Client do
 
   defp read_body(stream, buffer \\ "") do
     receive do
-      {^stream, %{data: data, end_stream: end_stream}} ->
+      {^stream, %Raxx.Fragment{data: data, end_stream: end_stream}} ->
         buffer = buffer <> data
-        if end_stream do
-          {:ok, buffer}
-        else
-          read_body(stream, buffer)
-        end
+        read_body(stream, buffer)
+      {^stream, %Raxx.Trailer{}} ->
+        {:ok, buffer}
       after
         1_000 ->
           :timeout

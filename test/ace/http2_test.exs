@@ -118,7 +118,8 @@ defmodule Ace.HTTP2Test do
 
     assert_receive {^client_stream, %{data: body, end_stream: end_stream}}, 1_000
     assert body == "Here is all the bodies"
-    assert end_stream == true
+    assert end_stream == false
+    assert_receive {^client_stream, %Raxx.Trailer{headers: []}}, 1_000
     # TODO test process dies
   end
 
@@ -143,7 +144,7 @@ defmodule Ace.HTTP2Test do
 
     assert_receive {^client_stream, %{data: "For the client", end_stream: false}}, 1_000
 
-    assert_receive {^client_stream, %{headers: [{"x-foo", "bar"}], end_stream: true}}, 1_000
+    assert_receive {^client_stream, %Raxx.Trailer{headers: [{"x-foo", "bar"}]}}, 1_000
     # TODO test process dies
   end
 

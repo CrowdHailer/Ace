@@ -21,8 +21,8 @@ defmodule Ace.HTTP2.ClientTest do
     assert 200 == response.status
     assert true == response.body
 
-    assert_receive {^stream, %{data: data, end_stream: end_stream}}, 1_000
-    assert true == end_stream
+    assert_receive {^stream, %Raxx.Fragment{data: data, end_stream: false}}, 1_000
+    assert_receive {^stream, %Raxx.Trailer{headers: []}}, 1_000
 
     assert String.contains?(data, "Method: GET")
     assert String.contains?(data, "Protocol: HTTP/2.0")
