@@ -5,6 +5,7 @@ defmodule Ace.Governor.SupervisorTest do
 
   @socket_options mode: :binary, packet: :line, active: false, reuseaddr: true
 
+  @tag :skip
   test "drain connection pool" do
     {:ok, server_supervisor} = Server.Supervisor.start_link({EchoServer, :explode})
     {:ok, socket} = :gen_tcp.listen(0, @socket_options)

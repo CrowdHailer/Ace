@@ -5,6 +5,7 @@ defmodule Ace.GovernorTest do
 
   @socket_options mode: :binary, packet: :line, active: false, reuseaddr: true
 
+  @tag :skip
   test "governor starts new server when connection established" do
     {:ok, supervisor} = Server.Supervisor.start_link({EchoServer, :explode})
     {:ok, socket} = :gen_tcp.listen(0, @socket_options)
@@ -21,6 +22,7 @@ defmodule Ace.GovernorTest do
     assert [^first, {_name, _server, :worker, _args}] = Supervisor.which_children(supervisor)
   end
 
+  @tag :skip
   test "governor will exit if server exits before establishing connection" do
     Process.flag(:trap_exit, true)
     {:ok, supervisor} = Server.Supervisor.start_link({__MODULE__, :explode})
@@ -37,6 +39,7 @@ defmodule Ace.GovernorTest do
     exit(:normal)
   end
 
+  @tag :skip
   test "governor will start new server that exits normally before establishing connection" do
     Process.flag(:trap_exit, true)
     {:ok, supervisor} = Server.Supervisor.start_link({__MODULE__, :normal})
@@ -54,6 +57,7 @@ defmodule Ace.GovernorTest do
     assert server2 != server1
   end
 
+  @tag :skip
   test "governor will exit if server fails to establish connection" do
     Process.flag(:trap_exit, true)
     {:ok, supervisor} = Server.Supervisor.start_link({__MODULE__, :explode})
@@ -66,6 +70,7 @@ defmodule Ace.GovernorTest do
     assert_receive {:EXIT, ^governor, {:function_clause, _}}
   end
 
+  @tag :skip
   test "governor will not exit if server exits after establishing connection" do
     Process.flag(:trap_exit, true)
     {:ok, supervisor} = Server.Supervisor.start_link({EchoServer, :explode})

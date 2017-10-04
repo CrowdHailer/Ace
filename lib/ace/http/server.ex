@@ -14,6 +14,18 @@ defmodule Ace.HTTP.Server do
     }
   end
 
+  @doc """
+  Start a new `Ace.HTTP.Server` linked to the calling process.
+
+  A server is started with a reference to a supervisor that can start HTTP workers.
+
+  The server process is returned immediatly.
+  This is allow a supervisor to start several servers without waiting for connections.
+
+  To accept a connection `accept_connection/2` must be called.
+
+  A provisioned server will remain in an awaiting state until accept is called.
+  """
   def start_link(worker_supervisor, settings \\ []) when is_pid(worker_supervisor) do
     state = %__MODULE__{
       worker_supervisor: worker_supervisor,
@@ -23,6 +35,12 @@ defmodule Ace.HTTP.Server do
     GenServer.start_link(__MODULE__, state)
   end
 
+  @doc """
+  Manage a client connect with server
+
+  Accept can only be called once for each server.
+  After a connection has been closed the server will terminate.
+  """
   def accept_connection(endpoint, listen_socket) do
     GenServer.call(endpoint, {:accept, listen_socket}, :infinity)
   end

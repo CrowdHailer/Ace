@@ -40,9 +40,33 @@ defmodule Ace.HTTP.Service do
   ]
 
   @doc """
-  Start a HTTP web application.
+  Start a HTTP web service.
+
+  ## Options
+
+    * `:certificate` - **required**, the certificate.
+
+    * `:certificate_key` - **required**, the private key used to sign the certificate request.
+
+    * `:port` - the port to run the server on.
+      Defaults to port 8443.
+
+    * `:name` - name to register the spawned endpoint under.
+      The supported values are the same as GenServers.
+
+    * `:acceptors` - The number of servers simultaneously waiting for a connection.
+      Defaults to 50.
   """
   def start_link(app = {module, config}, options) do
+    # module.module_info[:attributes]
+    # |> Keyword.get(:behaviour, [])
+    # |> Enum.member?(Raxx.Server)
+    # case Ace.Application.is_implemented?(mod) do
+    #   true ->
+    #     :ok
+    #   false ->
+    #     Logger.warn("#{__MODULE__}: #{mod} does not implement Ace.Application behaviour.")
+    # end
     # TODO test that module implements `Raxx.Server`
     service_options = Keyword.take(options, [:name])
     GenServer.start_link(__MODULE__, {app, options}, service_options)
@@ -61,36 +85,6 @@ defmodule Ace.HTTP.Service do
   end
 
   ## SERVER CALLBACKS
-
-  defmodule Governor do
-    @moduledoc false
-
-    def child_spec({endpoint_supervisor, listen_socket}) do
-      # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
-      %{
-        id: __MODULE__,
-        start: {__MODULE__, :start_link, [endpoint_supervisor, listen_socket]},
-        type: :worker,
-        restart: :transient,
-        shutdown: 500
-      }
-    end
-
-    def start_link(endpoint_supervisor, listen_socket) do
-      GenServer.start_link(__MODULE__, {listen_socket, endpoint_supervisor})
-    end
-
-    def init(state = {listen_socket, endpoint_supervisor}) do
-      send(self(), :start)
-      {:ok, state}
-    end
-
-    def handle_info(:start, state = {listen_socket, endpoint_supervisor}) do
-      {:ok, server} = Supervisor.start_child(endpoint_supervisor, [])
-      Ace.HTTP.Server.accept_connection(server, listen_socket)
-      handle_info(:start, state)
-    end
-  end
 
   @doc false
   def init({app, options}) do
@@ -124,8 +118,7 @@ defmodule Ace.HTTP.Service do
       [strategy: :simple_one_for_one]
     )
     {:ok, governor_supervisor} = Supervisor.start_link(
-      # TODO move this to a proper module
-      [{Governor, {endpoint_supervisor, listen_socket}}],
+      [{Ace.Governor, {endpoint_supervisor, listen_socket}}],
       [strategy: :simple_one_for_one]
     )
 

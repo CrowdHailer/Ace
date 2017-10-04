@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+## Removed
+- `Ace.Application` undocumented internal module
+- `Ace.TCP` undocumented internal module
+- `Ace.TLS` undocumented internal module
+- `Ace.Server` undocumented internal module
+- `Ace.Server.Supervisor` undocumented internal module
+
 ## Fixed
 - HTTP/2 connection always sends a `Raxx.Trailer` to close a stream with data.
 

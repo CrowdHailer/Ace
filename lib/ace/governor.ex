@@ -2,52 +2,38 @@ defmodule Ace.Governor do
   @moduledoc """
   A governor maintains servers ready to handle clients.
 
-  A governor process starts a server under the supervision of a server supervisor.
+  A governor process starts with a reference to supervision that can start servers.
   It will then wait until the server has accepted a connection.
   Once it's server has accepted a connection the governor will start a new server.
   """
 
   use GenServer
-  alias Ace.Server
-  import Server, only: [connection_ack: 2]
 
-  @doc """
-  Start a new governor, linked to the calling process.
-  """
-  @spec start_link(:inet.socket, supervisor) :: {:ok, pid} when
-    supervisor: pid()
-  def start_link(listen_socket, server_supervisor) do
-    GenServer.start_link(__MODULE__, {listen_socket, server_supervisor})
+  def child_spec({endpoint_supervisor, listen_socket}) do
+    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [endpoint_supervisor, listen_socket]},
+      type: :worker,
+      restart: :transient,
+      shutdown: 500
+    }
   end
 
-  ## Server callbacks
-
-  def init({listen_socket, server_supervisor}) do
-    {:ok, server} = Supervisor.start_child(server_supervisor, [])
-    true = Process.link(server)
-    monitor_ref = Process.monitor(server) # Normal exit will stop governor
-    {:ok, ref} = Server.accept_connection(server, listen_socket)
-    {:ok, {listen_socket, server_supervisor, ref, server, monitor_ref}}
+  def start_link(endpoint_supervisor, listen_socket) when is_pid(endpoint_supervisor) do
+    GenServer.start_link(__MODULE__, {listen_socket, endpoint_supervisor})
   end
 
-  def handle_info({:DOWN, monitor_ref, :process, server, :normal}, {listen_socket, server_supervisor, _ref, server, monitor_ref}) do
-    {:ok, new_server} = Supervisor.start_child(server_supervisor, [])
-    true = Process.link(new_server)
-    monitor_ref = Process.monitor(new_server)
-    {:ok, new_ref} = Server.accept_connection(new_server, listen_socket)
-    {:noreply, {listen_socket, server_supervisor, new_ref, new_server, monitor_ref}}
-  end
-  def handle_info({:DOWN, _, :process, _, :normal}, state) do
-    {:noreply, state}
-  end
-  def handle_info(connection_ack(ref, _), {listen_socket, server_supervisor, ref, server, monitor_ref}) do
-    true = Process.unlink(server)
-    true = Process.demonitor(monitor_ref)
-    {:ok, new_server} = Supervisor.start_child(server_supervisor, [])
-    true = Process.link(new_server)
-    monitor_ref = Process.monitor(new_server)
-    {:ok, new_ref} = Server.accept_connection(new_server, listen_socket)
-    {:noreply, {listen_socket, server_supervisor, new_ref, new_server, monitor_ref}}
+  @impl GenServer
+  def init(state = {listen_socket, endpoint_supervisor}) do
+    send(self(), :start)
+    {:ok, state}
   end
 
+  @impl GenServer
+  def handle_info(:start, state = {listen_socket, endpoint_supervisor}) do
+    {:ok, server} = Supervisor.start_child(endpoint_supervisor, [])
+    Ace.HTTP.Server.accept_connection(server, listen_socket)
+    handle_info(:start, state)
+  end
 end

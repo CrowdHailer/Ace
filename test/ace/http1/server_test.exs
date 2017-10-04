@@ -13,6 +13,12 @@ defmodule Ace.HTTP1.ServerTest do
     {:ok, %{port: port}}
   end
 
+  # tests organised by
+  # - service test
+  # - connection tests
+  # - request tests
+  # - response tests
+
   ## Connection setup
 
   test "server can handle cleartext exchange" do
