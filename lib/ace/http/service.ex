@@ -16,6 +16,8 @@ defmodule Ace.HTTP.Service do
   Raxx specifies early abortion of an exchange can be achieved by causing the worker process to exit.
   """
 
+  use GenServer
+
   require Logger
 
   @socket_options [
@@ -86,7 +88,7 @@ defmodule Ace.HTTP.Service do
 
   ## SERVER CALLBACKS
 
-  @doc false
+  @impl GenServer
   def init({app, options}) do
     port = case Keyword.fetch(options, :port) do
       {:ok, port} when is_integer(port) ->
@@ -104,7 +106,8 @@ defmodule Ace.HTTP.Service do
         Logger.info("Serving cleartext using HTTP/1")
         {:tcp, listen_socket}
       _ ->
-        {:ok, listen_socket} = :ssl.listen(port, @socket_options ++ options)
+        ssl_options = Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr, :alpn_preferred_protocols, :cert, :key, :certfile, :keyfile])
+        {:ok, listen_socket} = :ssl.listen(port, ssl_options)
         Logger.info("Serving securly using HTTP/1, for HTTP/2 use Ace.HTTP2.Service directly")
         listen_socket
     end
@@ -129,7 +132,7 @@ defmodule Ace.HTTP.Service do
     {:ok, {listen_socket, worker_supervisor, endpoint_supervisor, governor_supervisor}}
   end
 
-  @doc false
+  @impl GenServer
   def handle_call(:port, _from, state = {{:tcp, listen_socket}, _, _, _}) do
     {:reply, :inet.port(listen_socket), state}
   end

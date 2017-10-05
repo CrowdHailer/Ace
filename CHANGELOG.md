@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.Server.Supervisor` undocumented internal module
 
 ## Fixed
+- Limit forwarded keys to known ssl options only.
 - HTTP/2 connection always sends a `Raxx.Trailer` to close a stream with data.
 
 ## [0.14.6](https://github.com/CrowdHailer/Ace/tree/0.14.6) - 2017-09-2
