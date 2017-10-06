@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## master
+## [0.14.7](https://github.com/CrowdHailer/Ace/tree/0.14.7) - 2017-10-4
 
 ## Removed
 - `Ace.Application` undocumented internal module
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Limit forwarded keys to known ssl options only.
 - HTTP/2 connection always sends a `Raxx.Trailer` to close a stream with data.
 
-## [0.14.6](https://github.com/CrowdHailer/Ace/tree/0.14.6) - 2017-09-2
+## [0.14.6](https://github.com/CrowdHailer/Ace/tree/0.14.6) - 2017-09-29
 
 ## Fixed
 - Workers exit normally when client connection is lost prematurely.
