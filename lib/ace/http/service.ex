@@ -58,6 +58,13 @@ defmodule Ace.HTTP.Service do
       Defaults to 50.
   """
   def start_link(app = {module, config}, options) do
+    case Ace.HTTP2.Settings.for_server(options) do
+      {:ok, _settings} ->
+        service_options = Keyword.take(options, [:name])
+        GenServer.start_link(__MODULE__, {app, options}, service_options)
+      {:error, reason} ->
+        {:error, reason}
+    end
     # module.module_info[:attributes]
     # |> Keyword.get(:behaviour, [])
     # |> Enum.member?(Raxx.Server)
@@ -68,8 +75,6 @@ defmodule Ace.HTTP.Service do
     #     Logger.warn("#{__MODULE__}: #{mod} does not implement Ace.Application behaviour.")
     # end
     # TODO test that module implements `Raxx.Server`
-    service_options = Keyword.take(options, [:name])
-    GenServer.start_link(__MODULE__, {app, options}, service_options)
   end
 
   @doc """
@@ -106,7 +111,8 @@ defmodule Ace.HTTP.Service do
       _ ->
         ssl_options = Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr, :alpn_preferred_protocols, :cert, :key, :certfile, :keyfile])
         {:ok, listen_socket} = :ssl.listen(port, ssl_options)
-        Logger.info("Serving securly using HTTP/1 and HTTP/2")
+        {:ok, {_, port}} = :ssl.sockname(listen_socket)
+        Logger.info("Serving securly using HTTP/1 and HTTP/2 on port #{port}")
         listen_socket
     end
 

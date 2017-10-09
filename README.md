@@ -15,7 +15,7 @@
 - [x] Secure data transport; TLS(SSL) support via ALPN
 - [x] Verified against [h2spec](https://github.com/summerwind/h2spec) (*143/146*)
 - [x] Simple request/response interactions; [Raxx](https://github.com/crowdhailer/raxx) interface
-- [ ] HTTP upgrade mechanisms
+- [x] HTTP upgrade mechanisms
 - [ ] HTTP/1.1 pipelining
 
 *View progress on the [roadmap](https://github.com/CrowdHailer/Ace/projects/1).*

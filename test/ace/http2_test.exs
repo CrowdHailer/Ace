@@ -12,8 +12,8 @@ defmodule Ace.HTTP2Test do
 
   setup do
     opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
-    assert_receive {:listening, ^service, port}
+    assert {:ok, service} = Ace.HTTP.Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    {:ok, port} = Ace.HTTP.Service.port(service)
     {:ok, %{port: port}}
   end
 

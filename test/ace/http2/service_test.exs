@@ -1,7 +1,7 @@
 defmodule Ace.HTTP2.ServiceTest do
   use ExUnit.Case
 
-  alias Ace.HTTP2.Service
+  alias Ace.HTTP.Service
 
   test "service can be started as named process" do
     opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), name: __MODULE__]

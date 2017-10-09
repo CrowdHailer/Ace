@@ -2,7 +2,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   use ExUnit.Case
 
   alias Ace.{
-    HTTP2.Service,
+    HTTP.Service,
     HTTP2.Frame
   }
 
@@ -15,17 +15,17 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   end
 
   test "max_frame_size setting is sent in handshake" do
-    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
+    opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
     assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
-    assert_receive {:listening, ^service, port}
+    {:ok, port} = Service.port(service)
     connection = Support.open_connection(port)
     assert {:ok, Frame.Settings.new(max_frame_size: 20_000)} == Support.read_next(connection)
   end
 
   test "sending oversized frame is a connection error of type frame_size_error" do
-    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
+    opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
     assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
-    assert_receive {:listening, ^service, port}
+    {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
 
@@ -47,9 +47,9 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   end
 
   test "Service uses default setting until client has acknowledged" do
-    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
+    opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile(), max_frame_size: 20_000]
     assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
-    assert_receive {:listening, ^service, port}
+    {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
 
@@ -73,9 +73,9 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
   # Call things waiting in stream blocks
   test "client cannot request max_frame_size less than default" do
-    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
+    opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
     assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
-    assert_receive {:listening, ^service, port}
+    {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
 
@@ -87,9 +87,9 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   end
 
   test "large response blocks from server are broken into multiple fragments" do
-    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
+    opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
     assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
-    assert_receive {:listening, ^service, port}
+    {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
 
