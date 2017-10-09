@@ -36,9 +36,7 @@ defmodule Ace.HTTP.Service do
     # It is NOT a vulnerability from outside the machine.
     {:reuseaddr, true},
 
-    # TODO change for HTTP/2 support
-    {:alpn_preferred_protocols, ["http/1.1"]}
-    # {:alpn_preferred_protocols, ["h2", "http/1.1"]}
+    {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
   @doc """
@@ -108,7 +106,7 @@ defmodule Ace.HTTP.Service do
       _ ->
         ssl_options = Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr, :alpn_preferred_protocols, :cert, :key, :certfile, :keyfile])
         {:ok, listen_socket} = :ssl.listen(port, ssl_options)
-        Logger.info("Serving securly using HTTP/1, for HTTP/2 use Ace.HTTP2.Service directly")
+        Logger.info("Serving securly using HTTP/1 and HTTP/2")
         listen_socket
     end
 

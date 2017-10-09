@@ -2,6 +2,8 @@ defmodule Ace.HTTP.Server do
   @moduledoc false
   use GenServer
 
+  require Logger
+
   defstruct [:worker_supervisor, :settings, :socket]
 
   def child_spec({worker_supervisor, settings}) do
@@ -70,9 +72,41 @@ defmodule Ace.HTTP.Server do
         :ok = :ssl.setopts(socket, active: :once)
         state = %{state | socket: socket}
         case :ssl.negotiated_protocol(socket) do
-          # TODO atm only http/1.1 is an accepted protocol
           {:ok, "h2"} ->
-            :gen_server.enter_loop(Ace.HTTP2.Endpoint, [], state)
+            {:ok, local_settings} = Ace.HTTP2.Settings.for_server(state.settings)
+
+            {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
+            initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_server_settings)
+
+            {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
+
+            # TODO max table size
+            decode_context = Ace.HPack.new_context(4_096)
+            encode_context = Ace.HPack.new_context(4_096)
+
+            {:ok, {_, port}} = :ssl.sockname(listen_socket)
+            initial_state = %Ace.HTTP2.Connection{
+              socket: socket,
+              outbound_window: 65_535,
+              local_settings: default_server_settings,
+              queued_settings: [local_settings],
+              remote_settings: default_client_settings,
+              # DEBT set when handshaking settings
+              decode_context: decode_context,
+              encode_context: encode_context,
+              streams: %{},
+              stream_supervisor: state.worker_supervisor,
+              next_local_stream_id: 2,
+              name: "SERVER (port: #{port})"
+            }
+
+            state = %{initial_state | next: :handshake}
+            Logger.debug("#{state.name} sent: #{inspect(initial_settings_frame)}")
+            :ok = :ssl.send(state.socket, Ace.HTTP2.Frame.serialize(initial_settings_frame))
+
+            :ssl.setopts(socket, [active: :once])
+
+            :gen_server.enter_loop(Ace.HTTP2.Connection, [], {:pending, initial_state})
           response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
             state = %Ace.HTTP1.Endpoint{

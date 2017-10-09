@@ -2,9 +2,13 @@ defmodule Ace.HTTP2SetupTest do
   use ExUnit.Case
 
   setup do
-    opts = [port: 0, owner: self(), certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Ace.HTTP2.Service.start_link({ForwardTo, [self()]}, opts)
-    assert_receive {:listening, ^service, port}
+    {:ok, service} = Ace.HTTP.Service.start_link(
+      {Raxx.Forwarder, %{test: self()}},
+      port: 0,
+      certfile: Support.test_certfile(),
+      keyfile: Support.test_keyfile()
+    )
+    {:ok, port} = Ace.HTTP.Service.port(service)
     connection = Support.open_connection(port)
     {:ok, %{client: connection}}
   end
