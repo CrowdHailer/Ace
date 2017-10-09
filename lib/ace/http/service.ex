@@ -44,9 +44,15 @@ defmodule Ace.HTTP.Service do
 
   ## Options
 
-    * `:certificate` - **required**, the certificate.
+    * `:cleartext` - Serve over TCP rather than TLS(ssl), will not support HTTP/2.
 
-    * `:certificate_key` - **required**, the private key used to sign the certificate request.
+    * `:certfile` - the certificate.
+
+    * `:keyfile` - the private key used to sign the certificate request.
+
+    * `:cert` - the certificate.
+
+    * `:key` - the private key used to sign the certificate request.
 
     * `:port` - the port to run the server on.
       Defaults to port 8443.

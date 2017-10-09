@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.8](https://github.com/CrowdHailer/Ace/tree/0.14.8) - 2017-10-9
+
+## Added
+- Upgrade via ALPN to HTTP/2 connections, when using `Ace.HTTP.Service`.
+
 ## [0.14.7](https://github.com/CrowdHailer/Ace/tree/0.14.7) - 2017-10-4
 
 ## Removed
