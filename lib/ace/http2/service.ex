@@ -97,9 +97,7 @@ defmodule Ace.HTTP2.Service do
   This can be seen in action in the test directories of this project.
   """
 
-  alias Ace.HTTP2.{
-    Settings
-  }
+  alias Ace.HTTP2.{Settings}
 
   use Supervisor
   require Logger
@@ -113,12 +111,16 @@ defmodule Ace.HTTP2.Service do
         port = Keyword.get(options, :port, 8443)
         # name = Keyword.get(options, :name, :"#{__MODULE__}:#{port}")
         connections = Keyword.get(options, :connections, 100)
-        {:ok, supervisor} = Supervisor.start_link(__MODULE__, {application, port, options, settings}, options)
+
+        {:ok, supervisor} =
+          Supervisor.start_link(__MODULE__, {application, port, options, settings}, options)
 
         for _index <- 1..connections do
           Supervisor.start_child(supervisor, [])
         end
+
         {:ok, supervisor}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -140,9 +142,11 @@ defmodule Ace.HTTP2.Service do
       reuseaddr: true,
       alpn_preferred_protocols: ["h2", "http/1.1"]
     ]
+
     {:ok, listen_socket} = :ssl.listen(port, tls_options)
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     Logger.debug("Listening to port: #{port}")
+
     if owner = Keyword.get(opts, :owner) do
       send(owner, {:listening, self(), port})
     end
@@ -150,6 +154,7 @@ defmodule Ace.HTTP2.Service do
     children = [
       worker(Ace.HTTP2.Server, [listen_socket, app, settings], restart: :transient)
     ]
-    supervise(children, strategy: :simple_one_for_one, max_restarts: 1_000)
+
+    supervise(children, strategy: :simple_one_for_one, max_restarts: 1000)
   end
 end

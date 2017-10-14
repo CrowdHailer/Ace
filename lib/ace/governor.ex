@@ -49,11 +49,13 @@ defmodule Ace.Governor do
     new_state = start_server(%{state | monitor: nil, server: nil})
     {:noreply, new_state}
   end
+
   def handle_info({:DOWN, monitor, :process, _server, :normal}, state = %{monitor: monitor}) do
     # Server process has terminated so existing references are irrelevant
     new_state = start_server(%{state | monitor: nil, server: nil})
     {:noreply, new_state}
   end
+
   # Messages from previously monitored process can arrive when the connection response quickly and exits normally.
   def handle_info({:DOWN, _, :process, _, :normal}, state) do
     {:noreply, state}
@@ -75,6 +77,4 @@ defmodule Ace.Governor do
 
     %{state | monitor: monitor, server: server}
   end
-
-
 end

@@ -34,6 +34,7 @@ defmodule Ace.HTTP.Server do
       settings: settings,
       socket: nil
     }
+
     GenServer.start_link(__MODULE__, state)
   end
 
@@ -53,6 +54,7 @@ defmodule Ace.HTTP.Server do
         :ok = :inet.setopts(socket, active: :once)
         state = %{state | socket: socket}
         {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+
         state = %Ace.HTTP1.Endpoint{
           status: {:request, :response},
           socket: {:tcp, socket},
@@ -60,34 +62,41 @@ defmodule Ace.HTTP.Server do
           channel: {:http1, self(), 1},
           worker: worker
         }
+
         GenServer.reply(from, {:ok, self()})
         :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
+
       {:error, reason} ->
         {:stop, :normal, {:error, reason}, state}
     end
   end
+
   def handle_call({:accept, listen_socket}, from, state) do
     case ssl_accept_connection(listen_socket, from, state) do
       {:ok, socket} ->
         :ok = :ssl.setopts(socket, active: :once)
         state = %{state | socket: socket}
+
         case :ssl.negotiated_protocol(socket) do
           {:ok, "h2"} ->
             {:ok, local_settings} = Ace.HTTP2.Settings.for_server(state.settings)
 
             {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
-            initial_settings_frame = Ace.HTTP2.Settings.update_frame(local_settings, default_server_settings)
+
+            initial_settings_frame =
+              Ace.HTTP2.Settings.update_frame(local_settings, default_server_settings)
 
             {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
 
             # TODO max table size
-            decode_context = Ace.HPack.new_context(4_096)
-            encode_context = Ace.HPack.new_context(4_096)
+            decode_context = Ace.HPack.new_context(4096)
+            encode_context = Ace.HPack.new_context(4096)
 
             {:ok, {_, port}} = :ssl.sockname(listen_socket)
+
             initial_state = %Ace.HTTP2.Connection{
               socket: socket,
-              outbound_window: 65_535,
+              outbound_window: 65535,
               local_settings: default_server_settings,
               queued_settings: [local_settings],
               remote_settings: default_client_settings,
@@ -104,11 +113,13 @@ defmodule Ace.HTTP.Server do
             Logger.debug("#{state.name} sent: #{inspect(initial_settings_frame)}")
             :ok = :ssl.send(state.socket, Ace.HTTP2.Frame.serialize(initial_settings_frame))
 
-            :ssl.setopts(socket, [active: :once])
+            :ssl.setopts(socket, active: :once)
 
             :gen_server.enter_loop(Ace.HTTP2.Connection, [], {:pending, initial_state})
+
           response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+
             state = %Ace.HTTP1.Endpoint{
               status: {:request, :response},
               socket: socket,
@@ -116,9 +127,11 @@ defmodule Ace.HTTP.Server do
               channel: {:http1, self(), 1},
               worker: worker
             }
+
             GenServer.reply(from, {:ok, self()})
             :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
         end
+
       {:error, :closed} ->
         {:reply, {:error, :closed}, state}
     end
@@ -130,11 +143,14 @@ defmodule Ace.HTTP.Server do
         case :ssl.ssl_accept(socket) do
           :ok ->
             {:ok, socket}
+
           {:error, :closed} ->
             {:error, :econnaborted}
+
           {:error, reason} ->
             {:error, reason}
         end
+
       {:error, reason} ->
         {:error, reason}
     end

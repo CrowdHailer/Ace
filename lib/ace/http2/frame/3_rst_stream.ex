@@ -1,9 +1,7 @@
 defmodule Ace.HTTP2.Frame.RstStream do
   @moduledoc false
 
-  alias Ace.HTTP2.{
-    Errors
-  }
+  alias Ace.HTTP2.{Errors}
 
   @enforce_keys [:stream_id, :error]
   defstruct @enforce_keys
@@ -16,9 +14,11 @@ defmodule Ace.HTTP2.Frame.RstStream do
     error = Errors.decode(error_code)
     {:ok, new(stream_id, error)}
   end
+
   def decode({3, _flags, 0, <<_::32>>}) do
     {:error, {:protocol_error, "RstStream frame not valid on stream 0"}}
   end
+
   def decode({3, _flags, _stream_id, _payload}) do
     {:error, {:protocol_error, "RstStream frame invalid payload length"}}
   end

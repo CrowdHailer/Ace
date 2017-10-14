@@ -2,12 +2,13 @@ defmodule Ace.HTTP1.ServerTest do
   use ExUnit.Case, async: true
 
   setup do
-    {:ok, service} = Ace.HTTP.Service.start_link(
-      {Raxx.Forwarder, %{test: self()}},
-      port: 0,
-      certfile: Support.test_certfile(),
-      keyfile: Support.test_keyfile()
-    )
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {Raxx.Forwarder, %{test: self()}},
+        port: 0,
+        certfile: Support.test_certfile(),
+        keyfile: Support.test_keyfile()
+      )
 
     {:ok, port} = Ace.HTTP.Service.port(service)
     {:ok, %{port: port}}
@@ -22,11 +23,12 @@ defmodule Ace.HTTP1.ServerTest do
   ## Connection setup
 
   test "server can handle cleartext exchange" do
-    {:ok, service} = Ace.HTTP.Service.start_link(
-      {Raxx.Forwarder, %{test: self()}},
-      port: 0,
-      cleartext: true
-    )
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {Raxx.Forwarder, %{test: self()}},
+        port: 0,
+        cleartext: true
+      )
 
     {:ok, port} = Ace.HTTP.Service.port(service)
 
@@ -36,18 +38,22 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :gen_tcp.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :gen_tcp.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1_000
-    response = Raxx.response(:ok)
-    |> Raxx.set_header("x-test", "Value")
-    |> Raxx.set_body("OK")
+    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_header("x-test", "Value")
+      |> Raxx.set_body("OK")
+
     GenServer.reply(from, response)
 
-    assert_receive {:tcp, ^socket, response}, 1_000
+    assert_receive {:tcp, ^socket, response}, 1000
 
-    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+    assert response ==
+             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
   test "exits normal when client closes connection", %{port: port} do
@@ -57,56 +63,64 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", _from = {worker, _ref}, {:headers, _request, _state}}, 1_000
+    assert_receive {:"$gen_call", _from = {worker, _ref}, {:headers, _request, _state}}, 1000
 
     monitor = Process.monitor(worker)
     Process.sleep(500)
     :ok = :ssl.close(socket)
-    assert_receive {:DOWN, ^monitor, :process, ^worker, :shutdown}, 1_000
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :shutdown}, 1000
   end
 
   # Connection level errors
   # TODO test with :gen_tcp
 
   test "400 response for invalid start_line", %{port: port} do
-    {:ok, connection} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ssl.send(connection, "rubbish\n")
 
-    assert_receive {:ssl, ^connection, response}, 1_000
-    assert response == "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert_receive {:ssl, ^connection, response}, 1000
 
-    assert_receive {:ssl_closed, ^connection}, 1_000
+    assert response ==
+             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+
+    assert_receive {:ssl_closed, ^connection}, 1000
   end
 
   test "400 response for invalid headers", %{port: port} do
-    {:ok, connection} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ssl.send(connection, "GET / HTTP/1.1\r\na \r\n::\r\n")
 
-    assert_receive {:ssl, ^connection, response}, 1_000
-    assert response == "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert_receive {:ssl, ^connection, response}, 1000
 
-    assert_receive {:ssl_closed, ^connection}, 1_000
+    assert response ==
+             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+
+    assert_receive {:ssl_closed, ^connection}, 1000
   end
 
   test "too long url ", %{port: port} do
-    path = (for _i <- 1..3000, do: "a")
-    |> Enum.join("")
+    path =
+      for(_i <- 1..3000, do: "a")
+      |> Enum.join("")
 
     request = """
     GET /#{path} HTTP/1.1
     Host: www.raxx.com
 
     """
-    {:ok, connection} = :ssl.connect({127,0,0,1}, port, [:binary])
+
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ssl.send(connection, request)
 
-    assert_receive {:ssl, ^connection, response}, 1_000
-    assert response == "HTTP/1.1 414 URI Too Long\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert_receive {:ssl, ^connection, response}, 1000
 
-    assert_receive {:ssl_closed, ^connection}, 1_000
+    assert response ==
+             "HTTP/1.1 414 URI Too Long\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+
+    assert_receive {:ssl_closed, ^connection}, 1000
   end
 
   test "Client too slow to deliver request head", %{port: port} do
@@ -114,10 +128,13 @@ defmodule Ace.HTTP1.ServerTest do
     GET / HTTP/1.1
     Host: www.raxx.com
     """
-    {:ok, connection} = :ssl.connect({127,0,0,1}, port, [:binary])
+
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ssl.send(connection, unfinished_head)
-    assert_receive {:ssl, ^connection, response}, 15_000
-    assert response == "HTTP/1.1 408 Request Timeout\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert_receive {:ssl, ^connection, response}, 15000
+
+    assert response ==
+             "HTTP/1.1 408 Request Timeout\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
 
   test "can connect with alpn preferences", %{port: port} do
@@ -127,14 +144,21 @@ defmodule Ace.HTTP1.ServerTest do
     x-test: Value
 
     """
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [mode: :binary,
-    packet: :raw,
-    active: false,
-    alpn_advertised_protocols: ["http/1.1"]])
+
+    {:ok, socket} =
+      :ssl.connect(
+        {127, 0, 0, 1},
+        port,
+        mode: :binary,
+        packet: :raw,
+        active: false,
+        alpn_advertised_protocols: ["http/1.1"]
+      )
+
     assert {:ok, "http/1.1"} = :ssl.negotiated_protocol(socket)
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.scheme == :https
@@ -156,10 +180,11 @@ defmodule Ace.HTTP1.ServerTest do
     x-test: Value
 
     """
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.scheme == :https
@@ -180,10 +205,10 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.scheme == :https
@@ -198,6 +223,7 @@ defmodule Ace.HTTP1.ServerTest do
 
   test "handles request with split start-line ", %{port: port} do
     part_1 = "GET /foo/bar?var"
+
     part_2 = """
     =1 HTTP/1.1
     host: example.com:1234
@@ -205,12 +231,12 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, part_1)
     :ok = Process.sleep(100)
     :ok = :ssl.send(socket, part_2)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.scheme == :https
@@ -228,17 +254,18 @@ defmodule Ace.HTTP1.ServerTest do
     GET /foo/bar?var=1 HTTP/1.1
     host: example.com:1234
     """
+
     part_2 = """
     x-test: Value
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, part_1)
     :ok = Process.sleep(100)
     :ok = :ssl.send(socket, part_2)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.scheme == :https
@@ -259,10 +286,10 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.body == false
@@ -278,20 +305,20 @@ defmodule Ace.HTTP1.ServerTest do
     And a bunch more content
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.body == true
 
-    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert "Hello, World!\n" == fragment
 
-    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
+    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1000
     GenServer.reply(from, {[], state})
   end
 
@@ -303,10 +330,10 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, request_head)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     GenServer.reply(from, {[], state})
 
     assert request.body == true
@@ -315,13 +342,13 @@ defmodule Ace.HTTP1.ServerTest do
     Process.sleep(100)
     :ok = :ssl.send(socket, "World!\n")
 
-    assert_receive {:"$gen_call", from, {:fragment, "Hello, ", state}}, 1_000
+    assert_receive {:"$gen_call", from, {:fragment, "Hello, ", state}}, 1000
     GenServer.reply(from, {[], state})
 
-    assert_receive {:"$gen_call", from, {:fragment, "World!\n", state}}, 1_000
+    assert_receive {:"$gen_call", from, {:fragment, "World!\n", state}}, 1000
     GenServer.reply(from, {[], state})
 
-    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1_000
+    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1000
     GenServer.reply(from, {[], state})
   end
 
@@ -334,19 +361,23 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1_000
-    response = Raxx.response(:ok)
-    |> Raxx.set_header("content-length", "2")
-    |> Raxx.set_header("x-test", "Value")
-    |> Raxx.set_body("OK")
+    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_header("content-length", "2")
+      |> Raxx.set_header("x-test", "Value")
+      |> Raxx.set_body("OK")
+
     GenServer.reply(from, response)
 
-    assert_receive {:ssl, ^socket, response}, 1_000
+    assert_receive {:ssl, ^socket, response}, 1000
 
-    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+    assert response ==
+             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
   test "server can stream response with a predetermined size", %{port: port} do
@@ -356,27 +387,31 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, _request, state}}, 1_000
-    response = Raxx.response(:ok)
-    |> Raxx.set_header("content-length", "15")
-    |> Raxx.set_header("x-test", "Value")
-    |> Raxx.set_body(true)
+    assert_receive {:"$gen_call", from, {:headers, _request, state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_header("content-length", "15")
+      |> Raxx.set_header("x-test", "Value")
+      |> Raxx.set_body(true)
+
     GenServer.reply(from, {[response], state})
 
-    assert_receive {:ssl, ^socket, response_head}, 1_000
+    assert_receive {:ssl, ^socket, response_head}, 1000
 
-    assert response_head == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 15\r\nx-test: Value\r\n\r\n"
+    assert response_head ==
+             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 15\r\nx-test: Value\r\n\r\n"
 
     {server, _ref} = from
     send(server, {[Raxx.fragment("Hello, ")], state})
 
-    assert_receive {:ssl, ^socket, "Hello, "}, 1_000
+    assert_receive {:ssl, ^socket, "Hello, "}, 1000
     send(server, {[Raxx.fragment("World!\r\n", true)], state})
 
-    assert_receive {:ssl, ^socket, "World!\r\n"}, 1_000
+    assert_receive {:ssl, ^socket, "World!\r\n"}, 1000
   end
 
   test "content-length will be added for a complete response", %{port: port} do
@@ -386,18 +421,22 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1_000
-    response = Raxx.response(:ok)
-    |> Raxx.set_header("x-test", "Value")
-    |> Raxx.set_body("OK")
+    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_header("x-test", "Value")
+      |> Raxx.set_body("OK")
+
     GenServer.reply(from, response)
 
-    assert_receive {:ssl, ^socket, response}, 1_000
+    assert_receive {:ssl, ^socket, response}, 1000
 
-    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+    assert response ==
+             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
   test "content-length will be added for a response with no body", %{port: port} do
@@ -407,18 +446,22 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1_000
-    response = Raxx.response(:ok)
-    |> Raxx.set_header("x-test", "Value")
-    |> Raxx.set_body(false)
+    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_header("x-test", "Value")
+      |> Raxx.set_body(false)
+
     GenServer.reply(from, response)
 
-    assert_receive {:ssl, ^socket, response}, 1_000
+    assert_receive {:ssl, ^socket, response}, 1000
 
-    assert response == "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 0\r\nx-test: Value\r\n\r\n"
+    assert response ==
+             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 0\r\nx-test: Value\r\n\r\n"
   end
 
   ## Connection test
@@ -431,17 +474,18 @@ defmodule Ace.HTTP1.ServerTest do
     x-test: Value
 
     """
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, _state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, _state}}, 1000
     GenServer.reply(from, Raxx.response(:no_content))
 
     assert request.headers == [{"x-test", "Value"}]
-    assert_receive {:ssl, ^socket, response}, 1_000
+    assert_receive {:ssl, ^socket, response}, 1000
     assert response == "HTTP/1.1 204 No Content\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
 
-    assert_receive {:ssl_closed, ^socket}, 1_000
+    assert_receive {:ssl_closed, ^socket}, 1000
   end
 
   # DEBT implement HTTP/1.1 pipelining
@@ -453,17 +497,18 @@ defmodule Ace.HTTP1.ServerTest do
     x-test: Value
 
     """
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, request, _state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, _state}}, 1000
     GenServer.reply(from, Raxx.response(:no_content))
 
     assert request.headers == [{"x-test", "Value"}]
-    assert_receive {:ssl, ^socket, response}, 1_000
+    assert_receive {:ssl, ^socket, response}, 1000
     assert response == "HTTP/1.1 204 No Content\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
 
-    assert_receive {:ssl_closed, ^socket}, 1_000
+    assert_receive {:ssl_closed, ^socket}, 1000
   end
 
   ## Chunked transfer_encoding
@@ -477,10 +522,10 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, request_head)
 
-    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
     state = Map.put(state, :count, 1)
     GenServer.reply(from, {[], state})
 
@@ -490,7 +535,7 @@ defmodule Ace.HTTP1.ServerTest do
     Process.sleep(100)
     :ok = :ssl.send(socket, " World!\r\nD")
 
-    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1000
     assert 1 == state.count
     assert fragment == "Hello, World!"
 
@@ -499,7 +544,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     :ok = :ssl.send(socket, "\r\nHello, World!\r\n")
 
-    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1_000
+    assert_receive {:"$gen_call", from, {:fragment, fragment, state}}, 1000
     assert 2 == state.count
     assert fragment == "Hello, World!"
 
@@ -507,18 +552,16 @@ defmodule Ace.HTTP1.ServerTest do
     GenServer.reply(from, {[], state})
 
     :ok = :ssl.send(socket, "0\r\n\r\n")
-    assert_receive {:"$gen_call", _from, {:trailers, [], state}}, 1_000
+    assert_receive {:"$gen_call", _from, {:trailers, [], state}}, 1000
     assert 3 == state.count
   end
 
   @tag :skip
   test "cannot receive content-length with transfer-encoding" do
-
   end
 
   @tag :skip
   test "cannot handle any other transfer-encoding" do
-
   end
 
   test "response without content length will be sent chunked", %{port: port} do
@@ -528,33 +571,38 @@ defmodule Ace.HTTP1.ServerTest do
 
     """
 
-    {:ok, socket} = :ssl.connect({127,0,0,1}, port, [:binary])
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from, {:headers, _request, state}}, 1_000
-    response = Raxx.response(:ok)
-    |> Raxx.set_header("x-test", "Value")
-    |> Raxx.set_body(true)
+    assert_receive {:"$gen_call", from, {:headers, _request, state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_header("x-test", "Value")
+      |> Raxx.set_body(true)
+
     state = Map.put(state, :count, 1)
 
     GenServer.reply(from, {[response], state})
 
-    assert_receive {:ssl, ^socket, headers}, 1_000
-    assert headers == "HTTP/1.1 200 OK\r\nconnection: close\r\ntransfer-encoding: chunked\r\nx-test: Value\r\n\r\n"
+    assert_receive {:ssl, ^socket, headers}, 1000
+
+    assert headers ==
+             "HTTP/1.1 200 OK\r\nconnection: close\r\ntransfer-encoding: chunked\r\nx-test: Value\r\n\r\n"
 
     {server, _ref} = from
     send(server, {[Raxx.fragment("Hello, ")], state})
 
-    assert_receive {:ssl, ^socket, part}, 1_000
+    assert_receive {:ssl, ^socket, part}, 1000
     assert part == "7\r\nHello, \r\n"
 
     send(server, {[Raxx.fragment("World!", true)], state})
 
-    assert_receive {:ssl, ^socket, part}, 1_000
+    assert_receive {:ssl, ^socket, part}, 1000
     assert part == "6\r\nWorld!\r\n0\r\n\r\n"
 
-    assert_receive {:ssl_closed, ^socket}, 1_000
+    assert_receive {:ssl_closed, ^socket}, 1000
   end
-  # DEBT try sending empty fragment with end_stream false? should not end stream
 
+  # DEBT try sending empty fragment with end_stream false? should not end stream
 end

@@ -12,12 +12,15 @@ defmodule Ace.HTTP2.Frame.Continuation do
   end
 
   def decode({9, <<_::5, end_headers_flag::1, _::2>>, stream_id, hbf}) do
-    end_headers = case end_headers_flag do
-      1 ->
-        true
-      0 ->
-        false
-    end
+    end_headers =
+      case end_headers_flag do
+        1 ->
+          true
+
+        0 ->
+          false
+      end
+
     {:ok, new(stream_id, hbf, end_headers)}
   end
 
@@ -26,7 +29,15 @@ defmodule Ace.HTTP2.Frame.Continuation do
 
     length = :erlang.iolist_size(frame.header_block_fragment)
     flags = <<0::5, end_headers_flag::1, 0::1, 0::1>>
-    <<length::24, 9::8, flags::binary, 0::1, frame.stream_id::31, frame.header_block_fragment::binary>>
+
+    <<
+      length::24,
+      9::8,
+      flags::binary,
+      0::1,
+      frame.stream_id::31,
+      frame.header_block_fragment::binary
+    >>
   end
 
   defimpl Inspect, for: Ace.HTTP2.Frame.Continuation do

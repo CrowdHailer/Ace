@@ -35,7 +35,6 @@ defmodule Ace.HTTP.Service do
     # This setting is a security vulnerability only on multi-user machines.
     # It is NOT a vulnerability from outside the machine.
     {:reuseaddr, true},
-
     {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
@@ -68,9 +67,11 @@ defmodule Ace.HTTP.Service do
       {:ok, _settings} ->
         service_options = Keyword.take(options, [:name])
         GenServer.start_link(__MODULE__, {app, options}, service_options)
+
       {:error, reason} ->
         {:error, reason}
     end
+
     # module.module_info[:attributes]
     # |> Keyword.get(:behaviour, [])
     # |> Enum.member?(Raxx.Server)
@@ -99,41 +100,61 @@ defmodule Ace.HTTP.Service do
 
   @impl GenServer
   def init({app, options}) do
-    port = case Keyword.fetch(options, :port) do
-      {:ok, port} when is_integer(port) ->
-        port
-      _ ->
-        raise "#{__MODULE__} must be started with a port to listen too."
-    end
+    port =
+      case Keyword.fetch(options, :port) do
+        {:ok, port} when is_integer(port) ->
+          port
+
+        _ ->
+          raise "#{__MODULE__} must be started with a port to listen too."
+      end
 
     acceptors = Keyword.get(options, :acceptors, 100)
 
-    listen_socket = case Keyword.fetch(options, :cleartext) do
-      {:ok, true} ->
-        tcp_options = Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr])
-        {:ok, listen_socket} = :gen_tcp.listen(port, tcp_options)
-        Logger.info("Serving cleartext using HTTP/1")
-        {:tcp, listen_socket}
-      _ ->
-        ssl_options = Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr, :alpn_preferred_protocols, :cert, :key, :certfile, :keyfile])
-        {:ok, listen_socket} = :ssl.listen(port, ssl_options)
-        {:ok, {_, port}} = :ssl.sockname(listen_socket)
-        Logger.info("Serving securly using HTTP/1 and HTTP/2 on port #{port}")
-        listen_socket
-    end
+    listen_socket =
+      case Keyword.fetch(options, :cleartext) do
+        {:ok, true} ->
+          tcp_options =
+            Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr])
 
-    {:ok, worker_supervisor} = Supervisor.start_link(
-      [{Ace.HTTP.Worker, app}],
-      [strategy: :simple_one_for_one]
-    )
-    {:ok, endpoint_supervisor} = Supervisor.start_link(
-      [{Ace.HTTP.Server, {worker_supervisor, options}}],
-      [strategy: :simple_one_for_one]
-    )
-    {:ok, governor_supervisor} = Supervisor.start_link(
-      [{Ace.Governor, {endpoint_supervisor, listen_socket}}],
-      [strategy: :simple_one_for_one]
-    )
+          {:ok, listen_socket} = :gen_tcp.listen(port, tcp_options)
+          Logger.info("Serving cleartext using HTTP/1")
+          {:tcp, listen_socket}
+
+        _ ->
+          ssl_options =
+            Keyword.take(@socket_options ++ options, [
+              :mode,
+              :packet,
+              :active,
+              :reuseaddr,
+              :alpn_preferred_protocols,
+              :cert,
+              :key,
+              :certfile,
+              :keyfile
+            ])
+
+          {:ok, listen_socket} = :ssl.listen(port, ssl_options)
+          {:ok, {_, port}} = :ssl.sockname(listen_socket)
+          Logger.info("Serving securly using HTTP/1 and HTTP/2 on port #{port}")
+          listen_socket
+      end
+
+    {:ok, worker_supervisor} =
+      Supervisor.start_link([{Ace.HTTP.Worker, app}], strategy: :simple_one_for_one)
+
+    {:ok, endpoint_supervisor} =
+      Supervisor.start_link(
+        [{Ace.HTTP.Server, {worker_supervisor, options}}],
+        strategy: :simple_one_for_one
+      )
+
+    {:ok, governor_supervisor} =
+      Supervisor.start_link(
+        [{Ace.Governor, {endpoint_supervisor, listen_socket}}],
+        strategy: :simple_one_for_one
+      )
 
     for _index <- 1..acceptors do
       Supervisor.start_child(governor_supervisor, [])
@@ -146,6 +167,7 @@ defmodule Ace.HTTP.Service do
   def handle_call(:port, _from, state = {{:tcp, listen_socket}, _, _, _}) do
     {:reply, :inet.port(listen_socket), state}
   end
+
   def handle_call(:port, _from, state = {listen_socket, _, _, _}) do
     {:ok, {_, port}} = :ssl.sockname(listen_socket)
     {:reply, {:ok, port}, state}

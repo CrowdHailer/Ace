@@ -12,10 +12,10 @@ defmodule Ace.HTTP2.Errors do
     {0x7, :refused_stream},
     {0x8, :cancel},
     {0x9, :compression_error},
-    {0xa, :connect_error},
-    {0xb, :enhance_your_calm},
-    {0xc, :inadequate_security},
-    {0xd, :http_1_1_required},
+    {0xA, :connect_error},
+    {0xB, :enhance_your_calm},
+    {0xC, :inadequate_security},
+    {0xD, :http_1_1_required}
   ]
 
   for {code, error} <- @defined do
@@ -25,5 +25,6 @@ defmodule Ace.HTTP2.Errors do
   for {code, error} <- @defined do
     def decode(unquote(code)), do: unquote(error)
   end
+
   def decode(_), do: :unknown_error_code
 end

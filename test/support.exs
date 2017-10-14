@@ -6,7 +6,7 @@ defmodule Raxx.Forwarder do
   def handle_headers(request, state = %{test: pid}) do
     GenServer.call(pid, {:headers, request, state})
   end
-  
+
   def handle_fragment(data, state = %{test: pid}) do
     GenServer.call(pid, {:fragment, data, state})
   end
@@ -20,7 +20,6 @@ defmodule Raxx.Forwarder do
   end
 end
 
-
 defmodule Support do
   def test_certfile() do
     Path.expand("ace/tls/cert.pem", __DIR__)
@@ -30,16 +29,18 @@ defmodule Support do
     Path.expand("ace/tls/key.pem", __DIR__)
   end
 
-  def read_next(connection, timeout \\ 5_000) do
+  def read_next(connection, timeout \\ 5000) do
     case :ssl.recv(connection, 9, timeout) do
       {:ok, <<length::24, type::8, flags::binary-size(1), 0::1, stream_id::31>>} ->
         case length do
           0 ->
             Ace.HTTP2.Frame.decode({type, flags, stream_id, ""})
+
           length ->
             {:ok, payload} = :ssl.recv(connection, length, timeout)
             Ace.HTTP2.Frame.decode({type, flags, stream_id, payload})
         end
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -50,12 +51,16 @@ defmodule Support do
   end
 
   def open_connection(port) do
-    {:ok, connection} = :ssl.connect('localhost', port, [
-      mode: :binary,
-      packet: :raw,
-      active: :false,
-      alpn_advertised_protocols: ["h2"]]
-    )
+    {:ok, connection} =
+      :ssl.connect(
+        'localhost',
+        port,
+        mode: :binary,
+        packet: :raw,
+        active: false,
+        alpn_advertised_protocols: ["h2"]
+      )
+
     {:ok, "h2"} = :ssl.negotiated_protocol(connection)
     connection
   end

@@ -34,24 +34,26 @@ defmodule Ace.HTTP2.Frame do
   Read the next available frame.
   """
   def parse_from_buffer(<<length::24, _::binary>>, max_length: max_length)
-  when length > max_length
-  do
+      when length > max_length do
     {:error, {:frame_size_error, "Frame greater than max allowed: (#{length} >= #{max_length})"}}
   end
+
   def parse_from_buffer(
-    <<
-      length::24,
-      type::8,
-      flags::bits-size(8),
-      _::1,
-      stream_id::31,
-      payload::binary-size(length),
-      rest::binary
-    >>, max_length: max_length)
-    when length <= max_length
-  do
+        <<
+          length::24,
+          type::8,
+          flags::bits-size(8),
+          _::1,
+          stream_id::31,
+          payload::binary-size(length),
+          rest::binary
+        >>,
+        max_length: max_length
+      )
+      when length <= max_length do
     {:ok, {{type, flags, stream_id, payload}, rest}}
   end
+
   def parse_from_buffer(buffer, max_length: _) when is_binary(buffer) do
     {:ok, {nil, buffer}}
   end
@@ -88,9 +90,11 @@ defmodule Ace.HTTP2.Frame do
   Add padding to a frames data
   """
   def pad_data(data, optional_pad_length)
+
   def pad_data(data, nil) do
     data
   end
+
   def pad_data(data, pad_length) when pad_length < 256 do
     bit_pad_length = pad_length * 8
     <<pad_length, data::binary, 0::size(bit_pad_length)>>

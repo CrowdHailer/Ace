@@ -24,11 +24,14 @@ defmodule Ace.HTTP.Worker do
     mod.handle_headers(request, state)
     |> normalise_reaction({mod, state, client})
   end
+
   def handle_info({client, fragment = %Raxx.Fragment{}}, {mod, state, client}) do
     false = fragment.end_stream
+
     mod.handle_fragment(fragment.data, state)
     |> normalise_reaction({mod, state, client})
   end
+
   def handle_info({client, trailer = %Raxx.Trailer{}}, {mod, state, client}) do
     mod.handle_trailers(trailer.headers, state)
     |> normalise_reaction({mod, state, client})
@@ -41,26 +44,32 @@ defmodule Ace.HTTP.Worker do
 
   defp normalise_reaction(response = %Raxx.Response{}, {mod, state, client}) do
     send_client(client, response)
+
     if Raxx.complete?(response) do
       {:stop, :normal, {mod, state, client}}
     else
       {:noreply, {mod, state, client}}
     end
   end
+
   defp normalise_reaction({parts, new_state}, {mod, _old_state, client}) do
-    Enum.each(parts, fn(part) -> send_client(client, part) end)
+    Enum.each(parts, fn part -> send_client(client, part) end)
     {:noreply, {mod, new_state, client}}
   end
 
   defp send_client(ref = {:http1, pid, _count}, part) do
     send(pid, {ref, part})
   end
+
   # TODO remove this special case
   defp send_client(stream = {:stream, _, _, _}, {:promise, request}) do
-    request = request
-    |> Map.put(:scheme, request.scheme || :https)
+    request =
+      request
+      |> Map.put(:scheme, request.scheme || :https)
+
     Ace.HTTP2.send(stream, {:promise, request})
   end
+
   defp send_client(stream = {:stream, _, _, _}, part) do
     Ace.HTTP2.send(stream, part)
   end

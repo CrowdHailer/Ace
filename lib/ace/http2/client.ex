@@ -91,9 +91,7 @@ defmodule Ace.HTTP2.Client do
   """
 
   import Kernel, except: [send: 2]
-  alias Ace.HTTP2.{
-    Connection
-  }
+  alias Ace.HTTP2.{Connection}
 
   @default_port 443
 
@@ -103,13 +101,16 @@ defmodule Ace.HTTP2.Client do
   Authority consists of the combination of `{host, port}`
   """
   def start_link(authority, options \\ [])
+
   def start_link(authority, options) when is_binary(authority) do
     start_link({authority, @default_port}, options)
   end
+
   def start_link({host, port}, options) when is_binary(host) do
     host = :erlang.binary_to_list(host)
     start_link({host, port}, options)
   end
+
   def start_link({host, port}, options) do
     ssl_options = Keyword.take(options, [:cert, :certfile, :key, :keyfile])
     {:ok, settings} = Ace.HTTP2.Settings.for_client(options)
@@ -137,9 +138,9 @@ defmodule Ace.HTTP2.Client do
           {:ok, body} = read_body(stream)
           {:ok, %{response | body: body}}
         end
-      after
-        1_000 ->
-          :no_headers
+    after
+      1000 ->
+        :no_headers
     end
   end
 
@@ -157,6 +158,7 @@ defmodule Ace.HTTP2.Client do
         fragment = Raxx.fragment(request.body, true)
         :ok = Ace.HTTP2.send(stream, fragment)
       end
+
       collect_response(stream)
     else
       raise "needs to be a complete request"
@@ -168,11 +170,12 @@ defmodule Ace.HTTP2.Client do
       {^stream, %Raxx.Fragment{data: data, end_stream: end_stream}} ->
         buffer = buffer <> data
         read_body(stream, buffer)
+
       {^stream, %Raxx.Trailer{}} ->
         {:ok, buffer}
-      after
-        1_000 ->
-          :timeout
+    after
+      1000 ->
+        :timeout
     end
   end
 

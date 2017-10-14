@@ -18,10 +18,13 @@ defmodule Ace.HTTP2 do
   def send(stream, request = %{scheme: nil}) do
     send(stream, %{request | scheme: :https})
   end
-  def send(stream, item = %type{}) when type in [Raxx.Request, Raxx.Response, Raxx.Fragment, Raxx.Trailer] do
+
+  def send(stream, item = %type{})
+      when type in [Raxx.Request, Raxx.Response, Raxx.Fragment, Raxx.Trailer] do
     {:stream, pid, _id, _ref} = stream
     GenServer.call(pid, {:send, stream, item})
   end
+
   def send(stream, item = {:promise, %Raxx.Request{}}) do
     {:stream, pid, _id, _ref} = stream
     GenServer.call(pid, {:send, stream, item})
@@ -41,19 +44,23 @@ defmodule Ace.HTTP2 do
   """
   def request_to_headers(request) do
     # TODO consider default values for required scheme and authority
-    query_string = case Plug.Conn.Query.encode(request.query || %{}) do
-      "" ->
-        ""
-      encoded ->
-        "?" <> encoded
-    end
+    query_string =
+      case Plug.Conn.Query.encode(request.query || %{}) do
+        "" ->
+          ""
+
+        encoded ->
+          "?" <> encoded
+      end
+
     path = "/" <> Enum.join(request.path, "/") <> query_string
+
     [
       {":scheme", Atom.to_string(request.scheme)},
       {":authority", request.authority || "example.com"},
       {":method", Atom.to_string(request.method)},
-      {":path", path} |
-      request.headers
+      {":path", path}
+      | request.headers
     ]
   end
 
@@ -64,8 +71,8 @@ defmodule Ace.HTTP2 do
   """
   def response_to_headers(request) do
     [
-      {":status", Integer.to_string(request.status)} |
-      request.headers
+      {":status", Integer.to_string(request.status)}
+      | request.headers
     ]
   end
 
@@ -88,6 +95,7 @@ defmodule Ace.HTTP2 do
     case build_request(headers) do
       {:ok, request} ->
         {:ok, %{request | body: !end_stream}}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -96,50 +104,62 @@ defmodule Ace.HTTP2 do
   defp build_request(request_headers) do
     build_request(request_headers, {:scheme, :authority, :method, :path})
   end
+
   defp build_request([{":scheme", scheme} | rest], {:scheme, authority, method, path}) do
     case scheme do
       # DEBT can sent headers even be empty?
       "" ->
         {:error, {:protocol_error, "scheme must not be empty"}}
+
       "https" ->
         build_request(rest, {:https, authority, method, path})
+
       "http" ->
         build_request(rest, {:http, authority, method, path})
     end
   end
+
   defp build_request([{":authority", authority} | rest], {scheme, :authority, method, path}) do
     case authority do
       "" ->
         {:error, {:protocol_error, "authority must not be empty"}}
+
       _ ->
         build_request(rest, {scheme, authority, method, path})
     end
   end
+
   defp build_request([{":method", method} | rest], {scheme, authority, :method, path}) do
     case method do
       "" ->
         {:error, {:protocol_error, "method must not be empty"}}
+
       method when method in @known_methods ->
         method = String.to_atom(method)
         build_request(rest, {scheme, authority, method, path})
     end
   end
+
   defp build_request([{":path", path} | rest], {scheme, authority, method, :path}) do
     case path do
       "" ->
         {:error, {:protocol_error, "path must not be empty"}}
+
       _ ->
         build_request(rest, {scheme, authority, method, path})
     end
   end
+
   defp build_request([{":" <> psudo, _value} | _rest], _required) do
     case psudo do
       psudo when psudo in ["scheme", "authority", "method", "path"] ->
         {:error, {:protocol_error, "pseudo-header sent more than once"}}
+
       other ->
         {:error, {:protocol_error, "unacceptable pseudo-header, :#{other}"}}
     end
   end
+
   defp build_request(headers, request = {scheme, authority, method, path}) do
     if scheme == :scheme or authority == :authority or method == :method or path == :path do
       {:error, {:protocol_error, "All pseudo-headers must be sent"}}
@@ -149,6 +169,7 @@ defmodule Ace.HTTP2 do
           uri = URI.parse(path)
           query = Plug.Conn.Query.decode(uri.query || "")
           segments = Raxx.split_path(uri.path)
+
           request = %Raxx.Request{
             scheme: scheme,
             authority: authority,
@@ -157,9 +178,11 @@ defmodule Ace.HTTP2 do
             path: segments,
             query: query,
             headers: headers,
-            body: false,
+            body: false
           }
+
           {:ok, request}
+
         {:error, reason} ->
           {:error, reason}
       end
@@ -193,30 +216,39 @@ defmodule Ace.HTTP2 do
   end
 
   defp read_headers(raw, acc \\ [])
+
   defp read_headers([], acc) do
     {:ok, Enum.reverse(acc)}
   end
-  defp read_headers([{":"<>_,_} | _], _acc) do
+
+  defp read_headers([{":" <> _, _} | _], _acc) do
     {:error, {:protocol_error, "pseudo-header sent amongst normal headers"}}
   end
+
   defp read_headers([{"connection", _} | _rest], _acc) do
     {:error, {:protocol_error, "connection header must not be used with HTTP/2"}}
   end
+
   defp read_headers([{"te", value} | rest], acc) do
     case value do
       "trailers" ->
         read_headers(rest, [{"te", value}, acc])
+
       _ ->
-        {:error, {:protocol_error, "TE header field with any value other than 'trailers' is invalid"}}
+        {
+          :error,
+          {:protocol_error, "TE header field with any value other than 'trailers' is invalid"}
+        }
     end
   end
+
   defp read_headers([{k, v} | rest], acc) do
     case String.downcase(k) == k do
       true ->
         read_headers(rest, [{k, v} | acc])
+
       false ->
         {:error, {:protocol_error, "headers must be lower case"}}
     end
   end
-
 end

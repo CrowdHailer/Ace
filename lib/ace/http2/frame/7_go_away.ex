@@ -1,9 +1,7 @@
 defmodule Ace.HTTP2.Frame.GoAway do
   @moduledoc false
 
-  alias Ace.HTTP2.{
-    Errors
-  }
+  alias Ace.HTTP2.{Errors}
 
   @enforce_keys [:error, :last_stream_id, :debug]
   defstruct @enforce_keys
@@ -27,10 +25,13 @@ defmodule Ace.HTTP2.Frame.GoAway do
   def payload(%__MODULE__{last_stream_id: last_stream_id, error: error, debug: debug}) do
     <<0::1, last_stream_id::31, Errors.encode(error)::32, debug::binary>>
   end
-
 end
+
 defimpl Inspect, for: Ace.HTTP2.Frame.GoAway do
-  def inspect(%Ace.HTTP2.Frame.GoAway{error: error, debug: debug, last_stream_id: last_stream_id}, _opts) do
+  def inspect(
+        %Ace.HTTP2.Frame.GoAway{error: error, debug: debug, last_stream_id: last_stream_id},
+        _opts
+      ) do
     "GO_AWAY(error: #{error}, debug: #{debug}, last_stream_id: #{last_stream_id})"
   end
 end

@@ -13,15 +13,19 @@ defmodule Ace.HTTP1 do
   def pop_chunk(buffer) do
     case String.split(buffer, "\r\n", parts: 2) do
       [base_16_size, rest] ->
-        size = base_16_size
-        |> :erlang.binary_to_list
-        |> :erlang.list_to_integer(16)
+        size =
+          base_16_size
+          |> :erlang.binary_to_list()
+          |> :erlang.list_to_integer(16)
+
         case rest do
           <<chunk::binary-size(size), "\r\n", rest::binary>> ->
             {chunk, rest}
+
           _incomplete_chunk ->
             {nil, buffer}
         end
+
       [rest] ->
         {nil, rest}
     end

@@ -2,21 +2,23 @@ defmodule Ace.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :ace,
-    version: "0.14.8",
-    elixir: "~> 1.4",
-    build_embedded: Mix.env == :prod,
-    start_permanent: Mix.env == :prod,
-    deps: deps(),
-    description: description(),
-    docs: [
-      main: "readme",
-      source_url: "https://github.com/crowdhailer/ace",
-      extras: [
-        "README.md"
+    [
+      app: :ace,
+      version: "0.14.8",
+      elixir: "~> 1.4",
+      build_embedded: Mix.env() == :prod,
+      start_permanent: Mix.env() == :prod,
+      deps: deps(),
+      description: description(),
+      docs: [
+        main: "readme",
+        source_url: "https://github.com/crowdhailer/ace",
+        extras: [
+          "README.md"
+        ]
       ],
-    ],
-    package: package()]
+      package: package()
+    ]
   end
 
   def application do
