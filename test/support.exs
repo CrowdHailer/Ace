@@ -3,18 +3,22 @@ defmodule Raxx.Forwarder do
   # TODO rename test -> target in config
   use Raxx.Server
 
+  @impl Raxx.Server
   def handle_headers(request, state = %{test: pid}) do
     GenServer.call(pid, {:headers, request, state})
   end
 
-  def handle_fragment(data, state = %{test: pid}) do
-    GenServer.call(pid, {:fragment, data, state})
+  @impl Raxx.Server
+  def handle_data(data, state = %{test: pid}) do
+    GenServer.call(pid, {:data, data, state})
   end
 
-  def handle_trailers(trailers, state = %{test: pid}) do
-    GenServer.call(pid, {:trailers, trailers, state})
+  @impl Raxx.Server
+  def handle_tail(tail, state = %{test: pid}) do
+    GenServer.call(pid, {:tail, tail, state})
   end
 
+  @impl Raxx.Server
   def handle_info(response, _state) do
     response
   end

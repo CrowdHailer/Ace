@@ -56,18 +56,18 @@ defmodule Ace.HTTP2Test do
     GenServer.reply(from, {[], state})
     assert received.path == request.path
 
-    fragment = Raxx.fragment("Hello, World!")
-    :ok = Ace.HTTP2.send(client_stream, fragment)
-    assert_receive {:"$gen_call", from, {:fragment, "Hello, World!", state}}, 1000
+    data = Raxx.data("Hello, World!")
+    :ok = Ace.HTTP2.send(client_stream, data)
+    assert_receive {:"$gen_call", from, {:data, "Hello, World!", state}}, 1000
     GenServer.reply(from, {[], state})
 
-    trailer = Raxx.trailer([{"x-foo", "bar"}])
-    :ok = Ace.HTTP2.send(client_stream, trailer)
-    assert_receive {:"$gen_call", from, {:trailers, [{"x-foo", "bar"}], state}}, 1000
+    tail = Raxx.tail([{"x-foo", "bar"}])
+    :ok = Ace.HTTP2.send(client_stream, tail)
+    assert_receive {:"$gen_call", from, {:tail, [{"x-foo", "bar"}], state}}, 1000
     GenServer.reply(from, {[], state})
   end
 
-  test "request stream ends if any fragment ends stream", %{port: port} do
+  test "request stream ends if any body complete", %{port: port} do
     {:ok, client} = Client.start_link({"localhost", port})
     {:ok, client_stream} = Client.stream(client)
 
@@ -81,10 +81,10 @@ defmodule Ace.HTTP2Test do
     assert_receive {:"$gen_call", from, {:headers, _received, state}}, 1000
     GenServer.reply(from, {[], state})
 
-    assert_receive {:"$gen_call", from, {:fragment, "This is all the content.", state}}, 1000
+    assert_receive {:"$gen_call", from, {:data, "This is all the content.", state}}, 1000
     GenServer.reply(from, {[], state})
 
-    assert_receive {:"$gen_call", from, {:trailers, [], state}}, 1000
+    assert_receive {:"$gen_call", from, {:tail, [], state}}, 1000
     GenServer.reply(from, {[], state})
   end
 
@@ -128,10 +128,9 @@ defmodule Ace.HTTP2Test do
 
     assert_receive {^client_stream, %Response{}}, 1000
 
-    assert_receive {^client_stream, %{data: body, end_stream: end_stream}}, 1000
+    assert_receive {^client_stream, %Raxx.Data{data: body}}, 1000
     assert body == "Here is all the bodies"
-    assert end_stream == false
-    assert_receive {^client_stream, %Raxx.Trailer{headers: []}}, 1000
+    assert_receive {^client_stream, %Raxx.Tail{headers: []}}, 1000
     # TODO test process dies
   end
 
@@ -149,17 +148,17 @@ defmodule Ace.HTTP2Test do
 
     reply = [
       Raxx.response(200) |> Raxx.set_header("content-type", "text/plain") |> Raxx.set_body(true),
-      Raxx.fragment("For the client"),
-      Raxx.trailer([{"x-foo", "bar"}])
+      Raxx.data("For the client"),
+      Raxx.tail([{"x-foo", "bar"}])
     ]
 
     GenServer.reply(from, {reply, state})
 
     assert_receive {^client_stream, %Response{}}, 1000
 
-    assert_receive {^client_stream, %{data: "For the client", end_stream: false}}, 1000
+    assert_receive {^client_stream, %{data: "For the client"}}, 1000
 
-    assert_receive {^client_stream, %Raxx.Trailer{headers: [{"x-foo", "bar"}]}}, 1000
+    assert_receive {^client_stream, %Raxx.Tail{headers: [{"x-foo", "bar"}]}}, 1000
     # TODO test process dies
   end
 

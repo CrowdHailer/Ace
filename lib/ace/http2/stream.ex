@@ -64,8 +64,8 @@ defmodule Ace.HTTP2.Stream do
   def send_request(stream, request = %{body: body}) do
     case send_request(stream, %{request | body: true}) do
       {:ok, stream_with_headers} ->
-        send_fragment(stream_with_headers, Raxx.fragment(body, true))
-
+        {:ok, new_stream} = send_data(stream_with_headers, Raxx.data(body))
+        send_tail(new_stream, Raxx.tail())
       {:error, reason} ->
         {:error, reason}
     end
@@ -103,44 +103,29 @@ defmodule Ace.HTTP2.Stream do
   def send_response(stream, response = %{body: body}) do
     case send_response(stream, %{response | body: true}) do
       {:ok, stream_with_headers} ->
-        send_fragment(stream_with_headers, Raxx.fragment(body, true))
-
+        {:ok, new_stream} = send_data(stream_with_headers, Raxx.data(body))
+        send_tail(new_stream, Raxx.tail([]))
       {:error, reason} ->
         {:error, reason}
     end
   end
 
-  # DEBT would be good to serialize data if not in correct format.
-  # However it might be good practise for ace to force users to be explicit in what is passed in.
-  def send_data(stream, data, end_stream) when is_binary(data) do
-    # TODO remove
-    IO.inspect("use send_fragment instead")
-    send_fragment(stream, %Raxx.Fragment{data: data, end_stream: end_stream})
-  end
-
-  def send_fragment(stream, fragment = %Raxx.Fragment{}) do
+  def send_data(stream, data = %Raxx.Data{}) do
     case stream.status do
       {:open, _remote} ->
-        queue = [fragment]
+        queue = [data]
         new_stream = %{stream | queue: stream.queue ++ queue}
 
-        final_stream =
-          if fragment.end_stream do
-            process_send_end_stream(new_stream)
-          else
-            new_stream
-          end
-
-        {:ok, final_stream}
+        {:ok, new_stream}
 
       {:closed, :closed} ->
         {:ok, stream}
     end
   end
 
-  def send_trailers(stream, trailers) do
+  def send_tail(stream, tail = %Raxx.Tail{}) do
     new_stream = process_send_end_stream(stream)
-    queue = stream.queue ++ [%{headers: trailers, end_stream: true}]
+    queue = stream.queue ++ [tail]
     new_stream = %{new_stream | queue: queue}
     {:ok, new_stream}
   end
@@ -192,7 +177,7 @@ defmodule Ace.HTTP2.Stream do
         # check end_stream
         if end_stream do
           trailers = Ace.HTTP2.headers_to_trailers(headers)
-          trailers = %Raxx.Trailer{headers: trailers.headers}
+          trailers = %Raxx.Tail{headers: trailers.headers}
           forward(stream, trailers)
           # Open but will be closed by handle process_received_end_stream
           {:ok, {local, :open}}
@@ -231,7 +216,10 @@ defmodule Ace.HTTP2.Stream do
     new_status =
       case stream.status do
         {local, :open} ->
-          forward(stream, %Raxx.Fragment{data: data, end_stream: end_stream})
+          forward(stream, %Raxx.Data{data: data})
+          if end_stream do
+            forward(stream, Raxx.tail())
+          end
           {local, :open}
 
         # errors
@@ -305,11 +293,6 @@ defmodule Ace.HTTP2.Stream do
     else
       {:error, {:flow_control_error, "Stream window was increased beyond maximum"}}
     end
-  end
-
-  defp forward(stream, %Raxx.Fragment{data: data, end_stream: true}) do
-    forward(stream, %Raxx.Fragment{data: data, end_stream: false})
-    forward(stream, %Raxx.Trailer{headers: []})
   end
 
   defp forward(stream, message) do

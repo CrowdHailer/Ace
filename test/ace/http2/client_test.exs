@@ -17,8 +17,8 @@ defmodule Ace.HTTP2.ClientTest do
     assert 200 == response.status
     assert true == response.body
 
-    assert_receive {^stream, %Raxx.Fragment{data: data, end_stream: false}}, 1000
-    assert_receive {^stream, %Raxx.Trailer{headers: []}}, 1000
+    assert_receive {^stream, %Raxx.Data{data: data}}, 1000
+    assert_receive {^stream, %Raxx.Tail{headers: []}}, 1000
 
     assert String.contains?(data, "Method: GET")
     assert String.contains?(data, "Protocol: HTTP/2.0")
@@ -32,15 +32,15 @@ defmodule Ace.HTTP2.ClientTest do
 
     {:ok, stream} = Client.stream(client)
     :ok = Ace.HTTP2.send(stream, request)
-    fragment = Raxx.fragment("foo")
-    :ok = Ace.HTTP2.send(stream, fragment)
+    data = Raxx.data("foo")
+    :ok = Ace.HTTP2.send(stream, data)
     assert_receive {^stream, response = %Response{}}, 1000
     assert 200 == response.status
     assert true == response.body
-    assert_receive {^stream, %{data: "FOO", end_stream: false}}, 1000
-    fragment = Raxx.fragment("bar")
-    :ok = Ace.HTTP2.send(stream, fragment)
-    assert_receive {^stream, %{data: "BAR", end_stream: false}}, 1000
+    assert_receive {^stream, %Raxx.Data{data: "FOO"}}, 1000
+    data = Raxx.data("bar")
+    :ok = Ace.HTTP2.send(stream, data)
+    assert_receive {^stream, %Raxx.Data{data: "BAR"}}, 1000
     # I do not think the remote closes stream if you do
     # :ok = Client.send_data(stream, "fin", true)
     # assert_receive {^stream, response = %{data: "FIN", end_stream: true}}, 1_000

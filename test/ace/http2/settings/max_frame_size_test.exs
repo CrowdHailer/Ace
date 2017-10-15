@@ -107,7 +107,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert "invalid value for max_frame_size setting" = message
   end
 
-  test "large response blocks from server are broken into multiple fragments" do
+  test "large response blocks from server are broken into multiple data parts" do
     opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
     assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
     {:ok, port} = Service.port(service)
@@ -141,7 +141,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
       |> Raxx.set_header("foo9", long_value)
       |> Raxx.set_body(true)
 
-    fragment = Raxx.fragment(Enum.map(1..10, fn _ -> long_value end) |> Enum.join(""), true)
+    data = Raxx.data(Enum.map(1..10, fn _ -> long_value end) |> Enum.join(""))
 
     request =
       Raxx.request(:GET, "/bar")
@@ -155,9 +155,16 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
       |> Raxx.set_header("bar8", long_value)
       |> Raxx.set_header("bar9", long_value)
 
-    GenServer.reply(from, {[response, fragment, {:promise, request}], state})
+    GenServer.reply(from, {[response, {:promise, request}, data, Raxx.tail()], state})
 
     assert {:ok, frame = %Frame.Headers{end_headers: false}} = Support.read_next(connection)
+    assert 17000 == :erlang.iolist_size(frame.header_block_fragment)
+    assert {:ok, frame = %Frame.Continuation{end_headers: false}} = Support.read_next(connection)
+    assert 17000 == :erlang.iolist_size(frame.header_block_fragment)
+    assert {:ok, frame = %Frame.Continuation{end_headers: true}} = Support.read_next(connection)
+    assert 17000 >= :erlang.iolist_size(frame.header_block_fragment)
+
+    assert {:ok, frame = %Frame.PushPromise{end_headers: false}} = Support.read_next(connection)
     assert 17000 == :erlang.iolist_size(frame.header_block_fragment)
     assert {:ok, frame = %Frame.Continuation{end_headers: false}} = Support.read_next(connection)
     assert 17000 == :erlang.iolist_size(frame.header_block_fragment)
@@ -170,12 +177,5 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
     assert 17000 == :erlang.iolist_size(frame.data)
     assert {:ok, frame = %Frame.Data{end_stream: true}} = Support.read_next(connection)
     assert 17000 >= :erlang.iolist_size(frame.data)
-
-    assert {:ok, frame = %Frame.PushPromise{end_headers: false}} = Support.read_next(connection)
-    assert 17000 == :erlang.iolist_size(frame.header_block_fragment)
-    assert {:ok, frame = %Frame.Continuation{end_headers: false}} = Support.read_next(connection)
-    assert 17000 == :erlang.iolist_size(frame.header_block_fragment)
-    assert {:ok, frame = %Frame.Continuation{end_headers: true}} = Support.read_next(connection)
-    assert 17000 >= :erlang.iolist_size(frame.header_block_fragment)
   end
 end

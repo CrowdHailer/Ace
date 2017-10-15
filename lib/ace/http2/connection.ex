@@ -252,11 +252,11 @@ defmodule Ace.HTTP2.Connection do
         response = %Raxx.Response{} ->
           Stream.send_response(stream, response)
 
-        fragment = %Raxx.Fragment{} ->
-          Stream.send_fragment(stream, fragment)
+        data = %Raxx.Data{} ->
+          Stream.send_data(stream, data)
 
-        %Raxx.Trailer{headers: trailers} ->
-          Stream.send_trailers(stream, trailers)
+        tail = %Raxx.Tail{} ->
+          Stream.send_tail(stream, tail)
       end
 
     state = put_stream(state, new_stream)
@@ -293,6 +293,42 @@ defmodule Ace.HTTP2.Connection do
     {previous, connection}
   end
 
+  def pop_stream(
+        stream = %{queue: [%Raxx.Tail{headers: headers} | rest]},
+        connection,
+        previous
+  ) do
+    end_stream = true
+
+    stream = %{stream | queue: rest}
+    {:ok, {header_block, new_encode_context}} = HPack.encode(headers, connection.encode_context)
+    connection = %{connection | encode_context: new_encode_context}
+
+    max_frame_size = connection.remote_settings.max_frame_size
+
+    {initial_fragment, tail_block} =
+      case header_block do
+        <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
+          {to_send, remaining_data}
+
+        to_send ->
+          {to_send, ""}
+      end
+
+    frames =
+      case tail_block do
+        "" ->
+          [Frame.Headers.new(stream.id, initial_fragment, true, end_stream)]
+
+        tail_block ->
+          [
+            Frame.Headers.new(stream.id, initial_fragment, false, end_stream)
+            | pack_continuation(tail_block, stream.id, max_frame_size)
+          ]
+      end
+
+    pop_stream(stream, connection, previous ++ frames)
+  end
   def pop_stream(
         stream = %{queue: [%{headers: headers, end_stream: end_stream} | rest]},
         connection,
@@ -341,7 +377,7 @@ defmodule Ace.HTTP2.Connection do
     ]
   end
 
-  def pop_stream(stream = %{queue: [fragment = %{data: _} | rest]}, connection, previous) do
+  def pop_stream(stream = %{queue: [data = %{data: _} | rest]}, connection, previous) do
     available_window = min(Stream.outbound_window(stream), connection.outbound_window)
 
     if available_window <= 0 do
@@ -349,7 +385,7 @@ defmodule Ace.HTTP2.Connection do
       {previous, connection}
     else
       {to_send, remaining_data} =
-        case fragment.data do
+        case data.data do
           <<to_send::binary-size(available_window), remaining_data::binary>> ->
             {to_send, remaining_data}
 
@@ -357,15 +393,20 @@ defmodule Ace.HTTP2.Connection do
             {to_send, ""}
         end
 
-      end_stream = remaining_data == "" && fragment.end_stream
+      end_stream = remaining_data == "" && rest == [%Raxx.Tail{headers: []}]
+      rest = if end_stream do
+        []
+      else
+        rest
+      end
 
       queue =
         case remaining_data do
           "" ->
             rest
 
-          data ->
-            [%Raxx.Fragment{data: data, end_stream: fragment.end_stream} | rest]
+          remaining_data ->
+            [%Raxx.Data{data: remaining_data} | rest]
         end
 
       max_frame_size = connection.remote_settings.max_frame_size

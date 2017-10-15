@@ -20,7 +20,7 @@ defmodule Ace.HTTP2 do
   end
 
   def send(stream, item = %type{})
-      when type in [Raxx.Request, Raxx.Response, Raxx.Fragment, Raxx.Trailer] do
+      when type in [Raxx.Request, Raxx.Response, Raxx.Data, Raxx.Tail] do
     {:stream, pid, _id, _ref} = stream
     GenServer.call(pid, {:send, stream, item})
   end
@@ -45,7 +45,8 @@ defmodule Ace.HTTP2 do
   def request_to_headers(request) do
     # TODO consider default values for required scheme and authority
     query_string =
-      case Plug.Conn.Query.encode(request.query || %{}) do
+      # DEBT nested queries
+      case URI.encode_query(request.query || %{}) do
         "" ->
           ""
 
@@ -167,7 +168,7 @@ defmodule Ace.HTTP2 do
       case read_headers(headers) do
         {:ok, headers} ->
           uri = URI.parse(path)
-          query = Plug.Conn.Query.decode(uri.query || "")
+          {:ok, query} = URI2.Query.decode(uri.query || "")
           segments = Raxx.split_path(uri.path)
 
           request = %Raxx.Request{

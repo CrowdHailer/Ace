@@ -55,8 +55,8 @@ defmodule Ace.HTTP2.Client do
       |> Raxx.set_header("content-length", "13")
       |> Raxx.set_body(true)
       :ok = Ace.HTTP2.send(stream, request)
-      fragment = Raxx.fragment("Hello, World!", true)
-      {:ok, _} = Ace.HTTP2.send(stream, fragment)
+      data = Raxx.data("Hello, World!")
+      {:ok, _} = Ace.HTTP2.send(stream, data)
 
   ## Receiving a response
 
@@ -68,7 +68,7 @@ defmodule Ace.HTTP2.Client do
           :ok
       end
       receive do
-        {^stream, %Raxx.Fragment{data: "Hello, World!", end_stream: end_stream}} ->
+        {^stream, %Raxx.Data{data: "Hello, World!"}} ->
           :ok
       end
 
@@ -155,8 +155,9 @@ defmodule Ace.HTTP2.Client do
       :ok = Ace.HTTP2.send(stream, request)
       # send - transmit, publish, dispatch, put, relay, emit, broadcast
       if is_binary(request.body) do
-        fragment = Raxx.fragment(request.body, true)
-        :ok = Ace.HTTP2.send(stream, fragment)
+        data = Raxx.data(request.body)
+        :ok = Ace.HTTP2.send(stream, data)
+        :ok = Ace.HTTP2.send(stream, Raxx.tail())
       end
 
       collect_response(stream)
@@ -167,11 +168,11 @@ defmodule Ace.HTTP2.Client do
 
   defp read_body(stream, buffer \\ "") do
     receive do
-      {^stream, %Raxx.Fragment{data: data, end_stream: end_stream}} ->
+      {^stream, %Raxx.Data{data: data}} ->
         buffer = buffer <> data
         read_body(stream, buffer)
 
-      {^stream, %Raxx.Trailer{}} ->
+      {^stream, %Raxx.Tail{headers: []}} ->
         {:ok, buffer}
     after
       1000 ->

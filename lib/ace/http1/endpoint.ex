@@ -28,7 +28,11 @@ defmodule Ace.HTTP1.Endpoint do
                    """
                    |> String.replace("\n", "\r\n")
 
-  alias Raxx.{Response, Fragment}
+  alias Raxx.{
+    Response,
+    Data,
+    Tail
+  }
   alias Ace.HTTP1
 
   use GenServer
@@ -68,9 +72,12 @@ defmodule Ace.HTTP1.Endpoint do
     end
   end
 
-  def handle_info({channel = {:http1, _, _}, part}, {buffer, state}) do
+  def handle_info({channel = {:http1, _, _}, parts}, {buffer, state}) do
     ^channel = state.channel
-    {:ok, {outbound, state}} = send_part(part, state)
+    {outbound, state} = Enum.reduce(parts, {"", state}, fn(part, {buffer, state}) ->
+    {:ok, {outbound, next_state}} = send_part(part, state)
+    {[buffer, outbound], next_state}
+    end)
     send_packet(state.socket, outbound)
 
     case state.status do
@@ -186,9 +193,9 @@ defmodule Ace.HTTP1.Endpoint do
   defp receive_data(packet, state = %{status: {{:body, remaining}, :response}})
        when byte_size(packet) >= remaining do
     <<data::binary-size(remaining), rest::binary>> = packet
-    fragment = Raxx.fragment(data, false)
-    send(state.worker, {state.channel, fragment})
-    send(state.worker, {state.channel, Raxx.trailer([])})
+    data = Raxx.data(data)
+    send(state.worker, {state.channel, data})
+    send(state.worker, {state.channel, Raxx.tail()})
     new_status = {:complete, :response}
     new_state = %{state | status: new_status}
     {:ok, {rest, new_state}}
@@ -196,11 +203,11 @@ defmodule Ace.HTTP1.Endpoint do
 
   defp receive_data(packet, state = %{status: {{:body, remaining}, :response}})
        when byte_size(packet) < remaining do
-    fragment = Raxx.fragment(packet, false)
+    data = Raxx.data(packet)
     new_status = {{:body, remaining - byte_size(packet)}, :response}
     new_state = %{state | status: new_status}
 
-    send(state.worker, {state.channel, fragment})
+    send(state.worker, {state.channel, data})
 
     {:ok, {"", new_state}}
   end
@@ -213,12 +220,12 @@ defmodule Ace.HTTP1.Endpoint do
         {:ok, {rest, state}}
 
       "" ->
-        send(state.worker, {state.channel, Raxx.trailer([])})
+        send(state.worker, {state.channel, Raxx.tail([])})
         {:ok, {rest, state}}
 
       chunk ->
-        fragment = Raxx.fragment(chunk, false)
-        send(state.worker, {state.channel, fragment})
+        data = Raxx.data(chunk)
+        send(state.worker, {state.channel, data})
         {:ok, {rest, state}}
     end
   end
@@ -276,23 +283,29 @@ defmodule Ace.HTTP1.Endpoint do
     end
   end
 
-  defp send_part(fragment = %Fragment{}, state = %{status: {up, {:body, remaining}}}) do
-    remaining = remaining - :erlang.iolist_size(fragment.data)
+  defp send_part(data = %Data{}, state = %{status: {up, {:body, remaining}}}) do
+    remaining = remaining - :erlang.iolist_size(data.data)
     new_status = {up, {:body, remaining}}
     new_state = %{state | status: new_status}
-    {:ok, {[fragment.data], new_state}}
+    {:ok, {[data.data], new_state}}
   end
 
-  defp send_part(fragment = %Fragment{end_stream: false}, state = %{status: {_up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk(fragment.data)
-    {:ok, {[chunk], state}}
-  end
-
-  defp send_part(fragment = %Fragment{end_stream: true}, state = %{status: {up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk(fragment.data)
+  defp send_part(%Tail{headers: []}, state = %{status: {up, {:body, 0}}}) do
     new_status = {up, :complete}
     new_state = %{state | status: new_status}
-    {:ok, {[chunk, HTTP1.serialize_chunk("")], new_state}}
+    {:ok, {[], new_state}}
+  end
+
+  defp send_part(%Data{data: data}, state = %{status: {_up, :chunked_body}}) do
+    chunk = HTTP1.serialize_chunk(data)
+    {:ok, {[chunk], state}}
+  end
+  defp send_part(%Tail{headers: []}, state = %{status: {up, :chunked_body}}) do
+    chunk = HTTP1.serialize_chunk("")
+    new_status = {up, :complete}
+    new_state = %{state | status: new_status}
+
+    {:ok, {[chunk], new_state}}
   end
 
   defp build_partial_request({:http_request, method, http_uri, _version}, transport) do
