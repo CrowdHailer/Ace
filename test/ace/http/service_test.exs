@@ -1,6 +1,7 @@
 defmodule Ace.HTTP.ServiceTest do
   use ExUnit.Case, async: true
 
+  @tag :skip
   test "service starts a new acceptor for each new connection" do
     {:ok, service} =
       Ace.HTTP.Service.start_link(

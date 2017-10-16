@@ -44,8 +44,8 @@ defmodule Ace.HTTP2 do
   """
   def request_to_headers(request) do
     # TODO consider default values for required scheme and authority
+    # DEBT nested queries
     query_string =
-      # DEBT nested queries
       case URI.encode_query(request.query || %{}) do
         "" ->
           ""

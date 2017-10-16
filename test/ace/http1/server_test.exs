@@ -56,6 +56,7 @@ defmodule Ace.HTTP1.ServerTest do
              "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
+  @tag :skip
   test "exits normal when client closes connection", %{port: port} do
     http1_request = """
     GET / HTTP/1.1

@@ -66,6 +66,7 @@ defmodule Ace.HTTP2.Stream do
       {:ok, stream_with_headers} ->
         {:ok, new_stream} = send_data(stream_with_headers, Raxx.data(body))
         send_tail(new_stream, Raxx.tail())
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -105,6 +106,7 @@ defmodule Ace.HTTP2.Stream do
       {:ok, stream_with_headers} ->
         {:ok, new_stream} = send_data(stream_with_headers, Raxx.data(body))
         send_tail(new_stream, Raxx.tail([]))
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -159,9 +161,14 @@ defmodule Ace.HTTP2.Stream do
   def receive_headers(stream, headers, end_stream) do
     case stream.status do
       {:idle, :idle} ->
-        {:ok, request} = Ace.HTTP2.headers_to_request(headers, end_stream)
-        forward(stream, request)
-        {:ok, {:idle, :open}}
+        case Ace.HTTP2.headers_to_request(headers, end_stream) do
+          {:ok, request} ->
+            forward(stream, request)
+            {:ok, {:idle, :open}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {local, :idle} ->
         {:ok, response} = Ace.HTTP2.headers_to_response(headers, end_stream)
@@ -217,9 +224,11 @@ defmodule Ace.HTTP2.Stream do
       case stream.status do
         {local, :open} ->
           forward(stream, %Raxx.Data{data: data})
+
           if end_stream do
             forward(stream, Raxx.tail())
           end
+
           {local, :open}
 
         # errors
@@ -259,13 +268,14 @@ defmodule Ace.HTTP2.Stream do
   end
 
   def process_received_end_stream(stream) do
-    new_status =
-      case stream.status do
-        {local, :open} ->
-          {local, :closed}
-      end
+    case stream.status do
+      {local, :open} ->
+        new_status = {local, :closed}
+        {:ok, %{stream | status: new_status}}
 
-    {:ok, %{stream | status: new_status}}
+      _ ->
+        {:error, {:protocol_error, "Unexpected stream message"}}
+    end
   end
 
   def receive_reset(stream, reason) do

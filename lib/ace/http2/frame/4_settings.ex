@@ -34,6 +34,10 @@ defmodule Ace.HTTP2.Frame.Settings do
     {:ok, %__MODULE__{ack: true}}
   end
 
+  def decode(_) do
+    {:error, :bad_settings_frame}
+  end
+
   def serialize(frame = %{ack: false}) do
     type = 4
     flags = 0

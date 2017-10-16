@@ -6,5 +6,5 @@
   "http_status": {:hex, :http_status, "0.2.2", "9710b536e42aaf2eedf1a5c3543b16dc459088dcfa41f80998ea2ba3715f35e6", [], [], "hexpm"},
   "mime": {:hex, :mime, "1.1.0", "01c1d6f4083d8aa5c7b8c246ade95139620ef8effb009edde934e0ec3b28090a", [], [], "hexpm"},
   "plug": {:hex, :plug, "1.4.3", "236d77ce7bf3e3a2668dc0d32a9b6f1f9b1f05361019946aae49874904be4aed", [], [{:cowboy, "~> 1.0.1 or ~> 1.1", [hex: :cowboy, repo: "hexpm", optional: true]}, {:mime, "~> 1.0", [hex: :mime, repo: "hexpm", optional: false]}], "hexpm"},
-  "raxx": {:git, "https://github.com/crowdhailer/raxx.git", "6db445cb65a0c9f13b14e98cd3fa0536a4669ff6", [branch: "master"]},
+  "raxx": {:hex, :raxx, "0.13.0", "f77c0c4e6c028e580e1ecf5c21f49c1619cc6a63b1b92f4b72e90d34ed013128", [:mix], [{:http_status, "~> 0.2", [hex: :http_status, repo: "hexpm", optional: false]}], "hexpm"},
 }

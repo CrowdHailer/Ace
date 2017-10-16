@@ -48,8 +48,10 @@ defmodule Ace.HTTP.Worker do
     case response.body do
       false ->
         {[response], state}
+
       true ->
         {[response], state}
+
       _body ->
         # {[%{response | body: true}, Raxx.data(response.body), Raxx.tail], state}
         {[response], state}
@@ -65,12 +67,14 @@ defmodule Ace.HTTP.Worker do
     case parts do
       [] ->
         :ok
+
       parts ->
         case client do
           ref = {:http1, pid, _count} ->
             send(pid, {ref, parts})
+
           stream = {:stream, _, _, _} ->
-            Enum.each(parts, fn(part) ->
+            Enum.each(parts, fn part ->
               Ace.HTTP2.send(stream, part)
             end)
         end
@@ -79,8 +83,10 @@ defmodule Ace.HTTP.Worker do
     case List.last(parts) do
       %{body: false} ->
         {:stop, :normal, {mod, new_state, client}}
+
       %Raxx.Tail{} ->
         {:stop, :normal, {mod, new_state, client}}
+
       _ ->
         {:noreply, {mod, new_state, client}}
     end
@@ -91,8 +97,10 @@ defmodule Ace.HTTP.Worker do
     request =
       request
       |> Map.put(:scheme, request.scheme || :https)
+
     {:promise, request}
   end
+
   defp fix_part(part) do
     part
   end

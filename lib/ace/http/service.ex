@@ -142,18 +142,25 @@ defmodule Ace.HTTP.Service do
       end
 
     {:ok, worker_supervisor} =
-      Supervisor.start_link([{Ace.HTTP.Worker, app}], strategy: :simple_one_for_one)
+      Supervisor.start_link(
+        [{Ace.HTTP.Worker, app}],
+        strategy: :simple_one_for_one,
+        max_restarts: 5000
+      )
 
     {:ok, endpoint_supervisor} =
       Supervisor.start_link(
         [{Ace.HTTP.Server, {worker_supervisor, options}}],
-        strategy: :simple_one_for_one
+        strategy: :simple_one_for_one,
+        max_restarts: 5000
       )
 
+    # DEBT reduce restarts
     {:ok, governor_supervisor} =
       Supervisor.start_link(
         [{Ace.Governor, {endpoint_supervisor, listen_socket}}],
-        strategy: :simple_one_for_one
+        strategy: :simple_one_for_one,
+        max_restarts: 5000
       )
 
     for _index <- 1..acceptors do

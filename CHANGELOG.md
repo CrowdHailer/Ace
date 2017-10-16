@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.15.0](https://github.com/CrowdHailer/Ace/tree/0.14.8) - 2017-10-16
+
+## Changed
+- Rely on `0.13.x` of raxx.
+
+## Removed
+- `Ace.HTTP2.Service`, instead use `Ace.HTTP.Service`.
+
 ## [0.14.8](https://github.com/CrowdHailer/Ace/tree/0.14.8) - 2017-10-9
 
 ## Added

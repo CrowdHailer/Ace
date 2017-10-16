@@ -74,7 +74,8 @@ defmodule Ace.HTTP.Server do
   def handle_call({:accept, listen_socket}, from, state) do
     case ssl_accept_connection(listen_socket, from, state) do
       {:ok, socket} ->
-        :ok = :ssl.setopts(socket, active: :once)
+        # DEBT returns :ok or {:error, :closed}
+        :ssl.setopts(socket, active: :once)
         state = %{state | socket: socket}
 
         case :ssl.negotiated_protocol(socket) do

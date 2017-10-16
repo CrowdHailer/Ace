@@ -77,57 +77,6 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
-  def init({listen_socket, {mod, config}, settings}) do
-    {:ok, stream_supervisor} =
-      Supervisor.start_link(
-        [Supervisor.Spec.worker(Ace.HTTP.Worker, [{mod, config}, :todo], restart: :transient)],
-        strategy: :simple_one_for_one
-      )
-
-    {:ok, {:listening, listen_socket, stream_supervisor, settings}, 0}
-  end
-
-  def handle_info(:timeout, {:listening, listen_socket, stream_supervisor, local_settings}) do
-    {:ok, socket} = :ssl.transport_accept(listen_socket)
-    :ok = :ssl.ssl_accept(socket)
-    {:ok, "h2"} = :ssl.negotiated_protocol(socket)
-
-    {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
-
-    initial_settings_frame =
-      Ace.HTTP2.Settings.update_frame(local_settings, default_server_settings)
-
-    {:ok, default_client_settings} = Ace.HTTP2.Settings.for_client()
-
-    # TODO max table size
-    decode_context = HPack.new_context(4096)
-    encode_context = HPack.new_context(4096)
-
-    {:ok, {_, port}} = :ssl.sockname(listen_socket)
-
-    initial_state = %__MODULE__{
-      socket: socket,
-      outbound_window: 65535,
-      local_settings: default_server_settings,
-      queued_settings: [local_settings],
-      remote_settings: default_client_settings,
-      # DEBT set when handshaking settings
-      decode_context: decode_context,
-      encode_context: encode_context,
-      streams: %{},
-      stream_supervisor: stream_supervisor,
-      next_local_stream_id: 2,
-      name: "SERVER (port: #{port})"
-    }
-
-    state = %{initial_state | next: :handshake}
-    do_send_frames([initial_settings_frame], state)
-
-    :ssl.setopts(socket, active: :once)
-
-    {:noreply, {:pending, initial_state}}
-  end
-
   def handle_info({:ssl, connection, @preface <> data}, {:pending, state}) do
     state = %{state | next: :handshake}
     handle_info({:ssl, connection, data}, {"", state})
@@ -149,13 +98,24 @@ defmodule Ace.HTTP2.Connection do
 
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
         {:stop, :normal, state}
+
+      {:error, reason} ->
+        Logger.warn("ERROR: #{inspect(reason)}, NO DEBUG INFO")
+        frame = Frame.GoAway.new(4, :internal_error, inspect(reason))
+        outbound = Frame.GoAway.serialize(frame)
+        :ok = :ssl.send(state.socket, outbound)
+        Process.sleep(1000)
+
+        # Despite being an error the connection has successfully dealt with the client and does not need to crash
+        {:stop, :normal, state}
     end
   end
 
   def handle_info({:ssl_closed, _socket}, {buffer_or_pending, state}) do
     if state.stream_supervisor do
       # TODO shut down each stream
-      :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
+      # TODO Send message instead
+      # :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
     end
 
     {:stop, :normal, {buffer_or_pending, state}}
@@ -283,7 +243,8 @@ defmodule Ace.HTTP2.Connection do
   def do_send_frames(frames, state) do
     Enum.each(frames, &Logger.debug("#{state.name} sent: #{inspect(&1)}"))
     io_list = Enum.map(frames, &Frame.serialize/1)
-    :ok = :ssl.send(state.socket, io_list)
+    # DEBT returns :ok or {:error, :closed}
+    :ssl.send(state.socket, io_list)
   end
 
   def pop_stream(stream, connection, previous \\ [])
@@ -293,11 +254,7 @@ defmodule Ace.HTTP2.Connection do
     {previous, connection}
   end
 
-  def pop_stream(
-        stream = %{queue: [%Raxx.Tail{headers: headers} | rest]},
-        connection,
-        previous
-  ) do
+  def pop_stream(stream = %{queue: [%Raxx.Tail{headers: headers} | rest]}, connection, previous) do
     end_stream = true
 
     stream = %{stream | queue: rest}
@@ -329,6 +286,7 @@ defmodule Ace.HTTP2.Connection do
 
     pop_stream(stream, connection, previous ++ frames)
   end
+
   def pop_stream(
         stream = %{queue: [%{headers: headers, end_stream: end_stream} | rest]},
         connection,
@@ -394,11 +352,13 @@ defmodule Ace.HTTP2.Connection do
         end
 
       end_stream = remaining_data == "" && rest == [%Raxx.Tail{headers: []}]
-      rest = if end_stream do
-        []
-      else
-        rest
-      end
+
+      rest =
+        if end_stream do
+          []
+        else
+          rest
+        end
 
       queue =
         case remaining_data do
@@ -461,7 +421,8 @@ defmodule Ace.HTTP2.Connection do
 
               case consume_frame(frame, state) do
                 {:ok, {frames, state}} ->
-                  :ok = do_send_frames(frames, state)
+                  # DEBT returns :ok or {:error, :closed}
+                  do_send_frames(frames, state)
                   consume(unprocessed, state)
 
                 {:error, reason} ->
@@ -533,20 +494,24 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def consume_frame(frame = %Frame.WindowUpdate{}, state = %{next: :any}) do
-    {:ok, stream} = Map.fetch(state.streams, frame.stream_id)
+    case Map.fetch(state.streams, frame.stream_id) do
+      {:ok, stream} ->
+        case Stream.receive_window_update(stream, frame.increment) do
+          {:ok, new_stream} ->
+            new_state = put_stream(state, new_stream)
+            {frames, newer_state} = send_available(new_state)
+            {:ok, {frames, newer_state}}
 
-    case Stream.receive_window_update(stream, frame.increment) do
-      {:ok, new_stream} ->
-        new_state = put_stream(state, new_stream)
-        {frames, newer_state} = send_available(new_state)
-        {:ok, {frames, newer_state}}
+          {:error, {:flow_control_error, _debug}} ->
+            {:ok, new_stream} = Stream.send_reset(stream, :flow_control_error)
+            new_state = put_stream(state, new_stream)
+            {:ok, {[Frame.RstStream.new(new_stream.id, :flow_control_error)], new_state}}
+            # {:error, reason} ->
+            #   {:error, reason}
+        end
 
-      {:error, {:flow_control_error, _debug}} ->
-        {:ok, new_stream} = Stream.send_reset(stream, :flow_control_error)
-        new_state = put_stream(state, new_stream)
-        {:ok, {[Frame.RstStream.new(new_stream.id, :flow_control_error)], new_state}}
-        # {:error, reason} ->
-        #   {:error, reason}
+      :error ->
+        {:error, :no_stream}
     end
   end
 
@@ -604,10 +569,15 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def consume_frame(frame = %Frame.RstStream{}, state = %{next: :any}) do
-    {:ok, stream} = fetch_stream(state, frame)
-    {:ok, new_stream} = Stream.receive_reset(stream, frame.error)
-    state = put_stream(state, new_stream)
-    {:ok, {[], state}}
+    case fetch_stream(state, frame) do
+      {:ok, stream} ->
+        {:ok, new_stream} = Stream.receive_reset(stream, frame.error)
+        state = put_stream(state, new_stream)
+        {:ok, {[], state}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def consume_frame(frame = %Frame.Headers{}, state = %{next: :any}) do
@@ -683,18 +653,22 @@ defmodule Ace.HTTP2.Connection do
     # control window of the maximum size (2^31-1) and can maintain this
     # window by sending a WINDOW_UPDATE frame when any data is received.
     # This effectively disables flow control for that receiver.
-    {:ok, stream} = fetch_stream(state, frame)
-
-    case Stream.receive_data(stream, frame.data, frame.end_stream) do
+    case fetch_stream(state, frame) do
       {:ok, stream} ->
-        state = put_stream(state, stream)
+        case Stream.receive_data(stream, frame.data, frame.end_stream) do
+          {:ok, stream} ->
+            state = put_stream(state, stream)
 
-        outbound = [
-          Frame.WindowUpdate.new(0, 65535),
-          Frame.WindowUpdate.new(frame.stream_id, 65535)
-        ]
+            outbound = [
+              Frame.WindowUpdate.new(0, 65535),
+              Frame.WindowUpdate.new(frame.stream_id, 65535)
+            ]
 
-        {:ok, {outbound, state}}
+            {:ok, {outbound, state}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}

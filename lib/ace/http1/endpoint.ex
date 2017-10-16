@@ -28,11 +28,7 @@ defmodule Ace.HTTP1.Endpoint do
                    """
                    |> String.replace("\n", "\r\n")
 
-  alias Raxx.{
-    Response,
-    Data,
-    Tail
-  }
+  alias Raxx.{Response, Data, Tail}
   alias Ace.HTTP1
 
   use GenServer
@@ -74,10 +70,13 @@ defmodule Ace.HTTP1.Endpoint do
 
   def handle_info({channel = {:http1, _, _}, parts}, {buffer, state}) do
     ^channel = state.channel
-    {outbound, state} = Enum.reduce(parts, {"", state}, fn(part, {buffer, state}) ->
-    {:ok, {outbound, next_state}} = send_part(part, state)
-    {[buffer, outbound], next_state}
-    end)
+
+    {outbound, state} =
+      Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
+        {:ok, {outbound, next_state}} = send_part(part, state)
+        {[buffer, outbound], next_state}
+      end)
+
     send_packet(state.socket, outbound)
 
     case state.status do
@@ -98,7 +97,8 @@ defmodule Ace.HTTP1.Endpoint do
       when transport in [:tcp_closed, :ssl_closed] do
     # Sending an exit :normal signal will do nothing. maybe the correct behaviour is to send a message
     # Or probably to have a two way monitor
-    Process.exit(state.worker, :shutdown)
+    # Process.exit(state.worker, :shutdown)
+    # TODO send message instead
     {:stop, :normal, {buffer, state}}
   end
 
@@ -300,6 +300,7 @@ defmodule Ace.HTTP1.Endpoint do
     chunk = HTTP1.serialize_chunk(data)
     {:ok, {[chunk], state}}
   end
+
   defp send_part(%Tail{headers: []}, state = %{status: {up, :chunked_body}}) do
     chunk = HTTP1.serialize_chunk("")
     new_status = {up, :complete}
