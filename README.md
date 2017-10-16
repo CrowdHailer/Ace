@@ -2,6 +2,11 @@
 
 **HTTP web server and client, supports http1 and http2**
 
+[![Hex pm](http://img.shields.io/hexpm/v/ace.svg?style=flat)](https://hex.pm/packages/ace)
+[![Build Status](https://secure.travis-ci.org/CrowdHailer/Ace.svg?branch=master
+"Build Status")](https://travis-ci.org/CrowdHailer/Ace)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 - [Install from Hex](https://hex.pm/packages/ace)
 - [Documentation available on hexdoc](https://hexdocs.pm/ace)
 
