@@ -118,7 +118,8 @@ defmodule Ace.HTTP.Service do
             Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr])
 
           {:ok, listen_socket} = :gen_tcp.listen(port, tcp_options)
-          Logger.info("Serving cleartext using HTTP/1")
+          {:ok, port} = :inet.port(listen_socket)
+          Logger.info("Serving cleartext using HTTP/1 on port #{port}")
           {:tcp, listen_socket}
 
         _ ->
@@ -137,7 +138,7 @@ defmodule Ace.HTTP.Service do
 
           {:ok, listen_socket} = :ssl.listen(port, ssl_options)
           {:ok, {_, port}} = :ssl.sockname(listen_socket)
-          Logger.info("Serving securly using HTTP/1 and HTTP/2 on port #{port}")
+          Logger.info("Serving securely using HTTP/1 and HTTP/2 on port #{port}")
           listen_socket
       end
 
