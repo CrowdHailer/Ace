@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.15.0](https://github.com/CrowdHailer/Ace/tree/0.14.8) - 2017-10-16
+## [0.15.1](https://github.com/CrowdHailer/Ace/tree/0.15.1) - 2017-10-25
+
+## Fixed
+- Server startup logs include port number when serving via cleartext.
+
+## [0.15.0](https://github.com/CrowdHailer/Ace/tree/0.15.0) - 2017-10-16
 
 ## Changed
 - Rely on `0.13.x` of raxx.

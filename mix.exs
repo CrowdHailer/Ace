@@ -4,7 +4,7 @@ defmodule Ace.Mixfile do
   def project do
     [
       app: :ace,
-      version: "0.15.0",
+      version: "0.15.1",
       elixir: "~> 1.5",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
