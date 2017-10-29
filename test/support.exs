@@ -4,7 +4,7 @@ defmodule Raxx.Forwarder do
   use Raxx.Server
 
   @impl Raxx.Server
-  def handle_headers(request, state = %{test: pid}) do
+  def handle_head(request, state = %{test: pid}) do
     GenServer.call(pid, {:headers, request, state})
   end
 

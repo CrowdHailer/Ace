@@ -4,7 +4,7 @@ defmodule Ace.Mixfile do
   def project do
     [
       app: :ace,
-      version: "0.15.1",
+      version: "0.15.2",
       elixir: "~> 1.5",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
@@ -30,7 +30,7 @@ defmodule Ace.Mixfile do
   defp deps do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
-      {:raxx, "~> 0.13.0"},
+      {:raxx, "~> 0.14.0"},
       {:dialyxir, "~> 0.5.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
