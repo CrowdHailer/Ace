@@ -3,7 +3,7 @@ defmodule Ace.HTTP1 do
 
   def serialize_response(status_code, headers, body) do
     [
-      HTTPStatus.status_line(status_code),
+      "HTTP/1.1 #{status_code} #{Raxx.reason_phrase(status_code)}\r\n",
       header_lines(headers),
       "\r\n",
       body
