@@ -24,6 +24,15 @@ defmodule Raxx.Forwarder do
   end
 end
 
+defmodule Raxx.HandleRequestForwarder do
+  use Raxx.Server
+
+  @impl Raxx.Server
+  def handle_request(%{path: ["raise_error"]}, _config) do
+    raise "Kaboom!"
+  end
+end
+
 defmodule Support do
   def test_certfile() do
     Path.expand("ace/tls/cert.pem", __DIR__)

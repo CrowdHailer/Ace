@@ -56,6 +56,30 @@ defmodule Ace.HTTP1.ServerTest do
              "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
+  test "renders 500 response if handle_request raises error" do
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {Raxx.HandleRequestForwarder, %{test: self()}},
+        port: 0,
+        cleartext: true
+      )
+
+    {:ok, port} = Ace.HTTP.Service.port(service)
+
+    http1_request = """
+    GET /raise_error HTTP/1.1
+    host: example.com
+
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:tcp, ^socket, response}, 1000
+
+    assert response == "HTTP/1.1 500 Internal server error\r\nconnection: close\r\ncontent-length: 2\r\n"
+  end
+
   @tag :skip
   test "exits normal when client closes connection", %{port: port} do
     http1_request = """
