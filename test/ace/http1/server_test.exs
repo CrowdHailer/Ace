@@ -77,7 +77,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:tcp, ^socket, response}, 1000
 
-    assert response == "HTTP/1.1 500 Internal server error\r\nconnection: close\r\ncontent-length: 2\r\n"
+    assert response == "HTTP/1.1 500 Internal server error\r\nconnection: close\r\ncontent-length: 21\r\n"
   end
 
   @tag :skip
