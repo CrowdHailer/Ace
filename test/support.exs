@@ -24,12 +24,12 @@ defmodule Raxx.Forwarder do
   end
 end
 
-defmodule Raxx.HandleRequestForwarder do
+defmodule Raxx.Kaboom do
   use Raxx.Server
 
   @impl Raxx.Server
-  def handle_request(%{path: ["raise_error"]}, _config) do
-    raise "Kaboom!"
+  def handle_request(_request, _config) do
+    raise "Kaboom !!!"
   end
 end
 
