@@ -54,6 +54,7 @@ defmodule Ace.HTTP.Server do
         :ok = :inet.setopts(socket, active: :once)
         state = %{state | socket: socket}
         {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+        monitor = Process.monitor(worker)
 
         state = %Ace.HTTP1.Endpoint{
           status: {:request, :response},
@@ -120,6 +121,7 @@ defmodule Ace.HTTP.Server do
 
           response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+            monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{
               status: {:request, :response},

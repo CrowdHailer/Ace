@@ -28,6 +28,14 @@ defmodule Ace.HTTP1.Endpoint do
                    """
                    |> String.replace("\n", "\r\n")
 
+  @internal_server_error """
+                   HTTP/1.1 500 Internal Server Error
+                   connection: close
+                   content-length: 0
+
+                   """
+                   |> String.replace("\n", "\r\n")
+
   alias Raxx.{Response, Data, Tail}
   alias Ace.HTTP1
 
@@ -37,6 +45,7 @@ defmodule Ace.HTTP1.Endpoint do
     :status,
     :socket,
     :worker,
+    :monitor,
     :channel,
     :keep_alive
   ]
@@ -100,6 +109,13 @@ defmodule Ace.HTTP1.Endpoint do
     # Process.exit(state.worker, :shutdown)
     # TODO send message instead
     {:stop, :normal, {buffer, state}}
+  end
+
+  # TODO add stacktrace info to response
+  # NOTE if any data already sent then canot send 500
+  def handle_info({:DOWN, _ref, :process, pid, stacktrace}, {buffer, state = %{worker: pid, status: {_, :response}}}) do
+    send_packet(state.socket, @internal_server_error)
+    {:stop, :normal, state}
   end
 
   defp send_packet({:tcp, socket}, packet) do
