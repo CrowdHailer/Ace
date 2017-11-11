@@ -21,7 +21,7 @@ defmodule Ace.HTTP.Worker do
   ## Server Callbacks
 
   def handle_info({client, request = %Raxx.Request{}}, {mod, state, nil}) do
-    mod.handle_headers(request, state)
+    mod.handle_head(request, state)
     |> normalise_reaction(state)
     |> do_send({mod, state, client})
   end
