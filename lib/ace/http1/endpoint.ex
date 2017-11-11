@@ -1,6 +1,8 @@
 defmodule Ace.HTTP1.Endpoint do
   @moduledoc false
 
+  require Logger
+
   @packet_timeout 10000
   @max_line_length 2048
 
@@ -166,7 +168,7 @@ defmodule Ace.HTTP1.Endpoint do
         case key do
           :Connection ->
             if value != "close" do
-              IO.puts("received 'connection: #{value}', Ace will always close connection")
+              Logger.debug("received 'connection: #{value}', Ace will always close connection")
             end
 
             new_state = %{state | keep_alive: false}
