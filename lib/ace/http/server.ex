@@ -135,8 +135,13 @@ defmodule Ace.HTTP.Server do
             :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
         end
 
-      {:error, :closed} ->
-        {:reply, {:error, :closed}, state}
+      err = {:error, _} ->
+        {:reply, err, state}
+          # other possible errors, i've seen these two: 
+          # {:error, {:tls_alert, 'record overflow'}}
+          # {:error, :econnaborted}
+       unknown -> # catch all?
+        {:reply, unknown, state}       
     end
   end
 
