@@ -62,26 +62,20 @@ defmodule Ace.HTTP.Service do
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 50.
   """
-  def start_link(app = {module, config}, options) do
+  def start_link(app, options) do
     case Ace.HTTP2.Settings.for_server(options) do
       {:ok, _settings} ->
-        service_options = Keyword.take(options, [:name])
-        GenServer.start_link(__MODULE__, {app, options}, service_options)
+        service_name =
+          case Keyword.take(options, [:name]) do
+            [] -> [name: __MODULE__]
+            name -> name
+          end
+
+        GenServer.start_link(__MODULE__, {app, options}, service_name)
 
       {:error, reason} ->
         {:error, reason}
     end
-
-    # module.module_info[:attributes]
-    # |> Keyword.get(:behaviour, [])
-    # |> Enum.member?(Raxx.Server)
-    # case Ace.Application.is_implemented?(mod) do
-    #   true ->
-    #     :ok
-    #   false ->
-    #     Logger.warn("#{__MODULE__}: #{mod} does not implement Ace.Application behaviour.")
-    # end
-    # TODO test that module implements `Raxx.Server`
   end
 
   @doc """
@@ -146,14 +140,16 @@ defmodule Ace.HTTP.Service do
       Supervisor.start_link(
         [{Ace.HTTP.Worker, app}],
         strategy: :simple_one_for_one,
-        max_restarts: 5000
+        max_restarts: 5000,
+        name: WorkerSupervisor
       )
 
     {:ok, endpoint_supervisor} =
       Supervisor.start_link(
         [{Ace.HTTP.Server, {worker_supervisor, options}}],
         strategy: :simple_one_for_one,
-        max_restarts: 5000
+        max_restarts: 5000,
+        name: EndpointSupervisor
       )
 
     # DEBT reduce restarts
@@ -161,7 +157,8 @@ defmodule Ace.HTTP.Service do
       Supervisor.start_link(
         [{Ace.Governor, {endpoint_supervisor, listen_socket}}],
         strategy: :simple_one_for_one,
-        max_restarts: 5000
+        max_restarts: 5000,
+        name: GovernorSupervisor
       )
 
     for _index <- 1..acceptors do
