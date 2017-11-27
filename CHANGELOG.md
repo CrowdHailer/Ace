@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Use `Logger.debug` to print warning about closing keep-alive connections.
 
+## Fixed
+
+- Properly close lingering workers. Send `{:stop, :normal, ...}` when RAxx.response :body is binary 
+
 ## [0.15.3](https://github.com/CrowdHailer/Ace/tree/0.15.3) - 2017-11-05
 
 ## Removed
