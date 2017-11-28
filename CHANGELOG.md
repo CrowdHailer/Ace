@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Fixed
 
-- Properly close lingering workers. Send `{:stop, :normal, ...}` when RAxx.response :body is binary 
+- Properly close lingering workers. Send `{:stop, :normal, ...}` when RAxx.Response :body is binary 
 
 ## [0.15.3](https://github.com/CrowdHailer/Ace/tree/0.15.3) - 2017-11-05
 
