@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.15.5](https://github.com/CrowdHailer/Ace/tree/0.15.5) - 2017-11-29
+
+## Fixed
+
+- Ensure worker process terminates when complete response is sent.
+
 ## [0.15.4](https://github.com/CrowdHailer/Ace/tree/0.15.4) - 2017-11-11
 
 ## Added
@@ -13,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Changed
 
 - Use `Logger.debug` to print warning about closing keep-alive connections.
+
 
 ## [0.15.3](https://github.com/CrowdHailer/Ace/tree/0.15.3) - 2017-11-05
 

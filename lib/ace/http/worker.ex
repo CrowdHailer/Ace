@@ -87,6 +87,9 @@ defmodule Ace.HTTP.Worker do
       %Raxx.Tail{} ->
         {:stop, :normal, {mod, new_state, client}}
 
+      %{body: body} when is_binary(body) ->
+        {:stop, :normal, {mod, new_state, client}}
+
       _ ->
         {:noreply, {mod, new_state, client}}
     end
