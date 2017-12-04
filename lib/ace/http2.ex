@@ -13,7 +13,8 @@ defmodule Ace.HTTP2 do
 
   import Kernel, except: [send: 2]
 
-  @known_methods ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+  # @known_methods ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+  @known_methods ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT"]
 
   def send(stream, request = %{scheme: nil}) do
     send(stream, %{request | scheme: :https})
