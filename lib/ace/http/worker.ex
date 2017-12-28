@@ -2,15 +2,21 @@ defmodule Ace.HTTP.Worker do
   @moduledoc false
   use GenServer
 
-  def child_spec({module, config}) do
-    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
-    %{
-      id: __MODULE__,
-      start: {__MODULE__, :start_link, [{module, config}]},
-      type: :worker,
-      restart: :temporary,
-      shutdown: 500
-    }
+  def child_spec(app) do
+    # NOTE child spec is called only once so possibly expensive call to `Code.ensure_compiled?` is not repeated
+    # `start_link` in this module could be protected by dialyzer
+    case Raxx.verify_application(app) do
+      {:ok, app} ->
+        %{
+          id: __MODULE__,
+          start: {__MODULE__, :start_link, [app]},
+          type: :worker,
+          restart: :temporary,
+          shutdown: 500
+        }
+      {:error, message} ->
+      raise message
+    end
   end
 
   def start_link({module, config}, _channel \\ nil) do

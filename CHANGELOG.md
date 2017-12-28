@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Added
 
 - `Ace.HTTP1.Parser` extracts functionality to incrementally parse data into parts of a Raxx message.
+- Server module is checked to implement `Raxx.Server` behaviour when starting a service.
 
 ## Removed
 
