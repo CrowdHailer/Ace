@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - `Ace.HTTP1.Parser` extracts functionality to incrementally parse data into parts of a Raxx message.
 
+## Removed
+
+- `Ace.Governor.Supervisor` is no longer necessary.
+
 ## Fixed
 
 - Request has scheme of `:http` when transmitted over `tcp` connection.
