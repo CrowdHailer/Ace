@@ -152,7 +152,13 @@ defmodule Ace.HTTP1.Endpoint do
         {:error, :start_line_too_long}
 
       {:ok, raw_request = {:http_request, _method, _http_uri, _version}, rest} ->
-        partial = build_partial_request(raw_request, :tls)
+        transport = case state.socket do
+          {:tcp, _} ->
+            :tcp
+          _ ->
+            :tls
+        end
+        partial = build_partial_request(raw_request, transport)
         new_status = {{:request_headers, partial}, :response}
         new_state = %{state | status: new_status}
         receive_data(rest, new_state)
