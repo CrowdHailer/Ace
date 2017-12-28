@@ -54,6 +54,7 @@ defmodule Ace.HTTP2.Stream do
         queue = [%{headers: headers, end_stream: !body}]
         new_stream = %{stream | status: new_status, queue: stream.queue ++ queue}
         {:ok, new_stream}
+
       _ ->
         {:error, :request_sent}
     end

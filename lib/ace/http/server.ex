@@ -54,18 +54,21 @@ defmodule Ace.HTTP.Server do
         :ok = :inet.setopts(socket, active: :once)
         state = %{state | socket: socket}
         {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
-        _monitor = Process.monitor(worker)
+        monitor = Process.monitor(worker)
 
         state = %Ace.HTTP1.Endpoint{
           status: {:request, :response},
           socket: {:tcp, socket},
           # Worker and channel could live on same key, there is no channel without a worker
           channel: {:http1, self(), 1},
-          worker: worker
+          worker: worker,
+          monitor: monitor,
+          keep_alive: false,
+          receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
         }
 
         GenServer.reply(from, {:ok, self()})
-        :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
+        :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
 
       {:error, reason} ->
         {:stop, :normal, {:error, reason}, state}
@@ -121,18 +124,21 @@ defmodule Ace.HTTP.Server do
 
           response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
-            _monitor = Process.monitor(worker)
+            monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{
               status: {:request, :response},
               socket: socket,
               # Worker and channel could live on same key, there is no channel without a worker
               channel: {:http1, self(), 1},
-              worker: worker
+              worker: worker,
+              monitor: monitor,
+              keep_alive: false,
+              receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
             }
 
             GenServer.reply(from, {:ok, self()})
-            :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], {"", state})
+            :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
         end
 
       {:error, :closed} ->
