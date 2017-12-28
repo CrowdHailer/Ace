@@ -51,7 +51,7 @@ defmodule Ace.HTTP2.Connection do
         encode_context = HPack.new_context(4096)
 
         initial_state = %__MODULE__{
-          socket: connection,
+          socket: {:ssl, connection},
           outbound_window: 65535,
           local_settings: default_client_settings,
           queued_settings: [local_settings],
@@ -66,10 +66,10 @@ defmodule Ace.HTTP2.Connection do
 
         state = %{initial_state | next: :handshake}
 
-        :ssl.send(connection, Ace.HTTP2.Connection.preface())
+        Ace.Socket.send({:ssl, connection}, Ace.HTTP2.Connection.preface())
         do_send_frames([initial_settings_frame], state)
 
-        :ssl.setopts(connection, active: :once)
+        :ok = Ace.Socket.set_active(state.socket)
         {:ok, {"", state}}
 
       {:error, reason} ->
@@ -93,7 +93,7 @@ defmodule Ace.HTTP2.Connection do
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(4, error, debug)
         outbound = Frame.GoAway.serialize(frame)
-        :ok = :ssl.send(state.socket, outbound)
+        :ok = Ace.Socket.send(state.socket, outbound)
         Process.sleep(1000)
 
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
@@ -103,7 +103,7 @@ defmodule Ace.HTTP2.Connection do
         Logger.warn("ERROR: #{inspect(reason)}, NO DEBUG INFO")
         frame = Frame.GoAway.new(4, :internal_error, inspect(reason))
         outbound = Frame.GoAway.serialize(frame)
-        :ok = :ssl.send(state.socket, outbound)
+        :ok = Ace.Socket.send(state.socket, outbound)
         Process.sleep(1000)
 
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
@@ -241,7 +241,7 @@ defmodule Ace.HTTP2.Connection do
     Enum.each(frames, &Logger.debug("#{state.name} sent: #{inspect(&1)}"))
     io_list = Enum.map(frames, &Frame.serialize/1)
     # DEBT returns :ok or {:error, :closed}
-    :ssl.send(state.socket, io_list)
+    Ace.Socket.send(state.socket, io_list)
   end
 
   def pop_stream(stream, connection, previous \\ [])
@@ -440,7 +440,7 @@ defmodule Ace.HTTP2.Connection do
               {:error, reason}
           end
         else
-          :ssl.setopts(state.socket, active: :once)
+          :ok = Ace.Socket.set_active(state.socket)
           {:ok, {unprocessed, state}}
         end
 

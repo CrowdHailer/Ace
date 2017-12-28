@@ -48,42 +48,32 @@ defmodule Ace.HTTP.Server do
     GenServer.call(endpoint, {:accept, listen_socket}, :infinity)
   end
 
-  def handle_call({:accept, {:tcp, listen_socket}}, from, state) do
-    case :gen_tcp.accept(listen_socket) do
-      {:ok, socket} ->
-        :ok = :inet.setopts(socket, active: :once)
-        state = %{state | socket: socket}
-        {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
-        monitor = Process.monitor(worker)
-
-        state = %Ace.HTTP1.Endpoint{
-          status: {:request, :response},
-          socket: {:tcp, socket},
-          # Worker and channel could live on same key, there is no channel without a worker
-          channel: {:http1, self(), 1},
-          worker: worker,
-          monitor: monitor,
-          keep_alive: false,
-          receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
-        }
-
-        GenServer.reply(from, {:ok, self()})
-        :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
-
-      {:error, reason} ->
-        {:stop, :normal, {:error, reason}, state}
-    end
-  end
-
   def handle_call({:accept, listen_socket}, from, state) do
-    case ssl_accept_connection(listen_socket, from, state) do
+    case Ace.Socket.accept(listen_socket) do
       {:ok, socket} ->
-        # DEBT returns :ok or {:error, :closed}
-        :ssl.setopts(socket, active: :once)
+        :ok = Ace.Socket.set_active(socket)
         state = %{state | socket: socket}
 
-        case :ssl.negotiated_protocol(socket) do
-          {:ok, "h2"} ->
+        case Ace.Socket.negotiated_protocol(socket) do
+          :http1 ->
+            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+            monitor = Process.monitor(worker)
+
+            state = %Ace.HTTP1.Endpoint{
+              status: {:request, :response},
+              socket: socket,
+              # Worker and channel could live on same key, there is no channel without a worker
+              channel: {:http1, self(), 1},
+              worker: worker,
+              monitor: monitor,
+              keep_alive: false,
+              receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
+            }
+
+            GenServer.reply(from, {:ok, self()})
+            :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
+
+          :http2 ->
             {:ok, local_settings} = Ace.HTTP2.Settings.for_server(state.settings)
 
             {:ok, default_server_settings} = Ace.HTTP2.Settings.for_server()
@@ -97,7 +87,7 @@ defmodule Ace.HTTP.Server do
             decode_context = Ace.HPack.new_context(4096)
             encode_context = Ace.HPack.new_context(4096)
 
-            {:ok, {_, port}} = :ssl.sockname(listen_socket)
+            {:ok, port} = Ace.Socket.port(listen_socket)
 
             initial_state = %Ace.HTTP2.Connection{
               socket: socket,
@@ -116,52 +106,15 @@ defmodule Ace.HTTP.Server do
 
             state = %{initial_state | next: :handshake}
             Logger.debug("#{state.name} sent: #{inspect(initial_settings_frame)}")
-            :ok = :ssl.send(state.socket, Ace.HTTP2.Frame.serialize(initial_settings_frame))
+            :ok = Ace.Socket.send(state.socket, Ace.HTTP2.Frame.serialize(initial_settings_frame))
 
-            :ssl.setopts(socket, active: :once)
+            :ok = Ace.Socket.set_active(socket)
 
             :gen_server.enter_loop(Ace.HTTP2.Connection, [], {:pending, initial_state})
-
-          response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
-            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
-            monitor = Process.monitor(worker)
-
-            state = %Ace.HTTP1.Endpoint{
-              status: {:request, :response},
-              socket: socket,
-              # Worker and channel could live on same key, there is no channel without a worker
-              channel: {:http1, self(), 1},
-              worker: worker,
-              monitor: monitor,
-              keep_alive: false,
-              receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
-            }
-
-            GenServer.reply(from, {:ok, self()})
-            :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
-        end
-
-      {:error, :closed} ->
-        {:reply, {:error, :closed}, state}
-    end
-  end
-
-  defp ssl_accept_connection(listen_socket, _from, _state = %{socket: nil}) do
-    case :ssl.transport_accept(listen_socket) do
-      {:ok, socket} ->
-        case :ssl.ssl_accept(socket) do
-          :ok ->
-            {:ok, socket}
-
-          {:error, :closed} ->
-            {:error, :econnaborted}
-
-          {:error, reason} ->
-            {:error, reason}
         end
 
       {:error, reason} ->
-        {:error, reason}
+        {:stop, :normal, {:error, reason}, state}
     end
   end
 end

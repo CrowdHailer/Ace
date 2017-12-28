@@ -23,30 +23,30 @@ defmodule Ace.HTTP1.Endpoint do
   defstruct @enforce_keys
 
   @impl GenServer
-  def handle_info({transport, _socket, packet}, state) when transport in [:tcp, :ssl] do
+  def handle_info({t, s, packet}, state = %{socket: {t, s}}) do
     case HTTP1.Parser.parse(packet, state.receive_state) do
       {:ok, {parts, receive_state}} ->
         Enum.each(parts, fn part ->
           send(state.worker, {state.channel, part})
         end)
 
-        :ok = set_active(state.socket)
+        :ok = Ace.Socket.set_active(state.socket)
         timeout = if HTTP1.Parser.done?(receive_state), do: :infinity, else: @packet_timeout
         {:noreply, %{state | receive_state: receive_state}, timeout}
 
       {:error, {:invalid_start_line, _line}} ->
         {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
-        send_packet(state.socket, outbound)
+        Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, state}
 
       {:error, {:invalid_header_line, _line}} ->
         {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
-        send_packet(state.socket, outbound)
+        Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, state}
 
       {:error, :start_line_too_long} ->
         {:ok, {outbound, new_state}} = send_part(Raxx.response(:uri_too_long), state)
-        send_packet(state.socket, outbound)
+        Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, new_state}
     end
   end
@@ -60,7 +60,7 @@ defmodule Ace.HTTP1.Endpoint do
         {[buffer, outbound], next_state}
       end)
 
-    send_packet(state.socket, outbound)
+    Ace.Socket.send(state.socket, outbound)
 
     case state.status do
       {_, :complete} ->
@@ -73,7 +73,7 @@ defmodule Ace.HTTP1.Endpoint do
 
   def handle_info(:timeout, state) do
     {:ok, {outbound, new_state}} = send_part(Raxx.response(:request_timeout), state)
-    send_packet(state.socket, outbound)
+    Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
   end
 
@@ -92,24 +92,8 @@ defmodule Ace.HTTP1.Endpoint do
         state = %{worker: pid, status: {_, :response}}
       ) do
     {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
-    send_packet(state.socket, outbound)
+    Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
-  end
-
-  defp send_packet({:tcp, socket}, packet) do
-    :gen_tcp.send(socket, packet)
-  end
-
-  defp send_packet(socket, packet) do
-    :ssl.send(socket, packet)
-  end
-
-  defp set_active({:tcp, socket}) do
-    :inet.setopts(socket, active: :once)
-  end
-
-  defp set_active(socket) do
-    :ssl.setopts(socket, active: :once)
   end
 
   defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
