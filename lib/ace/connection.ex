@@ -24,7 +24,7 @@ defmodule Ace.Connection do
   @typedoc """
   Generic client connection from either tcp or tls socket.
   """
-  @type connection :: {:tcp, :inet.socket()} | {:tls, :ssl.socket()}
+  @type connection :: {:tcp, :inet.socket()} | {:tls, :"ssl.SslSocket"}
 
   @spec accept(connection) :: {:ok, connection}
   def accept({:tcp, socket}) do

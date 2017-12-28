@@ -190,9 +190,6 @@ defmodule Ace.HTTP2.Connection do
           {:ok, stream} ->
             state = put_stream(state, stream)
             {:ok, {[], state}}
-
-          {:error, reason} ->
-            {:error, reason}
         end
 
       {:noreply, {buffer, state}}
