@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.15.7](https://github.com/CrowdHailer/Ace/tree/0.15.7) - 2017-12-28
+
+## Added
+
+- `OPTIONS`, `TRACE` and `CONNECT` method are understood in HTTP/2 requests.
+
+
 ## [0.15.5](https://github.com/CrowdHailer/Ace/tree/0.15.5) - 2017-11-29
 
 ## Fixed
