@@ -54,7 +54,7 @@ defmodule Ace.HTTP.Server do
         :ok = :inet.setopts(socket, active: :once)
         state = %{state | socket: socket}
         {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
-        monitor = Process.monitor(worker)
+        _monitor = Process.monitor(worker)
 
         state = %Ace.HTTP1.Endpoint{
           status: {:request, :response},
@@ -121,7 +121,7 @@ defmodule Ace.HTTP.Server do
 
           response when response in [{:ok, "http/1.1"}, {:error, :protocol_not_negotiated}] ->
             {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
-            monitor = Process.monitor(worker)
+            _monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{
               status: {:request, :response},
@@ -140,7 +140,7 @@ defmodule Ace.HTTP.Server do
     end
   end
 
-  defp ssl_accept_connection(listen_socket, from, state = %{socket: nil}) do
+  defp ssl_accept_connection(listen_socket, _from, _state = %{socket: nil}) do
     case :ssl.transport_accept(listen_socket) do
       {:ok, socket} ->
         case :ssl.ssl_accept(socket) do

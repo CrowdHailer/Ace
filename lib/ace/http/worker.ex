@@ -13,8 +13,7 @@ defmodule Ace.HTTP.Worker do
     }
   end
 
-  # TODO decide whether a channel should be limited from startup to single channel (stream/pipeline)
-  def start_link({module, config}, channel \\ nil) do
+  def start_link({module, config}, _channel \\ nil) do
     GenServer.start_link(__MODULE__, {module, config, nil}, [])
   end
 

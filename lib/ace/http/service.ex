@@ -62,7 +62,7 @@ defmodule Ace.HTTP.Service do
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 50.
   """
-  def start_link(app = {module, config}, options) do
+  def start_link(app = {_module, _config}, options) do
     case Ace.HTTP2.Settings.for_server(options) do
       {:ok, _settings} ->
         service_options = Keyword.take(options, [:name])
@@ -71,17 +71,6 @@ defmodule Ace.HTTP.Service do
       {:error, reason} ->
         {:error, reason}
     end
-
-    # module.module_info[:attributes]
-    # |> Keyword.get(:behaviour, [])
-    # |> Enum.member?(Raxx.Server)
-    # case Ace.Application.is_implemented?(mod) do
-    #   true ->
-    #     :ok
-    #   false ->
-    #     Logger.warn("#{__MODULE__}: #{mod} does not implement Ace.Application behaviour.")
-    # end
-    # TODO test that module implements `Raxx.Server`
   end
 
   @doc """

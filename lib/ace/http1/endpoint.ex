@@ -115,7 +115,7 @@ defmodule Ace.HTTP1.Endpoint do
 
   # TODO add stacktrace info to response
   # NOTE if any data already sent then canot send 500
-  def handle_info({:DOWN, _ref, :process, pid, stacktrace}, {buffer, state = %{worker: pid, status: {_, :response}}}) do
+  def handle_info({:DOWN, _ref, :process, pid, _stacktrace}, {_buffer, state = %{worker: pid, status: {_, :response}}}) do
     send_packet(state.socket, @internal_server_error)
     {:stop, :normal, state}
   end
@@ -181,7 +181,7 @@ defmodule Ace.HTTP1.Endpoint do
             receive_data(rest, new_state)
         end
 
-      {:ok, {:http_error, line}, rest} ->
+      {:ok, {:http_error, line}, _rest} ->
         {:error, {:invalid_header_line, line}}
 
       {:ok, :http_eoh, rest} ->
@@ -285,8 +285,6 @@ defmodule Ace.HTTP1.Endpoint do
         headers = [{"connection", "close"}, {"content-length", content_length} | response.headers]
         new_status = {up, :complete}
         new_state = %{state | status: new_status}
-        # Not used
-        new_state
         outbound = HTTP1.serialize_response(response.status, headers, response.body)
         {:ok, {outbound, new_state}}
 
@@ -294,8 +292,6 @@ defmodule Ace.HTTP1.Endpoint do
         headers = [{"connection", "close"} | response.headers]
         new_status = {up, :complete}
         new_state = %{state | status: new_status}
-        # Not used
-        new_state
         outbound = HTTP1.serialize_response(response.status, headers, response.body)
         {:ok, {outbound, new_state}}
     end

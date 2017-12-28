@@ -322,19 +322,6 @@ defmodule Ace.HTTP2.Connection do
     pop_stream(stream, connection, previous ++ frames)
   end
 
-  def pack_continuation(block, stream_id, max_frame_size) when byte_size(block) <= max_frame_size do
-    [Frame.Continuation.new(stream_id, block, true)]
-  end
-
-  def pack_continuation(long_block, stream_id, max_frame_size) do
-    <<to_send::binary-size(max_frame_size), remaining_block::binary>> = long_block
-
-    [
-      Frame.Continuation.new(stream_id, to_send, false)
-      | pack_continuation(remaining_block, stream_id, max_frame_size)
-    ]
-  end
-
   def pop_stream(stream = %{queue: [data = %{data: _} | rest]}, connection, previous) do
     available_window = min(Stream.outbound_window(stream), connection.outbound_window)
 
@@ -378,6 +365,25 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
+  def pop_stream(stream = %{queue: [{:reset, reason}]}, connection, previous) do
+    reset_frame = Frame.RstStream.new(stream.id, reason)
+    connection = put_stream(connection, %{stream | queue: []})
+    {previous ++ [reset_frame], connection}
+  end
+
+  def pack_continuation(block, stream_id, max_frame_size) when byte_size(block) <= max_frame_size do
+    [Frame.Continuation.new(stream_id, block, true)]
+  end
+
+  def pack_continuation(long_block, stream_id, max_frame_size) do
+    <<to_send::binary-size(max_frame_size), remaining_block::binary>> = long_block
+
+    [
+      Frame.Continuation.new(stream_id, to_send, false)
+      | pack_continuation(remaining_block, stream_id, max_frame_size)
+    ]
+  end
+
   def pack_data(block, stream_id, end_stream, max_frame_size)
       when byte_size(block) <= max_frame_size do
     [Frame.Data.new(stream_id, block, end_stream)]
@@ -391,12 +397,6 @@ defmodule Ace.HTTP2.Connection do
       Frame.Data.new(stream_id, next_block, false)
       | pack_data(remaining_block, stream_id, end_stream, max_frame_size)
     ]
-  end
-
-  def pop_stream(stream = %{queue: [{:reset, reason}]}, connection, previous) do
-    reset_frame = Frame.RstStream.new(stream.id, reason)
-    connection = put_stream(connection, %{stream | queue: []})
-    {previous ++ [reset_frame], connection}
   end
 
   def next_stream(state) do
