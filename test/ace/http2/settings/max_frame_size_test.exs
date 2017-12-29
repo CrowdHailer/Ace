@@ -5,7 +5,11 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
   test "service cannot be started with max_frame_size less than default value" do
     assert {:error, _} =
-             Service.start_link({Raxx.Forwarder, %{target: self()}}, port: 0, max_frame_size: 16383)
+             Service.start_link(
+               {Raxx.Forwarder, %{target: self()}},
+               port: 0,
+               max_frame_size: 16383
+             )
   end
 
   test "service cannot be started with max_frame_size greater than default value" do

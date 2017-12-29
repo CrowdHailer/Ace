@@ -112,12 +112,6 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def handle_info({:ssl_closed, _socket}, {buffer_or_pending, state}) do
-    if state.stream_supervisor do
-      # TODO shut down each stream
-      # TODO Send message instead
-      # :ok = Supervisor.stop(state.stream_supervisor, :shutdown)
-    end
-
     {:stop, :normal, {buffer_or_pending, state}}
   end
 
@@ -228,6 +222,11 @@ defmodule Ace.HTTP2.Connection do
     state = %{state | pings: pings}
     :ok = do_send_frames([ping_frame], state)
     {:noreply, {buffer, state}}
+  end
+
+  def handle_call({:stop, reason}, from, state) do
+    GenServer.reply(from, :ok)
+    {:stop, reason, state}
   end
 
   def send_available(connection) do

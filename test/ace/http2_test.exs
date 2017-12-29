@@ -17,6 +17,22 @@ defmodule Ace.HTTP2Test do
     {:ok, %{port: port}}
   end
 
+  test "exits normal when client closes connection", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request = Raxx.request(:GET, "/")
+    :ok = Ace.HTTP2.send(client_stream, request)
+
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, received, state}}, 1000
+    GenServer.reply(from, {[], state})
+    monitor = Process.monitor(worker)
+
+    :ok = Client.stop(client)
+
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}
+  end
+
   # Request
 
   test "header information sent to server is availale on request", %{port: port} do
@@ -118,7 +134,8 @@ defmodule Ace.HTTP2Test do
     request = Raxx.request(:GET, "/")
     :ok = Ace.HTTP2.send(client_stream, request)
 
-    assert_receive {:"$gen_call", from, {:headers, %Request{}, _state}}, 1000
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, %Request{}, _state}}, 1000
+    monitor = Process.monitor(worker)
 
     response =
       Raxx.response(200)
@@ -131,7 +148,8 @@ defmodule Ace.HTTP2Test do
     assert_receive {^client_stream, %Raxx.Data{data: body}}, 1000
     assert body == "Here is all the bodies"
     assert_receive {^client_stream, %Raxx.Tail{headers: []}}, 1000
-    # TODO test process dies
+
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}
   end
 
   test "response ends when trailers are send", %{port: port} do
@@ -144,7 +162,8 @@ defmodule Ace.HTTP2Test do
 
     :ok = Ace.HTTP2.send(client_stream, request)
 
-    assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1000
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, %Request{}, state}}, 1000
+    monitor = Process.monitor(worker)
 
     reply = [
       Raxx.response(200) |> Raxx.set_header("content-type", "text/plain") |> Raxx.set_body(true),
@@ -159,7 +178,8 @@ defmodule Ace.HTTP2Test do
     assert_receive {^client_stream, %{data: "For the client"}}, 1000
 
     assert_receive {^client_stream, %Raxx.Tail{headers: [{"x-foo", "bar"}]}}, 1000
-    # TODO test process dies
+
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}
   end
 
   test "send a promise from the server", %{port: port} do

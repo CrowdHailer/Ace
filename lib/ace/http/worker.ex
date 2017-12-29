@@ -14,8 +14,9 @@ defmodule Ace.HTTP.Worker do
           restart: :temporary,
           shutdown: 500
         }
+
       {:error, message} ->
-      raise message
+        raise message
     end
   end
 
@@ -26,6 +27,14 @@ defmodule Ace.HTTP.Worker do
   ## Server Callbacks
 
   def handle_info({client, request = %Raxx.Request{}}, {mod, state, nil}) do
+    case client do
+      {:http1, endpoint, _id} ->
+        Process.monitor(endpoint)
+
+      {:stream, endpoint, _id, _ref} ->
+        Process.monitor(endpoint)
+    end
+
     mod.handle_head(request, state)
     |> normalise_reaction(state)
     |> do_send({mod, state, client})
@@ -41,6 +50,14 @@ defmodule Ace.HTTP.Worker do
     mod.handle_tail(tail.headers, state)
     |> normalise_reaction(state)
     |> do_send({mod, state, client})
+  end
+
+  def handle_info({:DOWN, r, :process, p, reason}, {mod, state, client = {:http1, p, _id}}) do
+    {:stop, reason, {mod, state, client}}
+  end
+
+  def handle_info({:DOWN, r, :process, p, reason}, {mod, state, client = {:stream, p, _id, _ref}}) do
+    {:stop, reason, {mod, state, client}}
   end
 
   def handle_info(other, {mod, state, client}) do

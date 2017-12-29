@@ -127,6 +127,13 @@ defmodule Ace.HTTP2.Client do
   end
 
   @doc """
+  Close the connection established by a client.
+  """
+  def stop(connection) do
+    GenServer.call(connection, {:stop, :normal})
+  end
+
+  @doc """
   Collect all the parts streamed to a client as a single response.
   """
   def collect_response(stream) do

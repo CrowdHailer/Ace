@@ -58,7 +58,6 @@ defmodule Ace.HTTP1.ServerTest do
              "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
-  @tag :skip
   test "exits normal when client closes connection", %{port: port} do
     http1_request = """
     GET / HTTP/1.1
@@ -69,16 +68,17 @@ defmodule Ace.HTTP1.ServerTest do
     {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", _from = {worker, _ref}, {:headers, _request, _state}}, 1000
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, _request, state}}, 1000
+    GenServer.reply(from, {[], state})
+    # Worker receives request, but client closes connection before response is sent
 
     monitor = Process.monitor(worker)
     Process.sleep(500)
     :ok = :ssl.close(socket)
-    assert_receive {:DOWN, ^monitor, :process, ^worker, :shutdown}, 1000
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}, 1000
   end
 
   # Connection level errors
-  # TODO test with :gen_tcp
 
   test "400 response for invalid start_line", %{port: port} do
     {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])

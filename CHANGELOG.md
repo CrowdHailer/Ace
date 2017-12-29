@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - `Ace.HTTP1.Parser` extracts functionality to incrementally parse data into parts of a Raxx message.
 - Server module is checked to implement `Raxx.Server` behaviour when starting a service.
+- `Client.stop/1` breaks connection established by a client.
 
 ## Removed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Fixed
 
 - Request has scheme of `:http` when transmitted over `tcp` connection.
+- Worker monitors endpoint and will stop when endpoint stops.
 
 ## [0.15.7](https://github.com/CrowdHailer/Ace/tree/0.15.7) - 2017-12-28
 
