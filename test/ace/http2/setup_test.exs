@@ -4,7 +4,7 @@ defmodule Ace.HTTP2SetupTest do
   setup do
     {:ok, service} =
       Ace.HTTP.Service.start_link(
-        {Raxx.Forwarder, %{test: self()}},
+        {Raxx.Forwarder, %{target: self()}},
         port: 0,
         certfile: Support.test_certfile(),
         keyfile: Support.test_keyfile()

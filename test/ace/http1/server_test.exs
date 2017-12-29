@@ -4,7 +4,7 @@ defmodule Ace.HTTP1.ServerTest do
   setup do
     {:ok, service} =
       Ace.HTTP.Service.start_link(
-        {Raxx.Forwarder, %{test: self()}},
+        {Raxx.Forwarder, %{target: self()}},
         port: 0,
         certfile: Support.test_certfile(),
         keyfile: Support.test_keyfile()
@@ -25,7 +25,7 @@ defmodule Ace.HTTP1.ServerTest do
   test "server can handle cleartext exchange" do
     {:ok, service} =
       Ace.HTTP.Service.start_link(
-        {Raxx.Forwarder, %{test: self()}},
+        {Raxx.Forwarder, %{target: self()}},
         port: 0,
         cleartext: true
       )
@@ -177,7 +177,7 @@ defmodule Ace.HTTP1.ServerTest do
   test "renders 500 response if handler exits raises error" do
     {:ok, service} =
       Ace.HTTP.Service.start_link(
-        {Raxx.Kaboom, %{test: self()}},
+        {Raxx.Kaboom, %{target: self()}},
         port: 0,
         cleartext: true
       )

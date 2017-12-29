@@ -12,7 +12,7 @@ defmodule Ace.HTTP2Test do
       keyfile: Support.test_keyfile()
     ]
 
-    assert {:ok, service} = Ace.HTTP.Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    assert {:ok, service} = Ace.HTTP.Service.start_link({Raxx.Forwarder, %{target: self()}}, opts)
     {:ok, port} = Ace.HTTP.Service.port(service)
     {:ok, %{port: port}}
   end

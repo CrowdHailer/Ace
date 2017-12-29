@@ -5,13 +5,13 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
 
   test "service cannot be started with max_frame_size less than default value" do
     assert {:error, _} =
-             Service.start_link({Raxx.Forwarder, %{test: self()}}, port: 0, max_frame_size: 16383)
+             Service.start_link({Raxx.Forwarder, %{target: self()}}, port: 0, max_frame_size: 16383)
   end
 
   test "service cannot be started with max_frame_size greater than default value" do
     assert {:error, _} =
              Service.start_link(
-               {Raxx.Forwarder, %{test: self()}},
+               {Raxx.Forwarder, %{target: self()}},
                port: 0,
                max_frame_size: 16_777_216
              )
@@ -25,7 +25,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
       max_frame_size: 20000
     ]
 
-    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{target: self()}}, opts)
     {:ok, port} = Service.port(service)
     connection = Support.open_connection(port)
     assert {:ok, Frame.Settings.new(max_frame_size: 20000)} == Support.read_next(connection)
@@ -39,7 +39,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
       max_frame_size: 20000
     ]
 
-    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{target: self()}}, opts)
     {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
@@ -69,7 +69,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
       max_frame_size: 20000
     ]
 
-    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{target: self()}}, opts)
     {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
@@ -95,7 +95,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   # Call things waiting in stream blocks
   test "client cannot request max_frame_size less than default" do
     opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{target: self()}}, opts)
     {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)
@@ -110,7 +110,7 @@ defmodule Ace.HTTP2.Settings.MaxFrameSizeTest do
   @tag :skip
   test "large response blocks from server are broken into multiple data parts" do
     opts = [port: 0, certfile: Support.test_certfile(), keyfile: Support.test_keyfile()]
-    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{test: self()}}, opts)
+    assert {:ok, service} = Service.start_link({Raxx.Forwarder, %{target: self()}}, opts)
     {:ok, port} = Service.port(service)
 
     connection = Support.open_connection(port)

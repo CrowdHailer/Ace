@@ -1,20 +1,18 @@
 defmodule Raxx.Forwarder do
-  # TODO rename Proxy
-  # TODO rename test -> target in config
   use Raxx.Server
 
   @impl Raxx.Server
-  def handle_head(request, state = %{test: pid}) do
+  def handle_head(request, state = %{target: pid}) do
     GenServer.call(pid, {:headers, request, state})
   end
 
   @impl Raxx.Server
-  def handle_data(data, state = %{test: pid}) do
+  def handle_data(data, state = %{target: pid}) do
     GenServer.call(pid, {:data, data, state})
   end
 
   @impl Raxx.Server
-  def handle_tail(tail, state = %{test: pid}) do
+  def handle_tail(tail, state = %{target: pid}) do
     GenServer.call(pid, {:tail, tail, state})
   end
 
