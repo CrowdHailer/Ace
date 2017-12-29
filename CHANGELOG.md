@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.HTTP1.Parser` extracts functionality to incrementally parse data into parts of a Raxx message.
 - Server module is checked to implement `Raxx.Server` behaviour when starting a service.
 - `Client.stop/1` breaks connection established by a client.
+- `Ace.Service.child_spec/1` added so services can be added to supervision trees in standard manner.
 
 ## Removed
 

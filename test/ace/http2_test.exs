@@ -30,7 +30,7 @@ defmodule Ace.HTTP2Test do
 
     :ok = Client.stop(client)
 
-    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}, 1000
   end
 
   # Request

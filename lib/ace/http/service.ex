@@ -38,6 +38,13 @@ defmodule Ace.HTTP.Service do
     {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
+  @typedoc """
+  Process to manage a HTTP service.
+
+  This process should be added to a supervision tree as a supervisor.
+  """
+  @type service :: pid
+
   @doc """
   Start a HTTP web service.
 
@@ -62,6 +69,7 @@ defmodule Ace.HTTP.Service do
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 50.
   """
+  @spec start_link({module, any}, [{atom, any}]) :: {:ok, service}
   def start_link(app = {_module, _config}, options) do
     case Ace.HTTP2.Settings.for_server(options) do
       {:ok, _settings} ->
@@ -73,6 +81,16 @@ defmodule Ace.HTTP.Service do
     end
   end
 
+  @doc false
+  def child_spec([{mod, config}, options]) do
+    %{
+      id: Keyword.get(options, :id, __MODULE__),
+      start: {__MODULE__, :start_link, [{mod, config}, options]},
+      type: :supervisor,
+      restart: :permanent,
+    }
+  end
+
   @doc """
   Fetch the port number of a running service.
 
@@ -81,6 +99,7 @@ defmodule Ace.HTTP.Service do
   This can be used to start many endpoints simultaneously.
   It can be useful running parallel tests.
   """
+  @spec port(service) :: {:ok, :inet.port_number()}
   def port(endpoint) do
     GenServer.call(endpoint, :port)
   end
