@@ -3,23 +3,29 @@ defmodule Ace.HTTP1.Parser do
   Incrementally parse an HTTP/1.x request.
   """
 
-  @type buffer :: String.t()
+  @typedoc """
+  Available options when initializing a new parser
+  """
   @type option :: {:max_line_length, integer}
-  @type options :: map
 
-  @type read_start_line :: {:start_line, buffer, options}
-  @type read_headers :: {:headers, buffer, HttpRequest, [HttpHeader], options}
-  @type read_body :: {:body, buffer, non_neg_integer, options}
-  @type read_body_chunked :: {:body_chunked, buffer, options}
-  @type read_trailers :: {:trailers, buffer, options}
-  @type read_done :: {:done, buffer, options}
-  @type state ::
-          read_start_line
-          | read_headers
-          | read_body
-          | read_body_chunked
-          | read_trailers
-          | read_done
+  @typep buffer :: String.t()
+  @typep read_start_line :: {:start_line, buffer, map}
+  @typep read_headers :: {:headers, buffer, HttpRequest, [HttpHeader], map}
+  @typep read_body :: {:body, buffer, non_neg_integer, map}
+  @typep read_body_chunked :: {:body_chunked, buffer, map}
+  @typep read_trailers :: {:trailers, buffer, map}
+  @typep read_done :: {:done, buffer, map}
+
+  @typedoc """
+  State tracking the progress of the Parser.
+  """
+  @opaque state ::
+            read_start_line
+            | read_headers
+            | read_body
+            | read_body_chunked
+            | read_trailers
+            | read_done
 
   @doc """
   Initial state for the incremental parser.

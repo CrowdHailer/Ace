@@ -6,16 +6,6 @@ defmodule Ace.HTTP.Server do
 
   defstruct [:worker_supervisor, :settings, :socket]
 
-  def child_spec({worker_supervisor, settings}) do
-    %{
-      id: __MODULE__,
-      start: {__MODULE__, :start_link, [worker_supervisor, settings]},
-      type: :worker,
-      restart: :temporary,
-      shutdown: 500
-    }
-  end
-
   @doc """
   Start a new `Ace.HTTP.Server` linked to the calling process.
 
@@ -38,6 +28,17 @@ defmodule Ace.HTTP.Server do
     GenServer.start_link(__MODULE__, state)
   end
 
+  @doc false
+  def child_spec({worker_supervisor, settings}) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [worker_supervisor, settings]},
+      type: :worker,
+      restart: :temporary,
+      shutdown: 500
+    }
+  end
+
   @doc """
   Manage a client connect with server
 
@@ -56,7 +57,7 @@ defmodule Ace.HTTP.Server do
 
         case Ace.Socket.negotiated_protocol(socket) do
           :http1 ->
-            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [:the_channel])
+            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [])
             monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{

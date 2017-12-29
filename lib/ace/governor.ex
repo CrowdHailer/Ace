@@ -9,17 +9,6 @@ defmodule Ace.Governor do
 
   use GenServer
 
-  def child_spec({endpoint_supervisor, listen_socket}) do
-    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
-    %{
-      id: __MODULE__,
-      start: {__MODULE__, :start_link, [endpoint_supervisor, listen_socket]},
-      type: :worker,
-      restart: :transient,
-      shutdown: 500
-    }
-  end
-
   @enforce_keys [:server_supervisor, :listen_socket, :server, :monitor]
   defstruct @enforce_keys
 
@@ -32,6 +21,17 @@ defmodule Ace.Governor do
     }
 
     GenServer.start_link(__MODULE__, initial_state)
+  end
+
+  def child_spec({endpoint_supervisor, listen_socket}) do
+    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [endpoint_supervisor, listen_socket]},
+      type: :worker,
+      restart: :transient,
+      shutdown: 500
+    }
   end
 
   @impl GenServer

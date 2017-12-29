@@ -87,7 +87,7 @@ defmodule Ace.HTTP.Service do
       id: Keyword.get(options, :id, __MODULE__),
       start: {__MODULE__, :start_link, [{mod, config}, options]},
       type: :supervisor,
-      restart: :permanent,
+      restart: :permanent
     }
   end
 
