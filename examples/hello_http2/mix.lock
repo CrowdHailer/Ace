@@ -1,7 +1,9 @@
 %{
+  "dialyxir": {:hex, :dialyxir, "0.5.1", "b331b091720fd93e878137add264bac4f644e1ddae07a70bf7062c7862c4b952", [], [], "hexpm"},
   "hpack": {:hex, :hpack_erl, "0.2.3", "17670f83ff984ae6cd74b1c456edde906d27ff013740ee4d9efaa4f1bf999633", [], [], "hexpm"},
   "http_status": {:hex, :http_status, "0.2.2", "9710b536e42aaf2eedf1a5c3543b16dc459088dcfa41f80998ea2ba3715f35e6", [], [], "hexpm"},
   "mime": {:hex, :mime, "1.1.0", "01c1d6f4083d8aa5c7b8c246ade95139620ef8effb009edde934e0ec3b28090a", [], [], "hexpm"},
   "plug": {:hex, :plug, "1.4.3", "236d77ce7bf3e3a2668dc0d32a9b6f1f9b1f05361019946aae49874904be4aed", [], [{:cowboy, "~> 1.0.1 or ~> 1.1", [hex: :cowboy, repo: "hexpm", optional: true]}, {:mime, "~> 1.0", [hex: :mime, repo: "hexpm", optional: false]}], "hexpm"},
-  "raxx": {:git, "https://github.com/crowdhailer/raxx.git", "9d68559ddc81f9fb540d7194b30b8970cb8da32e", [branch: "master"]},
+  "raxx": {:hex, :raxx, "0.14.5", "d7187d05e41c9385b84ffb9e229d5caf1275ee1786066d23a5fbbc66171489b7", [:mix], [], "hexpm"},
+  "raxx_static": {:hex, :raxx_static, "0.5.0", "3f812dc5b03cb59ba22d187b72b03a025d065053a0e8593056be997ef7f1696b", [], [{:mime, "~> 1.1", [hex: :mime, repo: "hexpm", optional: false]}, {:raxx, "~> 0.14.2", [hex: :raxx, repo: "hexpm", optional: false]}], "hexpm"},
 }

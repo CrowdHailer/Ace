@@ -17,7 +17,9 @@ defmodule HelloHTTP2.Mixfile do
 
   defp deps do
     [
-      {:ace, path: "../.."}
+      {:ace, path: "../.."},
+      {:raxx_static, "~> 0.5.0"},
+      {:dialyxir, "~> 0.5.0", only: :dev},
     ]
   end
 end

@@ -8,12 +8,17 @@ defmodule HelloHTTP2.Application do
     certfile = Application.app_dir(:hello_http2, "/priv/cert.pem")
     keyfile = Application.app_dir(:hello_http2, "/priv/key.pem")
 
-    Ace.HTTP.Service.start_link(
-      {HelloHTTP2.WWW, "Hello, World!"},
+    options = [
       port: 8443,
       certfile: certfile,
       keyfile: keyfile,
       connections: 1_000
-    )
+    ]
+    children = [
+      {Ace.HTTP.Service, [{HelloHTTP2.WWW, "Hello, World!"}, options]}
+    ]
+
+    opts = [strategy: :one_for_one, name: Foo.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 end
