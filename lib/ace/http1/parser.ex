@@ -226,10 +226,14 @@ defmodule Ace.HTTP1.Parser do
     {:ok, query} = URI2.Query.decode(query_string || "")
     path = Raxx.split_path(path)
 
-    %{scheme: scheme} = URI.parse(host)
+    # NOTE scheme is ignored from message.
+    # It should therefore not be part of request but part of connection. same as client ip etc
+    # However scheme is a required header in HTTP/2
+    # Q? how often is a host header sent with http in place
+    # %{scheme: scheme} = URI.parse(host)
 
     %Raxx.Request{
-      scheme: :https,
+      scheme: nil,
       authority: host,
       method: method,
       path: path,

@@ -27,6 +27,7 @@ defmodule Ace.HTTP1.Endpoint do
     case HTTP1.Parser.parse(packet, state.receive_state) do
       {:ok, {parts, receive_state}} ->
         Enum.each(parts, fn part ->
+          part = normalise_part(part, t)
           send(state.worker, {state.channel, part})
         end)
 
@@ -91,6 +92,10 @@ defmodule Ace.HTTP1.Endpoint do
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
   end
+
+  defp normalise_part(request = %{scheme: nil}, :tcp), do: %{request | scheme: :http}
+  defp normalise_part(request = %{scheme: nil}, :ssl), do: %{request | scheme: :https}
+  defp normalise_part(part, _transport), do: part
 
   defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
     case content_length(response) do

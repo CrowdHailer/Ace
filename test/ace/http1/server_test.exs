@@ -42,8 +42,7 @@ defmodule Ace.HTTP1.ServerTest do
     :ok = :gen_tcp.send(socket, http1_request)
 
     assert_receive {:"$gen_call", from, {:headers, request, _state}}, 1000
-    # TODO reinstate
-    # assert request.scheme == :http
+    assert request.scheme == :http
 
     response =
       Raxx.response(:ok)
