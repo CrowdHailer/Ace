@@ -102,6 +102,9 @@ defmodule Ace.HTTP1.Parser do
       {:ok, start_line = {:http_request, _, _, _}, rest} ->
         pop_part({:headers, rest, start_line, [], options})
 
+      {:ok, start_line = {:http_response, _, _, _}, rest} ->
+        pop_part({:headers, rest, start_line, [], options})
+
       {:ok, {:http_error, line}, _rest} ->
         {:error, {:invalid_start_line, line}}
 
@@ -127,7 +130,7 @@ defmodule Ace.HTTP1.Parser do
         request_head =
           Enum.reduce(
             :proplists.delete("host", clean_headers),
-            build_partial_request(start_line, :proplists.get_value("host", headers)),
+            build_partial_message(start_line, :proplists.get_value("host", headers)),
             fn {k, v}, request -> Raxx.set_header(request, k, v) end
           )
 
@@ -208,7 +211,7 @@ defmodule Ace.HTTP1.Parser do
     end
   end
 
-  defp build_partial_request({:http_request, method, http_uri, _version}, host) do
+  defp build_partial_message({:http_request, method, http_uri, _version}, host) do
     path_string =
       case http_uri do
         {:abs_path, path_string} ->
@@ -241,5 +244,9 @@ defmodule Ace.HTTP1.Parser do
       headers: [],
       body: false
     }
+  end
+  # NOTE nil host. response never has host field.
+  defp build_partial_message({:http_response, _version, status, _reason_phrase}, :undefined) do
+    Raxx.response(status)
   end
 end

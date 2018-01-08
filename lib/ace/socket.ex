@@ -44,6 +44,18 @@ defmodule Ace.Socket do
     end
   end
 
+  def connect(endpoint = "http://" <> _) do
+    uri = URI.parse(endpoint)
+    "http" = uri.scheme
+    port = uri.port || 80
+    connect(:http, :erlang.binary_to_list(uri.host), port)
+  end
+
+  defp connect(:http, host, port) do
+    {:ok, socket} = :gen_tcp.connect(host, port, [:binary, {:active, true}])
+    {:ok, {:tcp, socket}}
+  end
+
   def port({:tcp, socket}) do
     :inet.port(socket)
   end
