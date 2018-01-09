@@ -4,5 +4,6 @@
   "ex_doc": {:hex, :ex_doc, "0.18.1", "37c69d2ef62f24928c1f4fdc7c724ea04aecfdf500c4329185f8e3649c915baf", [:mix], [{:earmark, "~> 1.1", [hex: :earmark, repo: "hexpm", optional: false]}], "hexpm"},
   "hpack": {:hex, :hpack_erl, "0.2.3", "17670f83ff984ae6cd74b1c456edde906d27ff013740ee4d9efaa4f1bf999633", [], [], "hexpm"},
   "mime": {:hex, :mime, "1.1.0", "01c1d6f4083d8aa5c7b8c246ade95139620ef8effb009edde934e0ec3b28090a", [], [], "hexpm"},
+  "ok": {:hex, :ok, "1.9.4", "fc8ff2193160c7a56bf2cf446077ff6a7bea34463b6c1958b101404a1b5a7fd3", [], [], "hexpm"},
   "raxx": {:hex, :raxx, "0.14.5", "d7187d05e41c9385b84ffb9e229d5caf1275ee1786066d23a5fbbc66171489b7", [:mix], [], "hexpm"},
 }

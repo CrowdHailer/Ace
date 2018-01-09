@@ -15,6 +15,8 @@ defmodule Ace.Socket do
   """
   @type listen_socket :: {:ssl, :"ssl.ListenSocket"} | {:tcp, :inet.socket()}
 
+  require OK
+
   def accept({:tcp, listen_socket}) do
     case :gen_tcp.accept(listen_socket) do
       {:ok, socket} ->
@@ -52,8 +54,11 @@ defmodule Ace.Socket do
   end
 
   defp connect(:http, host, port) do
-    {:ok, socket} = :gen_tcp.connect(host, port, [:binary, {:active, true}])
-    {:ok, {:tcp, socket}}
+    OK.for do
+      socket <- :gen_tcp.connect(host, port, [:binary, {:active, true}])
+    after
+      {:tcp, socket}
+    end
   end
 
   def port({:tcp, socket}) do
