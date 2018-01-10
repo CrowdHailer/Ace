@@ -15,7 +15,7 @@ defmodule Ace.HTTP1.ClientTest do
     assert String.contains?(response.body, "\"method\": \"DELETE\"")
   end
 
-  test "adds host information from connection if not given" do
+  test "adds host header from connection if not given" do
     request = Raxx.request(:GET, "/headers")
 
     {:ok, response} = Ace.HTTP1.Client.send_sync(request, "http://httpbin.org")
@@ -42,9 +42,10 @@ defmodule Ace.HTTP1.ClientTest do
     assert_receive {^ref, %Raxx.Tail{}}, 1_000
   end
 
-  test "can send data after request" do
+  test "can send data after request with content_length" do
     request = Raxx.request(:POST, "/post")
     |> Raxx.set_header("content-length", "13")
+    |> Raxx.set_body(true)
 
     {:ok, ref} = Ace.HTTP1.Client.send(request, "http://httpbin.org")
 
@@ -55,10 +56,21 @@ defmodule Ace.HTTP1.ClientTest do
     assert_receive {^ref, %Raxx.Tail{}}, 1_000
   end
 
+  test "can send chunked data when no content-length given" do
+    request = Raxx.request(:POST, "/post")
+    |> Raxx.set_body(true)
 
+    {:ok, ref} = Ace.HTTP1.Client.send(request, "http://httpbin.org")
+    data = Raxx.data("Hello, ")
+    assert {:ok, ^ref} = Ace.HTTP1.Client.send(data, ref)
+    data = Raxx.data("World!")
+    {:ok, ^ref} = Ace.HTTP1.Client.send(data, ref)
+    tail = Raxx.tail()
+    {:ok, ^ref} = Ace.HTTP1.Client.send(tail, ref)
 
-  test "can stream data with content_length" do
-
+    assert_receive {^ref, %Raxx.Response{}}, 1_000
+    assert_receive {^ref, %Raxx.Data{}}, 1_000
+    assert_receive {^ref, %Raxx.Tail{}}, 1_000
   end
 
   test "returns error if unable to connect to endpoint" do

@@ -34,7 +34,7 @@ defmodule Ace.HTTP1.Client do
   - *A response with no body will return only a `Raxx.Response`*
   - *A response with a body can return any number of `Raxx.Data` parts*
 
-  ## Streamed data
+  ## Streamed requests
 
   A request can have a body value of true indicating that the body will be sent later.
   The channel_ref returned when sending to an endpoint can be used to send follow up data.
@@ -60,25 +60,39 @@ defmodule Ace.HTTP1.Client do
   require OK
 
   @type channel_ref :: {:http1, pid(), integer}
-  # Could take a third argument that is a supervisor
+
+  @doc """
+  Start a client linked to the calling process to manage a HTTP/1 connection.
+
+  The location of the server to connect to, must include the scheme and host
+
+  ## Examples
+
+      {:ok, endpoint} = Ace.HTTP1.Client.start_link("http://httpbin.org")
+  """
+  def start_link(location, options \\ []) do
+    GenServer.start_link(__MODULE__, {:client, location, options})
+  end
 
   @doc """
   Send a request, or part of, to a remote endpoint.
   """
   @spec send(Raxx.Response.t, String.t) :: {:ok, channel_ref} | {:error, any()}
-  def send(part, channel_ref = {:http1, endpoint, _}) do
-    GenServer.call(endpoint, {:send, channel_ref, [part]})
-  end
-  def send(request, endpoint) do
-    # `Endpoint.connect`
+  def send(request, location) when is_binary(location) do
     # Linking to calling process is not an issue if never errors i.e. will always close
     # use monitor for exit normal
-    {:ok, endpoint} = GenServer.start_link(__MODULE__, {:client, endpoint})
-
-    # channel could be created with a monitor on the process
-    # channel would be called link
-    GenServer.call(endpoint, {:send, self(), [request]})
+    {:ok, endpoint} = start_link(location)
+    send(request, endpoint)
   end
+  def send(request, endpoint) when is_pid(endpoint) do
+    channel_monitor = Process.monitor(endpoint)
+    GenServer.call(endpoint, {:send, self(), channel_monitor, [request]})
+  end
+  # # channel would be called link
+  def send(part, channel_ref = {:http1, endpoint, _monitor, _id}) do
+    GenServer.call(endpoint, {:send, channel_ref, [part]})
+  end
+
   @doc """
   Send a request to a server and await the full response.
 
@@ -138,12 +152,13 @@ defmodule Ace.HTTP1.Client do
     :channel,
 
     :receive_state,
+    :dispatch_state,
 
     :authority,
   ]
   defstruct @enforce_keys
 
-  def init({:client, endpoint}) do
+  def init({:client, endpoint, _options}) do
     case Ace.Socket.connect(endpoint) do
       {:ok, socket} ->
         %{authority: authority} = URI.parse(endpoint)
@@ -151,6 +166,7 @@ defmodule Ace.HTTP1.Client do
           socket: socket,
           channel: nil,
           receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048),
+          dispatch_state: :head,
           authority: authority
         }
         {:ok, state}
@@ -159,14 +175,14 @@ defmodule Ace.HTTP1.Client do
     end
   end
 
-  def handle_call({:send, worker, parts}, from, state = %{channel: nil}) do
+  def handle_call({:send, worker, channel_monitor, parts}, from, state = %{channel: nil}) do
     # NOTE change 1 to latest id for streaming.
     channel_number = 1
 
-    channel_ref = {:http1, self(), channel_number}
+    channel_ref = {:http1, self(), channel_monitor, channel_number}
 
     monitor = Process.monitor(worker)
-    channel = {worker, monitor, channel_number}
+    channel = {worker, monitor, channel_ref}
     new_state = %{state | channel: channel}
 
     {packets, newer_state} = prepare(parts, new_state)
@@ -175,7 +191,7 @@ defmodule Ace.HTTP1.Client do
     Ace.Socket.send(state.socket, packets)
     {:reply, {:ok, channel_ref}, newer_state}
   end
-  def handle_call({:send, channel_ref, parts}, from, state) do
+  def handle_call({:send, channel_ref, parts}, from, state = %{channel: {worker, monitor, channel_ref}}) do
     {packets, new_state} = prepare(parts, state)
     IO.inspect(packets)
 
@@ -188,7 +204,7 @@ defmodule Ace.HTTP1.Client do
     IO.inspect(packet)
     case Ace.HTTP1.Parser.parse(packet, state.receive_state) do
       {:ok, {parts, receive_state}} ->
-        {worker, channel_ref} = channel_ref(state.channel)
+        {worker, worker_monitor, channel_ref} = state.channel
         Enum.each(parts, &Kernel.send(worker, {channel_ref, &1}))
         {:noreply, %{state | receive_state: receive_state}}
     end
@@ -209,7 +225,14 @@ defmodule Ace.HTTP1.Client do
         {queue ++ request, state}
       (request = %Raxx.Request{body: true}, {queue, state}) ->
         host = request.authority || state.authority
-        headers = [{"host", host} | request.headers]
+        {headers, state} = if raxx_header(request, "content-length") do
+          headers = [{"host", host} | request.headers]
+          {headers, %{state | dispatch_state: :body}}
+        else
+          headers = [{"host", host}, {"transfer-encoding", "chunked"} | request.headers]
+          {headers, %{state | dispatch_state: :chunked_body}}
+        end
+
 
         header_lines = Enum.map(headers, fn({k, v}) -> [k, ": ", v] end)
         request = Enum.map([raxx_start_line(request)] ++ header_lines ++ [""], fn(line) -> [line, "\r\n"] end)
@@ -222,13 +245,22 @@ defmodule Ace.HTTP1.Client do
         request = Enum.map([raxx_start_line(request)] ++ header_lines ++ [""], fn(line) -> [line, "\r\n"] end)
 
         {queue ++ request ++ [body], state}
-      (request = %Raxx.Data{data: data}, {queue, state}) ->
+      (request = %Raxx.Data{data: data}, {queue, state = %{dispatch_state: :body}}) ->
         {queue ++ [data], state}
+      (request = %Raxx.Data{data: data}, {queue, state = %{dispatch_state: :chunked_body}}) ->
+        {queue ++ [Ace.HTTP1.serialize_chunk(data)], state}
+      (request = %Raxx.Tail{}, {queue, state = %{dispatch_state: :chunked_body}}) ->
+        {queue ++ [Ace.HTTP1.serialize_chunk("")], %{state | dispatch_state: :complete}}
     end)
   end
 
-  defp raxx_header(%{headers: headers}, header, default \\ :undefined) do
-
+  defp raxx_header(%{headers: headers}, header, default \\ nil) do
+    case :proplists.get_all_values("content-length", headers) do
+      [] ->
+        default
+      [value] ->
+        value
+    end
   end
 
   defp raxx_start_line(request) do
@@ -244,9 +276,5 @@ defmodule Ace.HTTP1.Client do
     query_string = URI.encode_query(query || %{})
     query = if query_string == "", do: "", else: "?" <> query_string
     [path, query]
-  end
-
-  defp channel_ref({worker, _monitor, id}, endpoint \\ self()) do
-    {worker, {:http1, endpoint, id}}
   end
 end
