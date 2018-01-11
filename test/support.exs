@@ -1,27 +1,3 @@
-defmodule Raxx.Forwarder do
-  use Raxx.Server
-
-  @impl Raxx.Server
-  def handle_head(request, state = %{target: pid}) do
-    GenServer.call(pid, {:headers, request, state})
-  end
-
-  @impl Raxx.Server
-  def handle_data(data, state = %{target: pid}) do
-    GenServer.call(pid, {:data, data, state})
-  end
-
-  @impl Raxx.Server
-  def handle_tail(tail, state = %{target: pid}) do
-    GenServer.call(pid, {:tail, tail, state})
-  end
-
-  @impl Raxx.Server
-  def handle_info(response, _state) do
-    response
-  end
-end
-
 defmodule Raxx.Kaboom do
   use Raxx.Server
 
@@ -83,5 +59,34 @@ defmodule Support do
       {":method", "GET"},
       {":path", "/"}
     ] ++ rest
+  end
+end
+
+defmodule Raxx.Forwarder do
+  use Ace.HTTP.Service, [
+    port: 0,
+    acceptors: 1,
+    certfile: Support.test_certfile(),
+    keyfile: Support.test_keyfile()
+  ]
+
+  @impl Raxx.Server
+  def handle_head(request, state = %{target: pid}) do
+    GenServer.call(pid, {:headers, request, state})
+  end
+
+  @impl Raxx.Server
+  def handle_data(data, state = %{target: pid}) do
+    GenServer.call(pid, {:data, data, state})
+  end
+
+  @impl Raxx.Server
+  def handle_tail(tail, state = %{target: pid}) do
+    GenServer.call(pid, {:tail, tail, state})
+  end
+
+  @impl Raxx.Server
+  def handle_info(response, _state) do
+    response
   end
 end

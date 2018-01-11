@@ -45,6 +45,28 @@ defmodule Ace.HTTP.Service do
   """
   @type service :: pid
 
+  defmacro __using__(defaults) do
+    {defaults, []} = Module.eval_quoted(__CALLER__, defaults)
+    quote do
+      use Raxx.Server
+
+      def start_link(initial_state, options \\ []) do
+        application = {__MODULE__, initial_state}
+        options = options ++ unquote(defaults)
+        unquote(__MODULE__).start_link(application, options)
+      end
+
+      def child_spec([config, options]) do
+        %{
+          id: Keyword.get(options, :id, __MODULE__),
+          start: {__MODULE__, :start_link, [config, options]},
+          type: :supervisor,
+          restart: :permanent
+        }
+      end
+    end
+  end
+
   @doc """
   Start a HTTP web service.
 

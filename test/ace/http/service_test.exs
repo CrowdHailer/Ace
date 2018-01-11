@@ -3,14 +3,7 @@ defmodule Ace.HTTP.ServiceTest do
 
   @tag :skip
   test "service starts a new acceptor for each new connection" do
-    {:ok, service} =
-      Ace.HTTP.Service.start_link(
-        {Raxx.Forwarder, %{target: self()}},
-        port: 0,
-        acceptors: 1,
-        certfile: Support.test_certfile(),
-        keyfile: Support.test_keyfile()
-      )
+    {:ok, service} = Raxx.Forwarder.start_link(%{target: self()})
 
     {:ok, port} = Ace.HTTP.Service.port(service)
 
@@ -31,14 +24,7 @@ defmodule Ace.HTTP.ServiceTest do
   end
 
   test "governor will exit if server exits before accepting connection" do
-    {:ok, service} =
-      Ace.HTTP.Service.start_link(
-        {Raxx.Forwarder, %{target: self()}},
-        port: 0,
-        acceptors: 1,
-        certfile: Support.test_certfile(),
-        keyfile: Support.test_keyfile()
-      )
+    {:ok, service} = Raxx.Forwarder.start_link(%{target: self()})
 
     {:ok, port} = Ace.HTTP.Service.port(service)
 
@@ -54,14 +40,7 @@ defmodule Ace.HTTP.ServiceTest do
 
   test "governor will not exit if server exits after accepting connection" do
     # Just call `Ace.HTTP.Service.init` an turn test
-    {:ok, service} =
-      Ace.HTTP.Service.start_link(
-        {Raxx.Forwarder, %{target: self()}},
-        port: 0,
-        acceptors: 1,
-        certfile: Support.test_certfile(),
-        keyfile: Support.test_keyfile()
-      )
+    {:ok, service} = Raxx.Forwarder.start_link(%{target: self()})
 
     {:ok, port} = Ace.HTTP.Service.port(service)
 

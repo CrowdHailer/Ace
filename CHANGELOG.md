@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.15.9](https://github.com/CrowdHailer/Ace/tree/0.15.9) - 2018-01-11
+
+## Added
+
+- `__using__/1` macro to `Ace.HTTP.Service` that defines `start_link` and `child_spec`.
+
 ## [0.15.8](https://github.com/CrowdHailer/Ace/tree/0.15.8) - 2018-01-01
 
 ## Added

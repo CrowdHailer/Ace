@@ -16,7 +16,7 @@
 #### Hello, World!
 ```elixir
 defmodule MyApp do
-  use Raxx.Server
+  use Ace.HTTP.Service, [port: 8080, cleartext: true]
 
   @impl Raxx.Server
   def handle_request(%{method: :GET, path: []}, %{greeting: greeting}) do
@@ -27,6 +27,18 @@ defmodule MyApp do
 end
 ```
 
+*The arguments given to use Ace.HTTP.Service are default values when starting the service.*
+
+#### Start the service
+
+```elixir
+config = %{greeting: "Hello"}
+
+MyApp.start_link(config, [port: 1234])
+```
+
+*Here the default port value has been overridden at startup*
+
 #### Raxx
 
 Ace implements the Raxx HTTP interface.
@@ -36,24 +48,15 @@ Raxx has tooling for streaming, server-push, routing, api documentation and more
 
 *The correct version of raxx is included with ace, raxx does not need to be added as a dependency.*
 
-#### Start a service
-
-```elixir
-application = {MyApp, %{greeting: "Hello"}}
-options = [port: 8080, cleartext: true]
-
-Ace.HTTP.Service.start_link(application, options)
-```
-
 #### TLS/SSL
 
 If a service is started without the `cleartext` it will start using TLS. This requires a certificate and key.
 
 ```elixir
-application = {MyApp, %{greeting: "Hello"}}
+config = %{greeting: "Hello"}
 options = [port: 8443, certfile: "path/to/certificate", keyfile: "path/to/key"]
 
-Ace.HTTP.Service.start_link(application, options)
+MyApp.start_link(application, options)
 ```
 
 *TLS is required to serve content via HTTP/2.*
@@ -81,10 +84,7 @@ defmodule MyApp.Application do
 
     # List all child processes to be supervised
     children = [
-       supervisor(Ace.HTTP.Service, [
-         {MyApp, %{greeting: "Hello"}},
-         [port: 8080, cleartext: true]
-       ]),
+      {MyApp, [%{greeting: "Hello"}]},
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
