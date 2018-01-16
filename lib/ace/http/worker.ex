@@ -86,17 +86,7 @@ defmodule Ace.HTTP.Worker do
   end
 
   defp normalise_reaction(response = %Raxx.Response{}, state) do
-    case response.body do
-      false ->
-        {[response], state}
-
-      true ->
-        {[response], state}
-
-      _body ->
-        # {[%{response | body: true}, Raxx.data(response.body), Raxx.tail], state}
-        {[response], state}
-    end
+    {[response], state}
   end
 
   defp normalise_reaction({parts, new_state}, _old_state) do
@@ -107,7 +97,7 @@ defmodule Ace.HTTP.Worker do
   defp do_send({parts, new_state}, {mod, _old_state, client}) do
     case parts do
       [] ->
-        :ok
+        {:noreply, {mod, new_state, client}}
 
       parts ->
         case client do
@@ -119,20 +109,20 @@ defmodule Ace.HTTP.Worker do
               Ace.HTTP2.send(stream, part)
             end)
         end
-    end
+        
+        case List.last(parts) do
+          %{body: false} ->
+            {:stop, :normal, {mod, new_state, client}}
 
-    case List.last(parts) do
-      %{body: false} ->
-        {:stop, :normal, {mod, new_state, client}}
+          %Raxx.Tail{} ->
+            {:stop, :normal, {mod, new_state, client}}
 
-      %Raxx.Tail{} ->
-        {:stop, :normal, {mod, new_state, client}}
+          %{body: body} when is_binary(body) ->
+            {:stop, :normal, {mod, new_state, client}}
 
-      %{body: body} when is_binary(body) ->
-        {:stop, :normal, {mod, new_state, client}}
-
-      _ ->
-        {:noreply, {mod, new_state, client}}
+          _ ->
+            {:noreply, {mod, new_state, client}}
+        end        
     end
   end
 
