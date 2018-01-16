@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## master
+
+## Fixed
+
+- use `GenServer` behaviour in `Ace.HTTP2.Connection` to add default handlers.
+
 ## [0.15.9](https://github.com/CrowdHailer/Ace/tree/0.15.9) - 2018-01-11
 
 ## Added

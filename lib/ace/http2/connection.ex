@@ -2,6 +2,8 @@
 defmodule Ace.HTTP2.Connection do
   @moduledoc false
 
+  use GenServer
+
   require Logger
   alias Ace.{HPack}
   alias Ace.HTTP2.{Frame, Stream}
@@ -31,6 +33,7 @@ defmodule Ace.HTTP2.Connection do
 
   # accept_push always false for server but usable in client.
 
+  @impl GenServer
   def init({:client, {host, port}, local_settings, ssl_options}) do
     case :ssl.connect(
            host,
@@ -77,6 +80,7 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
+  @impl GenServer
   def handle_info({:ssl, connection, @preface <> data}, {:pending, state}) do
     state = %{state | next: :handshake}
     handle_info({:ssl, connection, data}, {"", state})
@@ -133,6 +137,7 @@ defmodule Ace.HTTP2.Connection do
     {:noreply, {buffer, state}}
   end
 
+  @impl GenServer
   def handle_call({:new_stream, receiver}, _from, {buffer, state}) do
     {stream_id, state} = next_stream_id(state)
     stream = Stream.idle(stream_id, receiver, state.remote_settings.initial_window_size)
