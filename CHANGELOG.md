@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Fixed
 
-- use `GenServer` behaviour in `Ace.HTTP2.Connection` to add default handlers.
+- Use `GenServer` behaviour in `Ace.HTTP2.Connection` to add default handlers.
+- Ensure Endpoint handles its worker dying when sending chunked response.
 
 ## [0.15.9](https://github.com/CrowdHailer/Ace/tree/0.15.9) - 2018-01-11
 

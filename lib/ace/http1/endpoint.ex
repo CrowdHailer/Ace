@@ -85,12 +85,16 @@ defmodule Ace.HTTP1.Endpoint do
 
   # NOTE if any data already sent then canot send 500
   def handle_info(
-        {:DOWN, _ref, :process, pid, _stacktrace},
+        {:DOWN, _ref, :process, pid, _reason},
         state = %{worker: pid, status: {_, :response}}
       ) do
     {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, reason}, state = %{worker: pid}) do
+    {:stop, reason, state}
   end
 
   defp normalise_part(request = %{scheme: nil}, :tcp), do: %{request | scheme: :http}

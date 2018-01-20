@@ -63,12 +63,11 @@ defmodule Support do
 end
 
 defmodule Raxx.Forwarder do
-  use Ace.HTTP.Service, [
+  use Ace.HTTP.Service,
     port: 0,
     acceptors: 1,
     certfile: Support.test_certfile(),
     keyfile: Support.test_keyfile()
-  ]
 
   @impl Raxx.Server
   def handle_head(request, state = %{target: pid}) do
@@ -86,6 +85,10 @@ defmodule Raxx.Forwarder do
   end
 
   @impl Raxx.Server
+  def handle_info({__MODULE__, :stop, reason}, _state) do
+    Process.exit(self(), reason)
+  end
+
   def handle_info(response, _state) do
     response
   end
