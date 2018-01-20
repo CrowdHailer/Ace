@@ -376,7 +376,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.1.1](https://github.com/CrowdHailer/Ace/tree/0.1.1) - 2016-10-03
 
-#### Fixed
+### Fixed
 
 - Handle socket closed by client.
 
