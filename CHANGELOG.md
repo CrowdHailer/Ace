@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+## [0.15.10](https://github.com/CrowdHailer/Ace/tree/0.15.10) - 2018-01-20
+
 ### Fixed
 
 - Use `GenServer` behaviour in `Ace.HTTP2.Connection` to add default handlers.
