@@ -650,13 +650,12 @@ defmodule Ace.HTTP1.ServerTest do
     response =
       Raxx.response(:ok)
       |> Raxx.set_body(true)
-
     GenServer.reply(from, response)
 
     {Raxx.Forwarder, _forwarder_state, {:http1, endpoint, _}} = :sys.get_state(worker)
     endpoint_monitor = Process.monitor(endpoint)
 
-    send(endpoint, {:DOWN, :ref, :process, worker, :normal})
+    send(worker, {Raxx.Forwarder, :stop, :normal})
 
     assert_receive {:DOWN, ^endpoint_monitor, :process, ^endpoint, endpoint_exit_reason}, 1000
     assert endpoint_exit_reason == :normal
