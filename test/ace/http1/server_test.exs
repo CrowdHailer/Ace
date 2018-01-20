@@ -632,4 +632,33 @@ defmodule Ace.HTTP1.ServerTest do
   end
 
   # DEBT try sending empty fragment with end_stream false? should not end stream
+
+  test "If a worker dies while sending a chunked response, its endpoint dies gracefully", %{
+    port: port
+  } do
+    http1_request = """
+    GET / HTTP/1.1
+    host: example.com
+
+    """
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, _request, _state}}, 1000
+
+    response =
+      Raxx.response(:ok)
+      |> Raxx.set_body(true)
+
+    GenServer.reply(from, response)
+
+    {Raxx.Forwarder, _forwarder_state, {:http1, endpoint, _}} = :sys.get_state(worker)
+    endpoint_monitor = Process.monitor(endpoint)
+
+    send(endpoint, {:DOWN, :ref, :process, worker, :normal})
+
+    assert_receive {:DOWN, ^endpoint_monitor, :process, ^endpoint, endpoint_exit_reason}, 1000
+    assert endpoint_exit_reason == :normal
+  end
 end
