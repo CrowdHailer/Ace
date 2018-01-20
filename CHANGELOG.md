@@ -6,19 +6,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
-## Fixed
+### Fixed
 
 - use `GenServer` behaviour in `Ace.HTTP2.Connection` to add default handlers.
 
 ## [0.15.9](https://github.com/CrowdHailer/Ace/tree/0.15.9) - 2018-01-11
 
-## Added
+### Added
 
 - `__using__/1` macro to `Ace.HTTP.Service` that defines `start_link` and `child_spec`.
 
 ## [0.15.8](https://github.com/CrowdHailer/Ace/tree/0.15.8) - 2018-01-01
 
-## Added
+### Added
 
 - `Ace.HTTP1.Parser` extracts functionality to incrementally parse data into parts of a Raxx message.
 - Server module is checked to implement `Raxx.Server` behaviour when starting a service.
@@ -26,123 +26,123 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.HTTP.Service.child_spec/1` added so services can be added to supervision trees in standard manner.
 - `Ace.HTTP.Worker` module added to public api.
 
-## Removed
+### Removed
 
 - `Ace.Governor.Supervisor` is no longer necessary.
 
-## Fixed
+### Fixed
 
 - Request has scheme of `:http` when transmitted over `tcp` connection.
 - Worker monitors endpoint and will stop when endpoint stops.
 
 ## [0.15.7](https://github.com/CrowdHailer/Ace/tree/0.15.7) - 2017-12-28
 
-## Added
+### Added
 
 - `OPTIONS`, `TRACE` and `CONNECT` method are understood in HTTP/2 requests.
 
 
 ## [0.15.5](https://github.com/CrowdHailer/Ace/tree/0.15.5) - 2017-11-29
 
-## Fixed
+### Fixed
 
 - Ensure worker process terminates when complete response is sent.
 
 ## [0.15.4](https://github.com/CrowdHailer/Ace/tree/0.15.4) - 2017-11-11
 
-## Added
+### Added
 
 - HTTP1.Endpoint sends 500 response when worker process crashes.
 
-## Changed
+### Changed
 
 - Use `Logger.debug` to print warning about closing keep-alive connections.
 
 
 ## [0.15.3](https://github.com/CrowdHailer/Ace/tree/0.15.3) - 2017-11-05
 
-## Removed
+### Removed
 
 - No dependency on `HTTPStatus`.
 
 ## [0.15.2](https://github.com/CrowdHailer/Ace/tree/0.15.2) - 2017-10-29
 
-## Changed
+### Changed
 - Rely on `0.14.x` of raxx.
 
 ## [0.15.1](https://github.com/CrowdHailer/Ace/tree/0.15.1) - 2017-10-25
 
-## Fixed
+### Fixed
 - Server startup logs include port number when serving via cleartext.
 
 ## [0.15.0](https://github.com/CrowdHailer/Ace/tree/0.15.0) - 2017-10-16
 
-## Changed
+### Changed
 - Rely on `0.13.x` of raxx.
 
-## Removed
+### Removed
 - `Ace.HTTP2.Service`, instead use `Ace.HTTP.Service`.
 
 ## [0.14.8](https://github.com/CrowdHailer/Ace/tree/0.14.8) - 2017-10-9
 
-## Added
+### Added
 - Upgrade via ALPN to HTTP/2 connections, when using `Ace.HTTP.Service`.
 
 ## [0.14.7](https://github.com/CrowdHailer/Ace/tree/0.14.7) - 2017-10-4
 
-## Removed
+### Removed
 - `Ace.Application` undocumented internal module
 - `Ace.TCP` undocumented internal module
 - `Ace.TLS` undocumented internal module
 - `Ace.Server` undocumented internal module
 - `Ace.Server.Supervisor` undocumented internal module
 
-## Fixed
+### Fixed
 - Limit forwarded keys to known ssl options only.
 - HTTP/2 connection always sends a `Raxx.Trailer` to close a stream with data.
 
 ## [0.14.6](https://github.com/CrowdHailer/Ace/tree/0.14.6) - 2017-09-29
 
-## Fixed
+### Fixed
 - Workers exit normally when client connection is lost prematurely.
 
 ## [0.14.5](https://github.com/CrowdHailer/Ace/tree/0.14.5) - 2017-09-28
 
-## Added
+### Added
 - `Ace.HTTP.Service` to communicate with HTTP/1 clients,
   functionality previously provided in `ace_http`.
 
 ## [0.14.4](https://github.com/CrowdHailer/Ace/tree/0.14.4) - 2017-09-27
 
-## Fixed
+### Fixed
 - Stream will not queue data to send that is not a binary.
 
 ## [0.14.3](https://github.com/CrowdHailer/Ace/tree/0.14.3) - 2017-09-25
 
-## Fixed
+### Fixed
 - Fixes made in `0.9.2` and `0.9.3` added to lastest.
 
 ## [0.14.2](https://github.com/CrowdHailer/Ace/tree/0.14.2) - 2017-09-19
 
-## Added
+### Added
 - `Ace.HTTP2.ping/2` for checking a connection.
 
 ## [0.14.1](https://github.com/CrowdHailer/Ace/tree/0.14.1) - 2017-09-08
 
-## Added
+### Added
 - Client certificate options added to `Ace.HTTP2.Client.start_link`.
 
 ## [0.14.0](https://github.com/CrowdHailer/Ace/tree/0.14.0) - 2017-08-31
 
-## Added
+### Added
 - Send any Raxx message using `Ace.HTTP2.send/2`.
 
-## Changed
+### Changed
 - Start services with `{hander, config}` instead of `{worker, args}`
 - All use of `Ace.Request` has been replaced with `Raxx.Request`.
 - All use of `Ace.Response` has been replaced with `Raxx.Response`.
 
-## Removed
+### Removed
 - `Ace.Raxx.Handler` all applications are assumed to be raxx applications
 - `Ace.HTTP2.Client.send_request/2` use `Ace.HTTP2.send/2`.
 - `Ace.HTTP2.Client.send_data/2` use `Ace.HTTP2.send/2`.
@@ -154,35 +154,35 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.13.1](https://github.com/CrowdHailer/Ace/tree/0.13.1) - 2017-08-26
 
-## Added
+### Added
 - Client can start with `:enable_push` option.
 - Client can start with `:max_concurrent_streams` option.
 - Server push is only forwarded to client if accepted by client.
 
-## Fixed
+### Fixed
 - PushPromise frames do not exceed maximum frame size.
 - Continuation frames must follow on same stream.
 
 ## [0.13.0](https://github.com/CrowdHailer/Ace/tree/0.13.0) - 2017-08-23
 
-## Changed
+### Changed
 - Request scheme is atom instead of string.
 - Request method is atom instead of string.
 
 ## [0.12.1](https://github.com/CrowdHailer/Ace/tree/0.12.1) - 2017-08-22
 
-## Fixed
+### Fixed
 - Raxx changed from being an optional dependency
 
 ## [0.9.3](https://github.com/CrowdHailer/Ace/tree/0.9.3) - 2017-08-20
 
-## Changed
+### Changed
 - Discard down messages from unknown monitors.
 - Accept request with absolute URL's in request line.
 
 ## [0.12.0](https://github.com/CrowdHailer/Ace/tree/0.12.0) - 2017-08-17
 
-## Added
+### Added
 - Client can fetch an idle stream using `Ace.HTTP2.Client.stream/1`.
 - Forward stream resets with reason to worker processes.
 - `Ace.HTTP2.Client.send_request/2`.
@@ -191,7 +191,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.HTTP2.Server.send_reset/2`.
 - Inspect protocol implementation for each frame type.
 
-## Changed
+### Changed
 - Server receives request object not raw headers.
 - Server sends with response object not raw headers.
 - Client cannot start a stream with request.
@@ -199,24 +199,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.9.2](https://github.com/CrowdHailer/Ace/tree/0.9.2) - 2017-08-4
 
-## Fixed
+### Fixed
 - Governor to correctly demonitor started servers.
 
 ## [0.11.1](https://github.com/CrowdHailer/Ace/tree/0.11.1) - 2017-08-03
 
-## Added
+### Added
 - Client for HTTP/2.0.
 
 ## [0.11.0](https://github.com/CrowdHailer/Ace/tree/0.11.0) - 2017-08-01
 
-## Added
+### Added
 - Casting for accepted values for each known setting.
 - Flow control for outbound data.
 
-## Changed
+### Changed
 - Creating priority frame requires exclusive value.
 
-## Fixed
+### Fixed
 - Graceful handling of closed connections.
 - Correctly keep state for multiple connection frames.
 - Discard trailers sent to Raxx handler.
@@ -244,41 +244,41 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.10.0](https://github.com/CrowdHailer/Ace/tree/0.10.0) - 2017-07-21
 
-## Added
+### Added
 - HTTP/2.0 support via `Ace.HTTP2`
 
 ## [0.9.1](https://github.com/CrowdHailer/Ace/tree/0.9.1) - 2017-06-14
 
-## Changed
+### Changed
 - Reduced noise from errors of prematurely closed connections.
 
 ## [0.9.0](https://github.com/CrowdHailer/Ace/tree/0.9.0) - 2017-04-16
 
-## Changed
+### Changed
 - Requires Elixir 1.4 and above,
   required applications are now listed as `extra_applications`.
 
 ## [0.8.1](https://github.com/CrowdHailer/Ace/tree/0.8.1) - 2017-04-02
 
-## Added
+### Added
 - Warning logged when application module is not using the `Ace.Application` behaviour.
 
 ## [0.8.0](https://github.com/CrowdHailer/Ace/tree/0.8.0) - 2017-03-26
 
-## Added
+### Added
 - `Ace.TLS` for tcp/ssl endpoints, matching `Ace.TCP` function profiles.
 - `Ace.Connection` to normalise `:gen_tcp`/`:ssl` interfaces.
 - Governors can be throttled to zero to drain connections,
   see `Ace.Governor.Supervisor.drain/1`
 
-## Changed
+### Changed
 - New connection calls `handle_connect/2` not `init/2`
 - Connection lost calls `handle_disconnect/2` not `terminate/2`
 - `Ace.TCP` is now the callback module when starting and endpoint,
   there is no `Ace.TCP.Endpoint` module anymore.
 - `Ace.Governor` now a `GenServer` to handle OTP sys calls
 
-## Removed
+### Removed
 - `Ace.TCP.Server`, now `Ace.Server`.
 - `Ace.TCP.Server.Supervisor`, now `Ace.Server.Supervisor`.
 - `Ace.TCP.Governor`, now `Ace.Governor`.
@@ -286,15 +286,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.7.1](https://github.com/CrowdHailer/Ace/tree/0.7.1) - 2017-02-13
 
-## Changed
+### Changed
 - Startup information is printed using `Logger` and not directly `IO`.
 
-## Fixed
+### Fixed
 - Remove warnings about bracket use from Elixir 1.4.
 
 ## [0.7.0](https://github.com/CrowdHailer/Ace/tree/0.7.0) - 2016-10-26
 
-## Added
+### Added
 - Support a response with a timeout from server modules.
   Passed directly to GenServer so integer and `:hibernate` responses are supported.
 - Support closing the connection from the server side.
@@ -303,12 +303,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.6.3](https://github.com/CrowdHailer/Ace/tree/0.6.3) - 2016-10-24
 
-## Changed
+### Changed
 - Information for new connections is now passed to the server as a map.
 
 ## [0.6.2](https://github.com/CrowdHailer/Ace/tree/0.6.2) - 2016-10-24
 
-## Added
+### Added
 - Endpoints can be registered as named processes by passing in a value for the `:name` option.
   Possible values for this are the same as for the underlying `GenServer`.
 - The number of servers simultaneously accepting can now be configured.
@@ -317,40 +317,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.6.1](https://github.com/CrowdHailer/Ace/tree/0.6.1) - 2016-10-17
 
-## Added
+### Added
 - `Ace.TCP.Endpoint.port/1` will return the port an endpoint is listening too.
   Required when the port option is set to `0` and the port is allocated by the OS.
 
-## Fixed
+### Fixed
 - The `handle_packet` and `handle_info` callbacks for a server module are able produce a return of the format `{:nosend, state}`.
 
 ## [0.6.0](https://github.com/CrowdHailer/Ace/tree/0.6.0) - 2016-10-17
 
-## Added
+### Added
 - Collect all processes in an endpoint `GenServer` so that they can be started as a unit and only the endpoint is linked to the calling process. This allows for endpoints to be added to supervision tree.
 
-## Removed
+### Removed
 - `Ace.TCP.start/2` use `start_link/2` instead which takes app as the first argument not the second.
 
 ## [0.5.2](https://github.com/CrowdHailer/Ace/tree/0.5.2) - 2016-10-13
 
-## Changed
+### Changed
 - The governors will keeps starting server processes to match demand.
 
 ## [0.5.1](https://github.com/CrowdHailer/Ace/tree/0.5.1) - 2016-10-10
 
-## Changed
+### Changed
 - Send any message that is not TCP related to the `handle_info` callback,
   previous only messages that matched `{:data, info}` where handled.
 
 ## [0.5.0](https://github.com/CrowdHailer/Ace/tree/0.5.0) - 2016-10-07
 
-## Added
+### Added
 - How to hande a tcp connection is specified by an application server module.
 
 ## [0.4.0](https://github.com/CrowdHailer/Ace/tree/0.4.0) - 2016-10-06
 
-## Added
+### Added
 - System sends welcome message.
 - System sends data messages over the socket.
 
@@ -359,7 +359,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.3.0](https://github.com/CrowdHailer/Ace/tree/0.3.0) - 2016-10-04
 
-## Added
+### Added
 - Dialyzer for static analysis, with updated contributing instructions.
 
 ### Changed
@@ -367,7 +367,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.2.0](https://github.com/CrowdHailer/Ace/tree/0.2.0) - 2016-10-04
 
-## Added
+### Added
 - ExUnit test suit and single test case.
 - ExDoc for first hex published version.
 
@@ -376,7 +376,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.1.1](https://github.com/CrowdHailer/Ace/tree/0.1.1) - 2016-10-03
 
-### Fixed
+#### Fixed
 
 - Handle socket closed by client.
 
