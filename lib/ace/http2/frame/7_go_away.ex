@@ -1,6 +1,8 @@
 defmodule Ace.HTTP2.Frame.GoAway do
   @moduledoc false
 
+  @type t :: %__MODULE__{last_stream_id: Ace.HTTP2.Frame.stream_id()}
+
   alias Ace.HTTP2.{Errors}
 
   @enforce_keys [:error, :last_stream_id, :debug]

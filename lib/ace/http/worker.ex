@@ -109,7 +109,7 @@ defmodule Ace.HTTP.Worker do
               Ace.HTTP2.send(stream, part)
             end)
         end
-        
+
         case List.last(parts) do
           %{body: false} ->
             {:stop, :normal, {mod, new_state, client}}
@@ -122,7 +122,7 @@ defmodule Ace.HTTP.Worker do
 
           _ ->
             {:noreply, {mod, new_state, client}}
-        end        
+        end
     end
   end
 

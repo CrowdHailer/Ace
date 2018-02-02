@@ -410,47 +410,41 @@ defmodule Ace.HTTP2.Connection do
 
   # Do not separate frame and binary level as this step needs to know state for max_frame
   def consume(buffer, state) do
-    max_frame_size = state.local_settings.max_frame_size
+    case Frame.parse(buffer, max_length: state.local_settings.max_frame_size) do
+      {:ok, {nil, unprocessed}} ->
+        :ok = Ace.Socket.set_active(state.socket)
+        {:ok, {unprocessed, state}}
 
-    case Frame.parse_from_buffer(buffer, max_length: max_frame_size) do
-      {:ok, {raw_frame, unprocessed}} ->
-        # Need raw frame step because parse needs to return remaining buffer for unknown frame type
-        if raw_frame do
-          case Frame.decode(raw_frame) do
-            {:ok, frame} ->
-              Logger.debug("#{state.name} received: #{inspect(frame)}")
+      {:ok, {frame, unprocessed}} ->
+        Logger.debug("#{state.name} received: #{inspect(frame)}")
 
-              case consume_frame(frame, state) do
-                {:ok, {frames, state}} ->
-                  # DEBT returns :ok or {:error, :closed}
-                  do_send_frames(frames, state)
-                  consume(unprocessed, state)
+        case consume_frame(frame, state) do
+          {:ok, {frames, state}} ->
+            # DEBT returns :ok or {:error, :closed}
+            do_send_frames(frames, state)
+            consume(unprocessed, state)
 
-                {:error, reason} ->
-                  {:error, reason}
-              end
-
-            {:error, {:unknown_frame_type, type}} ->
-              case state.next do
-                :any ->
-                  Logger.debug("Dropping unknown frame type (#{type})")
-                  consume(unprocessed, state)
-
-                {:continuation, _stream_id, _header_block_fragment, _end_stream} ->
-                  {:error, {:protocol_error, "Unknown frame interupted continuation"}}
-              end
-
-            {:error, reason} ->
-              {:error, reason}
-          end
-        else
-          :ok = Ace.Socket.set_active(state.socket)
-          {:ok, {unprocessed, state}}
+          {:error, reason} ->
+            {:error, reason}
         end
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # TODO test this case
+  def consume_frame({:unknown_frame_type, type}, state = %{state: %{next: :any}}) do
+    Logger.debug("Dropping unknown frame type (#{type})")
+    {:ok, {[], state}}
+  end
+
+  # TODO test this case
+  def consume_frame({:unknown_frame_type, type}, %{
+        state: %{next: {:continuation, _stream_id, _header_block_fragment, _end_stream}}
+      }) do
+    Logger.debug("Dropping unknown frame type (#{type})")
+    {:error, {:protocol_error, "Unknown frame interupted continuation"}}
   end
 
   def consume_frame(frame = %Frame.Settings{ack: false}, state = %{next: :handshake}) do

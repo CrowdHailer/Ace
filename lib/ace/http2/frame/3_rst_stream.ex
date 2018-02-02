@@ -1,6 +1,8 @@
 defmodule Ace.HTTP2.Frame.RstStream do
   @moduledoc false
 
+  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+
   alias Ace.HTTP2.{Errors}
 
   @enforce_keys [:stream_id, :error]

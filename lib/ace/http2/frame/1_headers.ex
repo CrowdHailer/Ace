@@ -1,5 +1,8 @@
 defmodule Ace.HTTP2.Frame.Headers do
   @moduledoc false
+  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+
+  # TODO rename header_block_fragment -> fragment
   @enforce_keys [:stream_id, :header_block_fragment, :end_headers, :end_stream]
   defstruct @enforce_keys
 

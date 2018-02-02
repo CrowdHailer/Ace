@@ -650,6 +650,7 @@ defmodule Ace.HTTP1.ServerTest do
     response =
       Raxx.response(:ok)
       |> Raxx.set_body(true)
+
     GenServer.reply(from, response)
 
     {Raxx.Forwarder, _forwarder_state, {:http1, endpoint, _}} = :sys.get_state(worker)
