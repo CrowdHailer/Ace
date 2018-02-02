@@ -199,21 +199,21 @@ defmodule Ace.HTTP2.Stream do
         {:error, {:stream_closed, "Headers received on closed stream"}}
     end
     |> case do
-         {:ok, new_status} ->
-           new_stream = %{stream | status: new_status}
+      {:ok, new_status} ->
+        new_stream = %{stream | status: new_status}
 
-           {:ok, final_stream} =
-             if end_stream do
-               process_received_end_stream(new_stream)
-             else
-               {:ok, new_stream}
-             end
+        {:ok, final_stream} =
+          if end_stream do
+            process_received_end_stream(new_stream)
+          else
+            {:ok, new_stream}
+          end
 
-           {:ok, final_stream}
+        {:ok, final_stream}
 
-         {:error, reason} ->
-           {:error, reason}
-       end
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def receive_promise(original, promised, request) do

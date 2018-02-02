@@ -75,7 +75,10 @@ defmodule Ace.HTTP.Worker do
     {:stop, reason, {mod, state, client}}
   end
 
-  def handle_info({:DOWN, _r, :process, p, reason}, {mod, state, client = {:stream, p, _id, _ref}}) do
+  def handle_info(
+        {:DOWN, _r, :process, p, reason},
+        {mod, state, client = {:stream, p, _id, _ref}}
+      ) do
     {:stop, reason, {mod, state, client}}
   end
 

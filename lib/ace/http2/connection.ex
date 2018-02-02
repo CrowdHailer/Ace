@@ -372,7 +372,8 @@ defmodule Ace.HTTP2.Connection do
     {previous ++ [reset_frame], connection}
   end
 
-  def pack_continuation(block, stream_id, max_frame_size) when byte_size(block) <= max_frame_size do
+  def pack_continuation(block, stream_id, max_frame_size)
+      when byte_size(block) <= max_frame_size do
     [Frame.Continuation.new(stream_id, block, true)]
   end
 

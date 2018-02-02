@@ -37,20 +37,20 @@ defmodule Ace.HTTP2.Frame.Headers do
       {:ok, data}
     end
     |> case do
-         {:ok, header_block_fragment} ->
-           {
-             :ok,
-             %__MODULE__{
-               stream_id: stream_id,
-               header_block_fragment: header_block_fragment,
-               end_headers: end_headers == 1,
-               end_stream: end_stream == 1
-             }
-           }
+      {:ok, header_block_fragment} ->
+        {
+          :ok,
+          %__MODULE__{
+            stream_id: stream_id,
+            header_block_fragment: header_block_fragment,
+            end_headers: end_headers == 1,
+            end_stream: end_stream == 1
+          }
+        }
 
-         {:error, reason} ->
-           {:error, reason}
-       end
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def serialize(frame) do
