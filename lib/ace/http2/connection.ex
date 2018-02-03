@@ -405,6 +405,7 @@ defmodule Ace.HTTP2.Connection do
     read_buffer({buffer <> packet, state}, [])
   end
 
+  # TODO frame parser should have a state rather than keep buffer outside
   defp read_buffer({buffer, state}, actions) do
     case Frame.parse(buffer, max_length: state.local_settings.max_frame_size) do
       {:ok, {nil, buffer}} ->

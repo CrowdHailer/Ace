@@ -102,7 +102,7 @@ defmodule Ace.HTTP1.Endpoint do
   defp normalise_part(part, _transport), do: part
 
   defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
-    case content_length(response) do
+    case Ace.Raxx.content_length(response) do
       nil ->
         headers = [{"connection", "close"}, {"transfer-encoding", "chunked"} | response.headers]
         new_status = {up, :chunked_body}
@@ -120,7 +120,7 @@ defmodule Ace.HTTP1.Endpoint do
   end
 
   defp send_part(response = %Response{body: false}, state = %{status: {up, :response}}) do
-    case content_length(response) do
+    case Ace.Raxx.content_length(response) do
       nil ->
         headers = [{"connection", "close"}, {"content-length", "0"} | response.headers]
         new_status = {up, :complete}
@@ -132,7 +132,7 @@ defmodule Ace.HTTP1.Endpoint do
 
   defp send_part(response = %Response{body: body}, state = %{status: {up, :response}})
        when is_binary(body) do
-    case content_length(response) do
+    case Ace.Raxx.content_length(response) do
       nil ->
         content_length = :erlang.iolist_size(body) |> to_string
         headers = [{"connection", "close"}, {"content-length", content_length} | response.headers]
@@ -174,16 +174,5 @@ defmodule Ace.HTTP1.Endpoint do
     new_state = %{state | status: new_status}
 
     {:ok, {[chunk], new_state}}
-  end
-
-  defp content_length(%{headers: headers}) do
-    case :proplists.get_value("content-length", headers) do
-      :undefined ->
-        nil
-
-      binary ->
-        {content_length, ""} = Integer.parse(binary)
-        content_length
-    end
   end
 end
