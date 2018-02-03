@@ -85,4 +85,18 @@ defmodule Ace.Socket do
   def send({:ssl, socket}, message) do
     :ssl.send(socket, message)
   end
+  
+  # defp client_info(soc) do
+  #   "soc:\n#{inspect(soc)}\n"
+  # end
+
+  def client_info({:ssl, socket}) do
+    {:ok, {{a, b, c, d}, port}} = :ssl.peername(socket)
+    "[#{inspect(self())}] <<< #{a}.#{b}.#{c}.#{d}:#{port}"
+  end
+
+  def client_info({:tcp, socket}) do
+    {:ok, {{a, b, c, d}, port}} = :inet.peername(socket)
+    "[#{inspect(self())}] <<< #{a}.#{b}.#{c}.#{d}:#{port}"
+  end
 end
