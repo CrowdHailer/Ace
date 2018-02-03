@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+### Added
+
+- TEMPORARY `Ace.Raxx` with functions that should be migrated to next Raxx release.
+
+- `.formatter.exs` file for use with Elixir 1.6+
+- `Ace.HTTP1.Parser.parse/2` returns categorized HTTP/2 frame instead of raw frame parts.
+- `Ace.HTTP1.Serializer` added for grouping code for serializing requests and responses.
+
+### Removed
+
+- `Ace.HTTP1.Parser.parse_from_buffer/2` use `Ace.HTTP1.Parser.parse/2` instead.
+- `Ace.HTTP2.Server` undocumented internal module.
+- `Ace.HTTP1` undocumented internal module.
+- `Ace.HTTP2.Stream.Reset` undocumented internal module.
+
+
 ## [0.15.10](https://github.com/CrowdHailer/Ace/tree/0.15.10) - 2018-01-20
 
 ### Fixed
