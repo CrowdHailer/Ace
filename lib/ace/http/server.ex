@@ -22,7 +22,6 @@ defmodule Ace.HTTP.Server do
     state = %__MODULE__{
       worker_supervisor: worker_supervisor,
       settings: settings,
-      socket: nil
     }
 
     GenServer.start_link(__MODULE__, state)
@@ -53,7 +52,6 @@ defmodule Ace.HTTP.Server do
     case Ace.Socket.accept(listen_socket) do
       {:ok, socket} ->
         :ok = Ace.Socket.set_active(socket)
-        state = %{state | socket: socket}
 
         case Ace.Socket.negotiated_protocol(socket) do
           :http1 ->
