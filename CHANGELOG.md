@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+### Added
+
+- TEMPORARY `Ace.Raxx` with functions that should be migrated to next Raxx release.
+- `Ace.HTTP1.Serializer` added for grouping code for serializing requests and responses.
+
+### Removed
+- `Ace.HTTP1` undocumented internal module.
+- `Ace.HTTP2.Stream.Reset` undocumented internal module.
+
 ## [0.15.11](https://github.com/CrowdHailer/Ace/tree/0.15.11) - 2018-03-28
 
 ### Added
