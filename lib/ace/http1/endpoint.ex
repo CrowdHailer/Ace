@@ -11,8 +11,8 @@ defmodule Ace.HTTP1.Endpoint do
   use GenServer
 
   @enforce_keys [
-    :status,
     :receive_state,
+    :serializer_state,
     :socket,
     :worker,
     :monitor,
@@ -63,11 +63,11 @@ defmodule Ace.HTTP1.Endpoint do
 
     Ace.Socket.send(state.socket, outbound)
 
-    case state.status do
-      {_, :complete} ->
+    case state.serializer_state do
+      %{next: :done} ->
         {:stop, :normal, state}
 
-      {_, _incomplete} ->
+      _ ->
         {:noreply, state}
     end
   end
@@ -83,96 +83,34 @@ defmodule Ace.HTTP1.Endpoint do
     {:stop, :normal, state}
   end
 
-  # NOTE if any data already sent then canot send 500
   def handle_info(
-        {:DOWN, _ref, :process, pid, _reason},
-        state = %{worker: pid, status: {_, :response}}
+        {:DOWN, _ref, :process, pid, reason},
+        state = %{worker: pid}
       ) do
-    {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
-    Ace.Socket.send(state.socket, outbound)
+    case state.serializer_state == Ace.HTTP1.Serializer.new() do
+      true ->
+        {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
+        Ace.Socket.send(state.socket, outbound)
+      false ->
+        # NOTE if any data already sent then canot send 500
+        :ok
+    end
     {:stop, :normal, new_state}
-  end
-
-  def handle_info({:DOWN, _ref, :process, pid, reason}, state = %{worker: pid}) do
-    {:stop, reason, state}
   end
 
   defp normalise_part(request = %{scheme: nil}, :tcp), do: %{request | scheme: :http}
   defp normalise_part(request = %{scheme: nil}, :ssl), do: %{request | scheme: :https}
   defp normalise_part(part, _transport), do: part
 
-  defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
-    case Ace.Raxx.content_length(response) do
-      nil ->
-        headers = [{"connection", "close"}, {"transfer-encoding", "chunked"} | response.headers]
-        new_status = {up, :chunked_body}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-
-      content_length when content_length > 0 ->
-        headers = [{"connection", "close"} | response.headers]
-        new_status = {up, {:body, content_length}}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-    end
+  defp send_part(response = %Response{}, state) do
+    response = response
+    |> Ace.Raxx.delete_header("connection")
+    |> Raxx.set_header("connection", "close")
+    {:ok, {outbound, serializer_state}} = Ace.HTTP1.Serializer.serialize(response, state.serializer_state)
+    {:ok, {outbound, %{state | serializer_state: serializer_state}}}
   end
-
-  defp send_part(response = %Response{body: false}, state = %{status: {up, :response}}) do
-    case Ace.Raxx.content_length(response) do
-      nil ->
-        headers = [{"connection", "close"}, {"content-length", "0"} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-    end
-  end
-
-  defp send_part(response = %Response{body: body}, state = %{status: {up, :response}})
-       when is_binary(body) do
-    case Ace.Raxx.content_length(response) do
-      nil ->
-        content_length = :erlang.iolist_size(body) |> to_string
-        headers = [{"connection", "close"}, {"content-length", content_length} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, response.body)
-        {:ok, {outbound, new_state}}
-
-      _content_length ->
-        headers = [{"connection", "close"} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, response.body)
-        {:ok, {outbound, new_state}}
-    end
-  end
-
-  defp send_part(data = %Data{}, state = %{status: {up, {:body, remaining}}}) do
-    remaining = remaining - :erlang.iolist_size(data.data)
-    new_status = {up, {:body, remaining}}
-    new_state = %{state | status: new_status}
-    {:ok, {[data.data], new_state}}
-  end
-
-  defp send_part(%Tail{headers: []}, state = %{status: {up, {:body, 0}}}) do
-    new_status = {up, :complete}
-    new_state = %{state | status: new_status}
-    {:ok, {[], new_state}}
-  end
-
-  defp send_part(%Data{data: data}, state = %{status: {_up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk(data)
-    {:ok, {[chunk], state}}
-  end
-
-  defp send_part(%Tail{headers: []}, state = %{status: {up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk("")
-    new_status = {up, :complete}
-    new_state = %{state | status: new_status}
-
-    {:ok, {[chunk], new_state}}
+  defp send_part(part, state) do
+    {:ok, {outbound, serializer_state}} = Ace.HTTP1.Serializer.serialize(part, state.serializer_state)
+    {:ok, {outbound, %{state | serializer_state: serializer_state}}}
   end
 end
