@@ -68,6 +68,8 @@ defmodule Ace.HTTP.Server do
               keep_alive: false,
               receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
             }
+            
+            Logger.debug(client_info(socket))
 
             GenServer.reply(from, {:ok, self()})
             :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
@@ -108,6 +110,8 @@ defmodule Ace.HTTP.Server do
             :ok = Ace.Socket.send(state.socket, Ace.HTTP2.Frame.serialize(initial_settings_frame))
 
             :ok = Ace.Socket.set_active(socket)
+            
+            Logger.debug(client_info(socket))
 
             :gen_server.enter_loop(Ace.HTTP2.Connection, [], {:pending, initial_state})
         end
@@ -115,5 +119,19 @@ defmodule Ace.HTTP.Server do
       {:error, reason} ->
         {:stop, :normal, {:error, reason}, state}
     end
+  end
+  
+  # defp client_info(soc) do
+  #   "soc:\n#{inspect(soc)}\n"
+  # end
+
+  defp client_info({:ssl, socket}) do
+    {:ok, {{a, b, c, d}, port}} = :ssl.peername(socket)
+    "[#{inspect(self())}] <<< #{a}.#{b}.#{c}.#{d}:#{port}"
+  end
+
+  defp client_info({:tcp, socket}) do
+    {:ok, {{a, b, c, d}, port}} = :inet.peername(socket)
+    "[#{inspect(self())}] <<< #{a}.#{b}.#{c}.#{d}:#{port}"
   end
 end
