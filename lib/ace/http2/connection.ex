@@ -86,26 +86,17 @@ defmodule Ace.HTTP2.Connection do
     handle_info({:ssl, connection, data}, {"", state})
   end
 
-  def handle_info({:ssl, _, data}, {buffer, state = %__MODULE__{}}) do
-    buffer = buffer <> data
-
-    case consume(buffer, state) do
-      {:ok, state} ->
-        {:noreply, state}
+  def handle_info({:ssl, _, packet}, {buffer, state = %__MODULE__{}}) do
+    case receive_packet({buffer, state}, packet) do
+      {:ok, {frames, {buffer, state}}} ->
+        :ok = Ace.Socket.set_active(state.socket)
+        # DEBT returns :ok or {:error, :closed}
+        do_send_frames(frames, state)
+        {:noreply, {buffer, state}}
 
       {:error, {error, debug}} ->
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(4, error, debug)
-        outbound = Frame.GoAway.serialize(frame)
-        :ok = Ace.Socket.send(state.socket, outbound)
-        Process.sleep(1000)
-
-        # Despite being an error the connection has successfully dealt with the client and does not need to crash
-        {:stop, :normal, state}
-
-      {:error, reason} ->
-        Logger.warn("ERROR: #{inspect(reason)}, NO DEBUG INFO")
-        frame = Frame.GoAway.new(4, :internal_error, inspect(reason))
         outbound = Frame.GoAway.serialize(frame)
         :ok = Ace.Socket.send(state.socket, outbound)
         Process.sleep(1000)
@@ -410,20 +401,21 @@ defmodule Ace.HTTP2.Connection do
   end
 
   # Do not separate frame and binary level as this step needs to know state for max_frame
-  def consume(buffer, state) do
-    case Frame.parse(buffer, max_length: state.local_settings.max_frame_size) do
-      {:ok, {nil, unprocessed}} ->
-        :ok = Ace.Socket.set_active(state.socket)
-        {:ok, {unprocessed, state}}
+  def receive_packet({buffer, state}, packet) do
+    read_buffer({buffer <> packet, state}, [])
+  end
 
-      {:ok, {frame, unprocessed}} ->
+  defp read_buffer({buffer, state}, actions) do
+    case Frame.parse(buffer, max_length: state.local_settings.max_frame_size) do
+      {:ok, {nil, buffer}} ->
+        {:ok, {actions, {buffer, state}}}
+
+      {:ok, {frame, buffer}} ->
         Logger.debug("#{state.name} received: #{inspect(frame)}")
 
         case consume_frame(frame, state) do
-          {:ok, {frames, state}} ->
-            # DEBT returns :ok or {:error, :closed}
-            do_send_frames(frames, state)
-            consume(unprocessed, state)
+          {:ok, {next_actions, state}} ->
+            read_buffer({buffer, state}, actions ++ next_actions)
 
           {:error, reason} ->
             {:error, reason}
