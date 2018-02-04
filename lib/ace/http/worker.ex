@@ -32,15 +32,6 @@ defmodule Ace.HTTP.Worker do
     GenServer.start_link(__MODULE__, {module, config, channel}, [])
   end
 
-  # NOTE use dynamic supervisor extra_arguments: [app]
-  # Works with default GenServer child_spec
-  # NOTE Channel needs functions like cleartext? http_version? transport_version
-  # NOTE verify_application can be in start_link
-  # using Ace.Service should add a `connect(connection, state)` or `init(channel, state)`
-  # Can use Ace as a proxy adds header information which is trusted
-  # - ace.peer_id
-  # - ace.transport: tls
-
   @doc false
   def child_spec(app) do
     # NOTE child spec is called only once so possibly expensive call to `Code.ensure_compiled?` is not repeated
