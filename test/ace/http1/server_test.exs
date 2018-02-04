@@ -616,7 +616,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:ssl, ^socket, headers}, 1000
 
     # assert headers ==
-            #  "HTTP/1.1 200 OK\r\nconnection: close\r\ntransfer-encoding: chunked\r\nx-test: Value\r\n\r\n"
+    #  "HTTP/1.1 200 OK\r\nconnection: close\r\ntransfer-encoding: chunked\r\nx-test: Value\r\n\r\n"
 
     {server, _ref} = from
     send(server, {[Raxx.data("Hello, ")], state})
@@ -654,7 +654,8 @@ defmodule Ace.HTTP1.ServerTest do
 
     GenServer.reply(from, response)
 
-    {Raxx.Forwarder, _forwarder_state, {:http1, endpoint, _}} = :sys.get_state(worker)
+    state = :sys.get_state(worker)
+    endpoint = state.channel.endpoint
     endpoint_monitor = Process.monitor(endpoint)
 
     send(worker, {Raxx.Forwarder, :stop, :normal})

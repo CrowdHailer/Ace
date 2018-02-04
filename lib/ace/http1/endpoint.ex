@@ -52,9 +52,7 @@ defmodule Ace.HTTP1.Endpoint do
     end
   end
 
-  def handle_info({channel = {:http1, _, _}, parts}, state) do
-    ^channel = state.channel
-
+  def handle_call({:send, channel, parts}, _from, state = %{channel: channel}) do
     {outbound, state} =
       Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
         {:ok, {outbound, next_state}} = send_part(part, state)
@@ -65,10 +63,10 @@ defmodule Ace.HTTP1.Endpoint do
 
     case state.serializer_state do
       %{next: :done} ->
-        {:stop, :normal, state}
+        {:stop, :normal, {:ok, channel}, state}
 
       _ ->
-        {:noreply, state}
+        {:reply, {:ok, channel}, state}
     end
   end
 
@@ -91,10 +89,12 @@ defmodule Ace.HTTP1.Endpoint do
       true ->
         {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
         Ace.Socket.send(state.socket, outbound)
+
       false ->
         # NOTE if any data already sent then canot send 500
         :ok
     end
+
     {:stop, :normal, new_state}
   end
 
@@ -103,14 +103,21 @@ defmodule Ace.HTTP1.Endpoint do
   defp normalise_part(part, _transport), do: part
 
   defp send_part(response = %Response{}, state) do
-    response = response
-    |> Ace.Raxx.delete_header("connection")
-    |> Raxx.set_header("connection", "close")
-    {:ok, {outbound, serializer_state}} = Ace.HTTP1.Serializer.serialize(response, state.serializer_state)
+    response =
+      response
+      |> Ace.Raxx.delete_header("connection")
+      |> Raxx.set_header("connection", "close")
+
+    {:ok, {outbound, serializer_state}} =
+      Ace.HTTP1.Serializer.serialize(response, state.serializer_state)
+
     {:ok, {outbound, %{state | serializer_state: serializer_state}}}
   end
+
   defp send_part(part, state) do
-    {:ok, {outbound, serializer_state}} = Ace.HTTP1.Serializer.serialize(part, state.serializer_state)
+    {:ok, {outbound, serializer_state}} =
+      Ace.HTTP1.Serializer.serialize(part, state.serializer_state)
+
     {:ok, {outbound, %{state | serializer_state: serializer_state}}}
   end
 end
