@@ -55,13 +55,19 @@ defmodule Ace.HTTP.Server do
 
         case Ace.Socket.negotiated_protocol(socket) do
           :http1 ->
-            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [])
+            channel = %Ace.HTTP.Channel{
+              endpoint: self(),
+              id: 1,
+              socket: socket
+            }
+
+            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [channel])
             monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{
               socket: socket,
               # Worker and channel could live on same key, there is no channel without a worker
-              channel: {:http1, self(), 1},
+              channel: channel,
               worker: worker,
               monitor: monitor,
               keep_alive: false,

@@ -3,8 +3,10 @@ defmodule Ace.Raxx do
     case :proplists.get_all_values(header, headers) do
       [] ->
         nil
+
       [value] ->
         value
+
       _ ->
         raise "More than one header found for `#{header}`"
     end
