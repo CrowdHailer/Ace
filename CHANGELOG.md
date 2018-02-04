@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `.formatter.exs` file for use with Elixir 1.6+
 - `Ace.HTTP1.Parser.parse/2` returns categorized HTTP/2 frame instead of raw frame parts.
 - `Ace.HTTP1.Serializer` added for grouping code for serializing requests and responses.
+- `Ace.HTTP.Channel` to encapsulate information about an exchange within the context of a connection.
+- `Ace.HTTP.Worker.start_link/2` workers must be started with a channel in addition to application.
 
 ### Removed
 
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - `Ace.HTTP2.Server` undocumented internal module.
 - `Ace.HTTP1` undocumented internal module.
 - `Ace.HTTP2.Stream.Reset` undocumented internal module.
+- `Ace.HTTP.Worker.start_link/1` no longer used internally.
 
 
 ## [0.15.10](https://github.com/CrowdHailer/Ace/tree/0.15.10) - 2018-01-20
