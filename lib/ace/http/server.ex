@@ -74,6 +74,8 @@ defmodule Ace.HTTP.Server do
               receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048),
               serializer_state: Ace.HTTP1.Serializer.new()
             }
+            
+            Logger.debug(Ace.Socket.client_info(socket))
 
             GenServer.reply(from, {:ok, self()})
             :gen_server.enter_loop(Ace.HTTP1.Endpoint, [], state)
@@ -114,6 +116,8 @@ defmodule Ace.HTTP.Server do
             :ok = Ace.Socket.send(state.socket, Ace.HTTP2.Frame.serialize(initial_settings_frame))
 
             :ok = Ace.Socket.set_active(socket)
+            
+            Logger.debug(Ace.Socket.client_info(socket))
 
             :gen_server.enter_loop(Ace.HTTP2.Connection, [], {:pending, initial_state})
         end
