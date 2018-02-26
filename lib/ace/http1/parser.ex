@@ -133,7 +133,7 @@ defmodule Ace.HTTP1.Parser do
 
         case transfer_encoding do
           nil ->
-            case content_length(headers) do
+            case Ace.Raxx.content_length(%{headers: headers}) do
               length when length in [0, nil] ->
                 {:ok, {request_head, {:done, rest, options}}}
 
@@ -165,7 +165,7 @@ defmodule Ace.HTTP1.Parser do
   end
 
   defp pop_part({:body_chunked, buffer, options}) do
-    {chunk, rest} = Ace.HTTP1.pop_chunk(buffer)
+    {chunk, rest} = pop_chunk(buffer)
 
     case chunk do
       nil ->
@@ -194,17 +194,6 @@ defmodule Ace.HTTP1.Parser do
 
       binary ->
         {binary, :proplists.delete("transfer-encoding", headers)}
-    end
-  end
-
-  defp content_length(headers) do
-    case :proplists.get_value("content-length", headers) do
-      :undefined ->
-        nil
-
-      binary ->
-        {content_length, ""} = Integer.parse(binary)
-        content_length
     end
   end
 
@@ -241,5 +230,26 @@ defmodule Ace.HTTP1.Parser do
       headers: [],
       body: false
     }
+  end
+
+  defp pop_chunk(buffer) do
+    case String.split(buffer, "\r\n", parts: 2) do
+      [base_16_size, rest] ->
+        size =
+          base_16_size
+          |> :erlang.binary_to_list()
+          |> :erlang.list_to_integer(16)
+
+        case rest do
+          <<chunk::binary-size(size), "\r\n", rest::binary>> ->
+            {chunk, rest}
+
+          _incomplete_chunk ->
+            {nil, buffer}
+        end
+
+      [rest] ->
+        {nil, rest}
+    end
   end
 end
