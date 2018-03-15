@@ -165,7 +165,16 @@ defmodule Ace.HTTP.Service do
               :cert,
               :key,
               :certfile,
-              :keyfile
+              :keyfile,
+              :dhfile,
+              :cacertfile,
+              :versions,
+              :secure_renegotiate,
+              :client_renegotiation,
+              :reuse_sessions,
+              :honor_cipher_order,
+              :ciphers,
+              :eccs
             ])
 
           {:ok, listen_socket} = :ssl.listen(port, ssl_options)
