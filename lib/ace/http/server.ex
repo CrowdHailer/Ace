@@ -21,8 +21,7 @@ defmodule Ace.HTTP.Server do
   def start_link(worker_supervisor, settings \\ []) when is_pid(worker_supervisor) do
     state = %__MODULE__{
       worker_supervisor: worker_supervisor,
-      settings: settings,
-      socket: nil
+      settings: settings
     }
 
     GenServer.start_link(__MODULE__, state)
@@ -53,22 +52,27 @@ defmodule Ace.HTTP.Server do
     case Ace.Socket.accept(listen_socket) do
       {:ok, socket} ->
         :ok = Ace.Socket.set_active(socket)
-        state = %{state | socket: socket}
 
         case Ace.Socket.negotiated_protocol(socket) do
           :http1 ->
-            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [])
+            channel = %Ace.HTTP.Channel{
+              endpoint: self(),
+              id: 1,
+              socket: socket
+            }
+
+            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [channel])
             monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{
-              status: {:request, :response},
               socket: socket,
               # Worker and channel could live on same key, there is no channel without a worker
-              channel: {:http1, self(), 1},
+              channel: channel,
               worker: worker,
               monitor: monitor,
               keep_alive: false,
-              receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048)
+              receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048),
+              serializer_state: Ace.HTTP1.Serializer.new()
             }
 
             GenServer.reply(from, {:ok, self()})

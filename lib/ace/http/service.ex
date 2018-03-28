@@ -47,6 +47,7 @@ defmodule Ace.HTTP.Service do
 
   defmacro __using__(defaults) do
     {defaults, []} = Module.eval_quoted(__CALLER__, defaults)
+
     quote do
       use Raxx.Server
 

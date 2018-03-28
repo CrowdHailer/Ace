@@ -199,25 +199,26 @@ defmodule Ace.HTTP2.Stream do
         {:error, {:stream_closed, "Headers received on closed stream"}}
     end
     |> case do
-         {:ok, new_status} ->
-           new_stream = %{stream | status: new_status}
+      {:ok, new_status} ->
+        new_stream = %{stream | status: new_status}
 
-           {:ok, final_stream} =
-             if end_stream do
-               process_received_end_stream(new_stream)
-             else
-               {:ok, new_stream}
-             end
+        {:ok, final_stream} =
+          if end_stream do
+            process_received_end_stream(new_stream)
+          else
+            {:ok, new_stream}
+          end
 
-           {:ok, final_stream}
+        {:ok, final_stream}
 
-         {:error, reason} ->
-           {:error, reason}
-       end
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def receive_promise(original, promised, request) do
     promised_stream_ref = {:stream, self(), promised.id, promised.monitor}
+    promised_stream_ref = %Ace.HTTP.Channel{endpoint: self(), id: promised.id, socket: :h2_socket}
     forward(original, {:promise, {promised_stream_ref, request}})
     {:ok, original}
   end
@@ -309,7 +310,7 @@ defmodule Ace.HTTP2.Stream do
   end
 
   defp forward(stream, message) do
-    stream_ref = {:stream, self(), stream.id, stream.monitor}
+    stream_ref = %Ace.HTTP.Channel{endpoint: self(), id: stream.id, socket: :h2_socket}
     # # Maybe send with same ref as used for reply
     send(stream.worker, {stream_ref, message})
   end

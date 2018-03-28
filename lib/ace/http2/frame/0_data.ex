@@ -1,5 +1,10 @@
 defmodule Ace.HTTP2.Frame.Data do
   @moduledoc false
+
+  alias Ace.HTTP2.Frame
+
+  @type t :: %__MODULE__{data: binary}
+
   @enforce_keys [:data, :stream_id, :end_stream]
   defstruct @enforce_keys
 
@@ -7,6 +12,7 @@ defmodule Ace.HTTP2.Frame.Data do
     %__MODULE__{data: data, stream_id: stream_id, end_stream: end_stream}
   end
 
+  @spec decode({0, Frame.flags(), Frame.stream_id(), binary}) :: {:ok, t}
   def decode({0, flags, stream_id, payload}) do
     {data, end_stream} = read(flags, payload)
     {:ok, new(stream_id, data, end_stream)}
@@ -26,7 +32,7 @@ defmodule Ace.HTTP2.Frame.Data do
 
     data =
       if padded do
-        Ace.HTTP2.Frame.remove_padding(payload)
+        Frame.remove_padding(payload)
       else
         payload
       end
@@ -41,7 +47,7 @@ defmodule Ace.HTTP2.Frame.Data do
     }
   end
 
-  defimpl Inspect, for: Ace.HTTP2.Frame.Data do
+  defimpl Inspect, for: Frame.Data do
     def inspect(%{data: data, end_stream: end_stream, stream_id: stream_id}, _opts) do
       {preview, rest} = String.split_at(data, 50)
       end_preview = if rest == "", do: "", else: "..."

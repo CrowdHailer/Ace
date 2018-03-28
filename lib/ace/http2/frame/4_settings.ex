@@ -1,5 +1,7 @@
 defmodule Ace.HTTP2.Frame.Settings do
   @moduledoc false
+  @type t :: %__MODULE__{ack: boolean}
+
   @enforce_keys [:ack]
   @parameter_keys [
     :header_table_size,

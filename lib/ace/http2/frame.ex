@@ -30,31 +30,76 @@ defmodule Ace.HTTP2.Frame do
   @window_update 8
   @continuation 9
 
-  @doc """
-  Read the next available frame.
-  """
-  def parse_from_buffer(<<length::24, _::binary>>, max_length: max_length)
-      when length > max_length do
+  @type stream_id :: 1..31
+  @type flags :: <<_::8>>
+
+  @type t ::
+          __MODULE__.Data.t()
+          | __MODULE__.Headers.t()
+          | __MODULE__.Priority.t()
+          | __MODULE__.RstStream.t()
+          | __MODULE__.Settings.t()
+          | __MODULE__.PushPromise.t()
+          | __MODULE__.Ping.t()
+          | __MODULE__.GoAway.t()
+          | __MODULE__.WindowUpdate.t()
+          | __MODULE__.Continuation.t()
+          | {:unknown_frame_type, integer}
+
+  @spec parse(binary(), max_length: binary) ::
+          {:ok, {t | nil, binary}}
+          | {
+              :error,
+              :bad_settings_frame
+              | {:flow_control_error, <<_::184>>}
+              | {:frame_size_error, <<_::64, _::_*8>>}
+              | {:protocol_error, <<_::64, _::_*8>>}
+            }
+  def parse(buffer, max_length: max_length) do
+    case parse_from_buffer(buffer, max_length: max_length) do
+      {:ok, {nil, unprocessed}} ->
+        {:ok, {nil, unprocessed}}
+
+      {:ok, {raw_frame, unprocessed}} ->
+        case decode(raw_frame) do
+          {:ok, frame} ->
+            {:ok, {frame, unprocessed}}
+
+          # TODO decode return unknown frame
+          {:error, {:unknown_frame_type, type}} ->
+            {:ok, {{:unknown_frame_type, type}, unprocessed}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp parse_from_buffer(<<length::24, _::binary>>, max_length: max_length)
+       when length > max_length do
     {:error, {:frame_size_error, "Frame greater than max allowed: (#{length} >= #{max_length})"}}
   end
 
-  def parse_from_buffer(
-        <<
-          length::24,
-          type::8,
-          flags::bits-size(8),
-          _::1,
-          stream_id::31,
-          payload::binary-size(length),
-          rest::binary
-        >>,
-        max_length: max_length
-      )
-      when length <= max_length do
+  defp parse_from_buffer(
+         <<
+           length::24,
+           type::8,
+           flags::bits-size(8),
+           _::1,
+           stream_id::31,
+           payload::binary-size(length),
+           rest::binary
+         >>,
+         max_length: max_length
+       )
+       when length <= max_length do
     {:ok, {{type, flags, stream_id, payload}, rest}}
   end
 
-  def parse_from_buffer(buffer, max_length: _) when is_binary(buffer) do
+  defp parse_from_buffer(buffer, max_length: _) when is_binary(buffer) do
     {:ok, {nil, buffer}}
   end
 

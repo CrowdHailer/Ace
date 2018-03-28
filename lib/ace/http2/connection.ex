@@ -86,26 +86,17 @@ defmodule Ace.HTTP2.Connection do
     handle_info({:ssl, connection, data}, {"", state})
   end
 
-  def handle_info({:ssl, _, data}, {buffer, state = %__MODULE__{}}) do
-    buffer = buffer <> data
-
-    case consume(buffer, state) do
-      {:ok, state} ->
-        {:noreply, state}
+  def handle_info({:ssl, _, packet}, {buffer, state = %__MODULE__{}}) do
+    case receive_packet({buffer, state}, packet) do
+      {:ok, {frames, {buffer, state}}} ->
+        :ok = Ace.Socket.set_active(state.socket)
+        # DEBT returns :ok or {:error, :closed}
+        do_send_frames(frames, state)
+        {:noreply, {buffer, state}}
 
       {:error, {error, debug}} ->
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(4, error, debug)
-        outbound = Frame.GoAway.serialize(frame)
-        :ok = Ace.Socket.send(state.socket, outbound)
-        Process.sleep(1000)
-
-        # Despite being an error the connection has successfully dealt with the client and does not need to crash
-        {:stop, :normal, state}
-
-      {:error, reason} ->
-        Logger.warn("ERROR: #{inspect(reason)}, NO DEBUG INFO")
-        frame = Frame.GoAway.new(4, :internal_error, inspect(reason))
         outbound = Frame.GoAway.serialize(frame)
         :ok = Ace.Socket.send(state.socket, outbound)
         Process.sleep(1000)
@@ -142,15 +133,12 @@ defmodule Ace.HTTP2.Connection do
     {stream_id, state} = next_stream_id(state)
     stream = Stream.idle(stream_id, receiver, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
-    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, {buffer, state}}
+
+    {:reply, {:ok, %Ace.HTTP.Channel{endpoint: self, id: stream_id, socket: :h2_socket}},
+     {buffer, state}}
   end
 
-  def handle_call({:send, {:stream, _, original_id, _ref}, {:promise, request}}, from, {
-        buffer,
-        state
-      }) do
-    GenServer.reply(from, :ok)
-
+  defp send_promise(request, original_id, state) do
     if state.remote_settings.enable_push do
       {promised_stream, state} = next_stream(state)
       headers = Ace.HTTP2.request_to_headers(request)
@@ -191,34 +179,47 @@ defmodule Ace.HTTP2.Connection do
             {:ok, {[], state}}
         end
 
-      {:noreply, {buffer, state}}
+      state
     else
-      {:noreply, {buffer, state}}
+      state
     end
   end
 
-  def handle_call({:send, {:stream, _, stream_id, _}, item}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
+  def handle_call({:send, channel = %{id: stream_id}, items}, _from, {buffer, state})
+      when is_list(items) do
+    state =
+      Enum.reduce(items, state, fn item, state ->
+        {:ok, stream} = Map.fetch(state.streams, stream_id)
 
-    {:ok, new_stream} =
-      case item do
-        request = %Raxx.Request{} ->
-          Stream.send_request(stream, request)
+        state =
+          case item do
+            request = %Raxx.Request{} ->
+              {:ok, new_stream} = Stream.send_request(stream, request)
+              put_stream(state, new_stream)
 
-        response = %Raxx.Response{} ->
-          Stream.send_response(stream, response)
+            response = %Raxx.Response{} ->
+              {:ok, new_stream} = Stream.send_response(stream, response)
+              put_stream(state, new_stream)
 
-        data = %Raxx.Data{} ->
-          Stream.send_data(stream, data)
+            data = %Raxx.Data{} ->
+              {:ok, new_stream} = Stream.send_data(stream, data)
+              put_stream(state, new_stream)
 
-        tail = %Raxx.Tail{} ->
-          Stream.send_tail(stream, tail)
-      end
+            tail = %Raxx.Tail{} ->
+              {:ok, new_stream} = Stream.send_tail(stream, tail)
+              put_stream(state, new_stream)
 
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
+            # TODO make Raxx.Promise
+            {:promise, request} ->
+              send_promise(request, stream_id, state)
+          end
+
+        {frames, state} = send_available(state)
+        :ok = do_send_frames(frames, state)
+        state
+      end)
+
+    {:reply, {:ok, channel}, {buffer, state}}
   end
 
   def handle_call({:ping, identifier}, from, {buffer, state}) do
@@ -372,7 +373,8 @@ defmodule Ace.HTTP2.Connection do
     {previous ++ [reset_frame], connection}
   end
 
-  def pack_continuation(block, stream_id, max_frame_size) when byte_size(block) <= max_frame_size do
+  def pack_continuation(block, stream_id, max_frame_size)
+      when byte_size(block) <= max_frame_size do
     [Frame.Continuation.new(stream_id, block, true)]
   end
 
@@ -401,56 +403,59 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def next_stream(state) do
-    {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
     {stream_id, state} = next_stream_id(state)
+
+    channel = %Ace.HTTP.Channel{
+      endpoint: self(),
+      id: stream_id,
+      socket: :h2_socket
+    }
+
+    {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [channel])
     stream = Stream.reserve(stream_id, worker, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
     {stream, state}
   end
 
   # Do not separate frame and binary level as this step needs to know state for max_frame
-  def consume(buffer, state) do
-    max_frame_size = state.local_settings.max_frame_size
+  def receive_packet({buffer, state}, packet) do
+    read_buffer({buffer <> packet, state}, [])
+  end
 
-    case Frame.parse_from_buffer(buffer, max_length: max_frame_size) do
-      {:ok, {raw_frame, unprocessed}} ->
-        # Need raw frame step because parse needs to return remaining buffer for unknown frame type
-        if raw_frame do
-          case Frame.decode(raw_frame) do
-            {:ok, frame} ->
-              Logger.debug("#{state.name} received: #{inspect(frame)}")
+  # TODO frame parser should have a state rather than keep buffer outside
+  defp read_buffer({buffer, state}, actions) do
+    case Frame.parse(buffer, max_length: state.local_settings.max_frame_size) do
+      {:ok, {nil, buffer}} ->
+        {:ok, {actions, {buffer, state}}}
 
-              case consume_frame(frame, state) do
-                {:ok, {frames, state}} ->
-                  # DEBT returns :ok or {:error, :closed}
-                  do_send_frames(frames, state)
-                  consume(unprocessed, state)
+      {:ok, {frame, buffer}} ->
+        Logger.debug("#{state.name} received: #{inspect(frame)}")
 
-                {:error, reason} ->
-                  {:error, reason}
-              end
+        case consume_frame(frame, state) do
+          {:ok, {next_actions, state}} ->
+            read_buffer({buffer, state}, actions ++ next_actions)
 
-            {:error, {:unknown_frame_type, type}} ->
-              case state.next do
-                :any ->
-                  Logger.debug("Dropping unknown frame type (#{type})")
-                  consume(unprocessed, state)
-
-                {:continuation, _stream_id, _header_block_fragment, _end_stream} ->
-                  {:error, {:protocol_error, "Unknown frame interupted continuation"}}
-              end
-
-            {:error, reason} ->
-              {:error, reason}
-          end
-        else
-          :ok = Ace.Socket.set_active(state.socket)
-          {:ok, {unprocessed, state}}
+          {:error, reason} ->
+            {:error, reason}
         end
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # TODO test this case
+  def consume_frame({:unknown_frame_type, type}, state = %{state: %{next: :any}}) do
+    Logger.debug("Dropping unknown frame type (#{type})")
+    {:ok, {[], state}}
+  end
+
+  # TODO test this case
+  def consume_frame({:unknown_frame_type, type}, %{
+        state: %{next: {:continuation, _stream_id, _header_block_fragment, _end_stream}}
+      }) do
+    Logger.debug("Dropping unknown frame type (#{type})")
+    {:error, {:protocol_error, "Unknown frame interupted continuation"}}
   end
 
   def consume_frame(frame = %Frame.Settings{ack: false}, state = %{next: :handshake}) do
@@ -730,7 +735,13 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def open_stream(connection, stream_id) do
-    {:ok, worker} = Supervisor.start_child(connection.stream_supervisor, [])
+    channel = %Ace.HTTP.Channel{
+      endpoint: self(),
+      id: stream_id,
+      socket: :h2_socket
+    }
+
+    {:ok, worker} = Supervisor.start_child(connection.stream_supervisor, [channel])
     stream = Stream.idle(stream_id, worker, connection.remote_settings.initial_window_size)
     {:ok, put_stream(connection, stream)}
   end

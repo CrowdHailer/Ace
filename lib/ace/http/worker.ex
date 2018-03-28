@@ -11,16 +11,25 @@ defmodule Ace.HTTP.Worker do
   Even if messages are sent on a single connection,
   e.g. HTTP pipelining or HTTP/2 streams.
   """
+  @typep application :: {module, any}
+
   use GenServer
 
-  @typep application :: {module, any}
+  @enforce_keys [
+    :app_module,
+    :app_state,
+    :channel,
+    :channel_monitor
+  ]
+
+  defstruct @enforce_keys
 
   @doc """
   Start a new worker linked to the calling process.
   """
-  @spec start_link(application) :: GenServer.on_start()
-  def start_link({module, config}) do
-    GenServer.start_link(__MODULE__, {module, config, nil}, [])
+  @spec start_link(application, :channel) :: GenServer.on_start()
+  def start_link({module, config}, channel) do
+    GenServer.start_link(__MODULE__, {module, config, channel}, [])
   end
 
   @doc false
@@ -45,97 +54,76 @@ defmodule Ace.HTTP.Worker do
   ## Server Callbacks
 
   @impl GenServer
-  def handle_info({client, request = %Raxx.Request{}}, {mod, state, nil}) do
-    case client do
-      {:http1, endpoint, _id} ->
-        Process.monitor(endpoint)
+  def init({module, config, channel}) do
+    channel_monitor = Ace.HTTP.Channel.monitor_endpoint(channel)
 
-      {:stream, endpoint, _id, _ref} ->
-        Process.monitor(endpoint)
+    {:ok,
+     %__MODULE__{
+       app_module: module,
+       app_state: config,
+       channel: channel,
+       channel_monitor: channel_monitor
+     }}
+  end
+
+  @impl GenServer
+  def handle_info({channel, part}, state = %{channel: channel}) do
+    handle_raxx_part(part, state)
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, state = %{channel_monitor: ref}) do
+    {:stop, reason, state}
+  end
+
+  def handle_info(other, state) do
+    state.app_module.handle_info(other, state.app_state)
+    |> normalise_reaction(state.app_state)
+    |> do_send(state)
+  end
+
+  defp handle_raxx_part(head = %Raxx.Request{}, state) do
+    state.app_module.handle_head(head, state.app_state)
+    |> normalise_reaction(state.app_state)
+    |> do_send(state)
+  end
+
+  defp handle_raxx_part(data = %Raxx.Data{}, state) do
+    state.app_module.handle_data(data.data, state.app_state)
+    |> normalise_reaction(state.app_state)
+    |> do_send(state)
+  end
+
+  defp handle_raxx_part(tail = %Raxx.Tail{}, state) do
+    state.app_module.handle_tail(tail.headers, state.app_state)
+    |> normalise_reaction(state.app_state)
+    |> do_send(state)
+  end
+
+  # TODO this should just be stop state
+  defp normalise_reaction(response = %Raxx.Response{}, app_state) do
+    {[response], app_state}
+  end
+
+  defp normalise_reaction({parts, new_app_state}, app_state) do
+    {parts, new_app_state}
+  end
+
+  defp do_send({parts, new_app_state}, state) do
+    new_state = %{state | app_state: new_app_state}
+    {:ok, _channel} = Ace.HTTP.Channel.send(state.channel, parts)
+
+    case List.last(parts) do
+      %{body: false} ->
+        {:stop, :normal, %{state | app_state: new_app_state}}
+
+      %Raxx.Tail{} ->
+        {:stop, :normal, %{state | app_state: new_app_state}}
+
+      %{body: body} when is_binary(body) ->
+        {:stop, :normal, %{state | app_state: new_app_state}}
+
+      _ ->
+        {:noreply, %{state | app_state: new_app_state}}
     end
-
-    mod.handle_head(request, state)
-    |> normalise_reaction(state)
-    |> do_send({mod, state, client})
-  end
-
-  def handle_info({client, data = %Raxx.Data{}}, {mod, state, client}) do
-    mod.handle_data(data.data, state)
-    |> normalise_reaction(state)
-    |> do_send({mod, state, client})
-  end
-
-  def handle_info({client, tail = %Raxx.Tail{}}, {mod, state, client}) do
-    mod.handle_tail(tail.headers, state)
-    |> normalise_reaction(state)
-    |> do_send({mod, state, client})
-  end
-
-  def handle_info({:DOWN, _r, :process, p, reason}, {mod, state, client = {:http1, p, _id}}) do
-    {:stop, reason, {mod, state, client}}
-  end
-
-  def handle_info({:DOWN, _r, :process, p, reason}, {mod, state, client = {:stream, p, _id, _ref}}) do
-    {:stop, reason, {mod, state, client}}
-  end
-
-  def handle_info(other, {mod, state, client}) do
-    mod.handle_info(other, state)
-    |> normalise_reaction(state)
-    |> do_send({mod, state, client})
-  end
-
-  defp normalise_reaction(response = %Raxx.Response{}, state) do
-    {[response], state}
-  end
-
-  defp normalise_reaction({parts, new_state}, _old_state) do
-    parts = Enum.map(parts, &fix_part/1)
-    {parts, new_state}
-  end
-
-  defp do_send({parts, new_state}, {mod, _old_state, client}) do
-    case parts do
-      [] ->
-        {:noreply, {mod, new_state, client}}
-
-      parts ->
-        case client do
-          ref = {:http1, pid, _count} ->
-            send(pid, {ref, parts})
-
-          stream = {:stream, _, _, _} ->
-            Enum.each(parts, fn part ->
-              Ace.HTTP2.send(stream, part)
-            end)
-        end
-        
-        case List.last(parts) do
-          %{body: false} ->
-            {:stop, :normal, {mod, new_state, client}}
-
-          %Raxx.Tail{} ->
-            {:stop, :normal, {mod, new_state, client}}
-
-          %{body: body} when is_binary(body) ->
-            {:stop, :normal, {mod, new_state, client}}
-
-          _ ->
-            {:noreply, {mod, new_state, client}}
-        end        
-    end
-  end
-
-  # TODO remove this special case
-  defp fix_part({:promise, request}) do
-    request =
-      request
-      |> Map.put(:scheme, request.scheme || :https)
-
-    {:promise, request}
-  end
-
-  defp fix_part(part) do
-    part
   end
 end
