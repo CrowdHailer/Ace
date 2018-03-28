@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+## [0.15.11](https://github.com/CrowdHailer/Ace/tree/0.15.11) - 2018-03-28
+
+### Added
+
+- `.formatter.exs` file for use with Elixir 1.6+
+- `Ace.HTTP1.Parser.parse/2` returns categorized HTTP/2 frame instead of raw frame parts.
+
+### Removed
+
+- `Ace.HTTP1.Parser.parse_from_buffer/2` use `Ace.HTTP1.Parser.parse/2` instead.
+- `Ace.HTTP2.Server` undocumented internal module.
+
 ## [0.15.10](https://github.com/CrowdHailer/Ace/tree/0.15.10) - 2018-01-20
 
 ### Fixed

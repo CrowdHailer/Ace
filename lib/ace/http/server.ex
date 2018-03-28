@@ -21,7 +21,7 @@ defmodule Ace.HTTP.Server do
   def start_link(worker_supervisor, settings \\ []) when is_pid(worker_supervisor) do
     state = %__MODULE__{
       worker_supervisor: worker_supervisor,
-      settings: settings,
+      settings: settings
     }
 
     GenServer.start_link(__MODULE__, state)
