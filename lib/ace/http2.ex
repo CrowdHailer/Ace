@@ -168,16 +168,14 @@ defmodule Ace.HTTP2 do
       case read_headers(headers) do
         {:ok, headers} ->
           uri = URI.parse(path)
-          {:ok, query} = URI2.Query.decode(uri.query || "")
-          segments = Raxx.split_path(uri.path)
 
           request = %Raxx.Request{
             scheme: scheme,
             authority: authority,
             method: method,
             mount: [],
-            path: segments,
-            query: query,
+            path: uri.path || "",
+            query: uri.query || "",
             headers: headers,
             body: false
           }

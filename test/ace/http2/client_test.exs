@@ -34,6 +34,7 @@ defmodule Ace.HTTP2.ClientTest do
     :ok = Ace.HTTP2.send(stream, request)
     data = Raxx.data("foo")
     :ok = Ace.HTTP2.send(stream, data)
+    IO.puts("STREAM*** " <> inspect(stream))
     assert_receive {^stream, response = %Response{}}, 1000
     assert 200 == response.status
     assert true == response.body

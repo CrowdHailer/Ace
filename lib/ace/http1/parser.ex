@@ -219,12 +219,10 @@ defmodule Ace.HTTP1.Parser do
           path_string
       end
 
-    %{path: path, query: query_string} = URI.parse(path_string)
+    %{path: path, query: query} = URI.parse(path_string)
     # DEBT in case of path '//' then parsing returns path of nil.
     # e.g. localhost:8080//
-    path = path || "/"
-    {:ok, query} = URI2.Query.decode(query_string || "")
-    path = Raxx.split_path(path)
+    path = path || ""
 
     # NOTE scheme is ignored from message.
     # It should therefore not be part of request but part of connection. same as client ip etc

@@ -51,8 +51,8 @@ defmodule Ace.HTTP2Test do
     assert received.authority == "example.com:1234"
     assert received.method == :GET
     assert received.mount == []
-    assert received.path == ["foo", "bar"]
-    assert received.query == %{"var" => "1"}
+    assert received.path == "/foo/bar"
+    assert received.query == "var=1"
     assert received.headers == request.headers
     assert received.body == false
   end
@@ -70,7 +70,7 @@ defmodule Ace.HTTP2Test do
 
     assert_receive {:"$gen_call", from, {:headers, received, state}}, 1000
     GenServer.reply(from, {[], state})
-    assert received.path == request.path
+    assert received.path == "/"
 
     data = Raxx.data("Hello, World!")
     :ok = Ace.HTTP2.send(client_stream, data)
@@ -202,7 +202,7 @@ defmodule Ace.HTTP2Test do
 
     assert_receive {
                      ^client_stream,
-                     {:promise, {client_promised_stream, %Request{path: ["favicon"]}}}
+                     {:promise, {client_promised_stream, %Request{path: "/favicon"}}}
                    },
                    1000
 
