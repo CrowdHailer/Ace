@@ -12,7 +12,7 @@ defmodule Ace.HTTP1.Serializer do
   def serialize(head = %{body: false}, %{next: :head}) do
     head =
       head
-      |> Ace.Raxx.delete_header("content-length")
+      |> Raxx.delete_header("content-length")
       |> Raxx.set_header("content-length", "0")
 
     state = %{next: :done}
@@ -20,11 +20,11 @@ defmodule Ace.HTTP1.Serializer do
   end
 
   def serialize(head = %{body: true}, %{next: :head}) do
-    case Ace.Raxx.content_length(head) do
+    case content_length(head) do
       nil ->
         head =
           head
-          |> Ace.Raxx.delete_header("transfer-encoding")
+          |> Raxx.delete_header("transfer-encoding")
           |> Raxx.set_header("transfer-encoding", "chunked")
 
         {:ok, {serialize_head(head), %__MODULE__{next: :chunked_body}}}
@@ -35,8 +35,8 @@ defmodule Ace.HTTP1.Serializer do
   end
 
   def serialize(message = %{body: body}, %{next: :head}) when is_binary(body) do
-    content_length = Ace.Raxx.content_length(message) || :erlang.iolist_size(body)
-    message = Ace.Raxx.delete_header(message, "content-length")
+    content_length = content_length(message) || :erlang.iolist_size(body)
+    message = Raxx.delete_header(message, "content-length")
     message = Raxx.set_header(message, "content-length", "#{content_length}")
     # Could call serialize body to check too long too short or already chunked
     {:ok, {serialize_head(message) <> body, %__MODULE__{next: :done}}}
@@ -94,5 +94,16 @@ defmodule Ace.HTTP1.Serializer do
 
   defp header_line({field_name, field_value}) do
     "#{field_name}: #{field_value}\r\n"
+  end
+
+  defp content_length(%{headers: headers}) do
+    case :proplists.get_value("content-length", headers) do
+      :undefined ->
+        nil
+
+      binary ->
+        {content_length, ""} = Integer.parse(binary)
+        content_length
+    end
   end
 end

@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
-- TEMPORARY `Ace.Raxx` with functions that should be migrated to next Raxx release.
 - `Ace.HTTP1.Serializer` added for grouping code for serializing requests and responses.
 - `Ace.HTTP.Channel` to encapsulate information about an exchange within the context of a connection.
 - `Ace.HTTP.Worker.start_link/2` workers must be started with a channel in addition to application.

@@ -105,7 +105,7 @@ defmodule Ace.HTTP1.Endpoint do
   defp send_part(response = %Response{}, state) do
     response =
       response
-      |> Ace.Raxx.delete_header("connection")
+      |> Raxx.delete_header("connection")
       |> Raxx.set_header("connection", "close")
 
     {:ok, {outbound, serializer_state}} =

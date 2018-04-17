@@ -133,7 +133,7 @@ defmodule Ace.HTTP1.Parser do
 
         case transfer_encoding do
           nil ->
-            case Ace.Raxx.content_length(%{headers: headers}) do
+            case content_length(headers) do
               length when length in [0, nil] ->
                 {:ok, {request_head, {:done, rest, options}}}
 
@@ -194,6 +194,17 @@ defmodule Ace.HTTP1.Parser do
 
       binary ->
         {binary, :proplists.delete("transfer-encoding", headers)}
+    end
+  end
+
+  defp content_length(headers) do
+    case :proplists.get_value("content-length", headers) do
+      :undefined ->
+        nil
+
+      binary ->
+        {content_length, ""} = Integer.parse(binary)
+        content_length
     end
   end
 
