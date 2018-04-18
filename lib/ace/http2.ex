@@ -46,12 +46,12 @@ defmodule Ace.HTTP2 do
     # TODO consider default values for required scheme and authority
     # DEBT nested queries
     query_string =
-      case URI.encode_query(request.query || %{}) do
-        "" ->
+      case request.query do
+        nil ->
           ""
 
-        encoded ->
-          "?" <> encoded
+        query ->
+          "?" <> query
       end
 
     path = "/" <> Enum.join(request.path, "/") <> query_string
@@ -167,19 +167,10 @@ defmodule Ace.HTTP2 do
     else
       case read_headers(headers) do
         {:ok, headers} ->
-          uri = URI.parse(path)
-          {:ok, query} = URI2.Query.decode(uri.query || "")
-          segments = Raxx.split_path(uri.path)
 
-          request = %Raxx.Request{
-            scheme: scheme,
-            authority: authority,
-            method: method,
-            mount: [],
-            path: segments,
-            query: query,
-            headers: headers,
-            body: false
+          request = %{Raxx.request(method, path) | scheme: scheme,
+          authority: authority,
+          headers: headers
           }
 
           {:ok, request}
