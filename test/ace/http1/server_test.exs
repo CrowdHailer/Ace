@@ -141,7 +141,7 @@ defmodule Ace.HTTP1.ServerTest do
 
   test "can connect with alpn preferences", %{port: port} do
     http1_request = """
-    GET /foo/bar?var=1 HTTP/1.1
+    GET /foo/bar/?var=1 HTTP/1.1
     host: example.com:1234
     x-test: Value
 
@@ -167,8 +167,8 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.authority == "example.com:1234"
     assert request.method == :GET
     assert request.mount == []
-    assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.path == "/foo/bar/"
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -218,8 +218,8 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.authority == "example.com:1234"
     assert request.method == :GET
     assert request.mount == []
-    assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.path == "/foo/bar"
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -242,8 +242,8 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.authority == "example.com:1234"
     assert request.method == :GET
     assert request.mount == []
-    assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.path == "/foo/bar"
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -270,8 +270,8 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.authority == "example.com:1234"
     assert request.method == :GET
     assert request.mount == []
-    assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.path == "/foo/bar"
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -299,8 +299,8 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.authority == "example.com:1234"
     assert request.method == :GET
     assert request.mount == []
-    assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.path == "/foo/bar"
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
