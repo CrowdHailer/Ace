@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+### Changed
+
+- Use `raxx 0.15` which has does not expect query strings to be parsed.  
+
 ## [0.15.11](https://github.com/CrowdHailer/Ace/tree/0.15.11) - 2018-03-28
 
 ### Added
