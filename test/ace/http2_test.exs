@@ -195,7 +195,7 @@ defmodule Ace.HTTP2Test do
 
     reply = [
       Raxx.response(200) |> Raxx.set_body(true),
-      {:promise, request}
+      {:promise, %{request | scheme: :https}}
     ]
 
     GenServer.reply(from, {reply, state})

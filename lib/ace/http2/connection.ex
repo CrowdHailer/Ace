@@ -133,15 +133,12 @@ defmodule Ace.HTTP2.Connection do
     {stream_id, state} = next_stream_id(state)
     stream = Stream.idle(stream_id, receiver, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
-    {:reply, {:ok, {:stream, self(), stream.id, stream.monitor}}, {buffer, state}}
+
+    {:reply, {:ok, %Ace.HTTP.Channel{endpoint: self, id: stream_id, socket: :h2_socket}},
+     {buffer, state}}
   end
 
-  def handle_call({:send, {:stream, _, original_id, _ref}, {:promise, request}}, from, {
-        buffer,
-        state
-      }) do
-    GenServer.reply(from, :ok)
-
+  defp send_promise(request, original_id, state) do
     if state.remote_settings.enable_push do
       {promised_stream, state} = next_stream(state)
       headers = Ace.HTTP2.request_to_headers(request)
@@ -182,34 +179,47 @@ defmodule Ace.HTTP2.Connection do
             {:ok, {[], state}}
         end
 
-      {:noreply, {buffer, state}}
+      state
     else
-      {:noreply, {buffer, state}}
+      state
     end
   end
 
-  def handle_call({:send, {:stream, _, stream_id, _}, item}, _from, {buffer, state}) do
-    {:ok, stream} = Map.fetch(state.streams, stream_id)
+  def handle_call({:send, channel = %{id: stream_id}, items}, _from, {buffer, state})
+      when is_list(items) do
+    state =
+      Enum.reduce(items, state, fn item, state ->
+        {:ok, stream} = Map.fetch(state.streams, stream_id)
 
-    {:ok, new_stream} =
-      case item do
-        request = %Raxx.Request{} ->
-          Stream.send_request(stream, request)
+        state =
+          case item do
+            request = %Raxx.Request{} ->
+              {:ok, new_stream} = Stream.send_request(stream, request)
+              put_stream(state, new_stream)
 
-        response = %Raxx.Response{} ->
-          Stream.send_response(stream, response)
+            response = %Raxx.Response{} ->
+              {:ok, new_stream} = Stream.send_response(stream, response)
+              put_stream(state, new_stream)
 
-        data = %Raxx.Data{} ->
-          Stream.send_data(stream, data)
+            data = %Raxx.Data{} ->
+              {:ok, new_stream} = Stream.send_data(stream, data)
+              put_stream(state, new_stream)
 
-        tail = %Raxx.Tail{} ->
-          Stream.send_tail(stream, tail)
-      end
+            tail = %Raxx.Tail{} ->
+              {:ok, new_stream} = Stream.send_tail(stream, tail)
+              put_stream(state, new_stream)
 
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:reply, :ok, {buffer, state}}
+            # TODO make Raxx.Promise
+            {:promise, request} ->
+              send_promise(request, stream_id, state)
+          end
+
+        {frames, state} = send_available(state)
+        :ok = do_send_frames(frames, state)
+        state
+      end)
+
+    {:reply, {:ok, channel}, {buffer, state}}
   end
 
   def handle_call({:ping, identifier}, from, {buffer, state}) do
@@ -393,8 +403,15 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def next_stream(state) do
-    {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [])
     {stream_id, state} = next_stream_id(state)
+
+    channel = %Ace.HTTP.Channel{
+      endpoint: self(),
+      id: stream_id,
+      socket: :h2_socket
+    }
+
+    {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [channel])
     stream = Stream.reserve(stream_id, worker, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
     {stream, state}
@@ -405,6 +422,7 @@ defmodule Ace.HTTP2.Connection do
     read_buffer({buffer <> packet, state}, [])
   end
 
+  # TODO frame parser should have a state rather than keep buffer outside
   defp read_buffer({buffer, state}, actions) do
     case Frame.parse(buffer, max_length: state.local_settings.max_frame_size) do
       {:ok, {nil, buffer}} ->
@@ -717,7 +735,13 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def open_stream(connection, stream_id) do
-    {:ok, worker} = Supervisor.start_child(connection.stream_supervisor, [])
+    channel = %Ace.HTTP.Channel{
+      endpoint: self(),
+      id: stream_id,
+      socket: :h2_socket
+    }
+
+    {:ok, worker} = Supervisor.start_child(connection.stream_supervisor, [channel])
     stream = Stream.idle(stream_id, worker, connection.remote_settings.initial_window_size)
     {:ok, put_stream(connection, stream)}
   end
