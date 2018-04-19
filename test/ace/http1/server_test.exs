@@ -654,8 +654,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     GenServer.reply(from, response)
 
-    state = :sys.get_state(worker)
-    endpoint = state.channel.endpoint
+    %{channel: %{endpoint: endpoint}, channel_monitor: channel_monitor} = :sys.get_state(worker)
     endpoint_monitor = Process.monitor(endpoint)
 
     send(worker, {Raxx.Forwarder, :stop, :normal})
