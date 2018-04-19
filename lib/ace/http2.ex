@@ -169,10 +169,11 @@ defmodule Ace.HTTP2 do
     else
       case read_headers(headers) do
         {:ok, headers} ->
-
-          request = %{Raxx.request(method, path) | scheme: scheme,
-          authority: authority,
-          headers: headers
+          request = %{
+            Raxx.request(method, path)
+            | scheme: scheme,
+              authority: authority,
+              headers: headers
           }
 
           {:ok, request}
