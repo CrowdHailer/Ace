@@ -21,13 +21,15 @@ defmodule Ace.HTTP2 do
 
   def send(stream, item = %type{})
       when type in [Raxx.Request, Raxx.Response, Raxx.Data, Raxx.Tail] do
-    {:stream, pid, _id, _ref} = stream
-    GenServer.call(pid, {:send, stream, item})
+    %{endpoint: endpoint} = stream
+    {:ok, _} = GenServer.call(endpoint, {:send, stream, [item]})
+    :ok
   end
 
   def send(stream, item = {:promise, %Raxx.Request{}}) do
-    {:stream, pid, _id, _ref} = stream
-    GenServer.call(pid, {:send, stream, item})
+    %{endpoint: endpoint} = stream
+    {:ok, _} = GenServer.call(endpoint, {:send, stream, [item]})
+    :ok
   end
 
   @doc """

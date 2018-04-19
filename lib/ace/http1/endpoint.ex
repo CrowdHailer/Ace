@@ -52,9 +52,7 @@ defmodule Ace.HTTP1.Endpoint do
     end
   end
 
-  def handle_info({channel = {:http1, _, _}, parts}, state) do
-    ^channel = state.channel
-
+  def handle_call({:send, channel, parts}, _from, state = %{channel: channel}) do
     {outbound, state} =
       Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
         {:ok, {outbound, next_state}} = send_part(part, state)
@@ -68,7 +66,7 @@ defmodule Ace.HTTP1.Endpoint do
         {:stop, :normal, state}
 
       {_, _incomplete} ->
-        {:noreply, state}
+        {:reply, {:ok, channel}, state}
     end
   end
 

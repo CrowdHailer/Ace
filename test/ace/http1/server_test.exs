@@ -653,7 +653,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     GenServer.reply(from, response)
 
-    {Raxx.Forwarder, _forwarder_state, {:http1, endpoint, _}} = :sys.get_state(worker)
+    %{channel: %{endpoint: endpoint}, channel_monitor: channel_monitor} = :sys.get_state(worker)
     endpoint_monitor = Process.monitor(endpoint)
 
     send(worker, {Raxx.Forwarder, :stop, :normal})
