@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Use `raxx 0.15` which has does not expect query strings to be parsed.  
 
+### Added
+
+- `Ace.HTTP1.Serializer` added for grouping code for serializing requests and responses.
+- `Ace.HTTP.Channel` to encapsulate information about an exchange within the context of a connection.
+- `Ace.HTTP.Worker.start_link/2` workers must be started with a channel in addition to application.
+
+### Removed
+- `Ace.HTTP1` undocumented internal module.
+- `Ace.HTTP2.Stream.Reset` undocumented internal module.
+- `Ace.HTTP1` undocumented internal module.
+- `Ace.HTTP2.Stream.Reset` undocumented internal module.
+- `Ace.HTTP.Worker.start_link/1` no longer used internally.
+
 ## [0.15.11](https://github.com/CrowdHailer/Ace/tree/0.15.11) - 2018-03-28
 
 ### Added
