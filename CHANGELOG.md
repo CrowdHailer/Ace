@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+### Added
+
+- `Ace.HTTP.Channel` to encapsulate information about an exchange within the context of a connection.
+- `Ace.HTTP.Worker.start_link/2` workers must be started with a channel in addition to application.
+- Channel struct is added to the process dictionary of a worker, so socket information is available.
+
 ### Removed
 
 - `Ace.HTTP2.Stream.Reset` undocumented internal module.

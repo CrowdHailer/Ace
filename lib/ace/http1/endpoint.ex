@@ -53,7 +53,6 @@ defmodule Ace.HTTP1.Endpoint do
   end
 
   def handle_call({:send, channel, parts}, _from, state = %{channel: channel}) do
-
     {outbound, state} =
       Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
         {:ok, {outbound, next_state}} = send_part(part, state)

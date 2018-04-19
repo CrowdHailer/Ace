@@ -27,7 +27,7 @@ defmodule Ace.HTTP.Worker do
   @doc """
   Start a new worker linked to the calling process.
   """
-  @spec start_link(application, :channel) :: GenServer.on_start()
+  @spec start_link(application, Ace.HTTP.Channel.t()) :: GenServer.on_start()
   def start_link({module, config}, channel) do
     GenServer.start_link(__MODULE__, {module, config, channel}, [])
   end
@@ -56,6 +56,7 @@ defmodule Ace.HTTP.Worker do
   @impl GenServer
   def init({module, config, channel}) do
     channel_monitor = Ace.HTTP.Channel.monitor_endpoint(channel)
+    nil = Process.put(Ace.HTTP.Channel, channel)
 
     {:ok,
      %__MODULE__{
