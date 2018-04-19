@@ -219,28 +219,13 @@ defmodule Ace.HTTP1.Parser do
           path_string
       end
 
-    %{path: path, query: query_string} = URI.parse(path_string)
-    # DEBT in case of path '//' then parsing returns path of nil.
-    # e.g. localhost:8080//
-    path = path || "/"
-    {:ok, query} = URI2.Query.decode(query_string || "")
-    path = Raxx.split_path(path)
-
     # NOTE scheme is ignored from message.
     # It should therefore not be part of request but part of connection. same as client ip etc
     # However scheme is a required header in HTTP/2
     # Q? how often is a host header sent with http in place
     # %{scheme: scheme} = URI.parse(host)
 
-    %Raxx.Request{
-      scheme: nil,
-      authority: host,
-      method: method,
-      path: path,
-      query: query,
-      headers: [],
-      body: false
-    }
+    %{Raxx.request(method, path_string) | authority: host}
   end
 
   defp pop_chunk(buffer) do

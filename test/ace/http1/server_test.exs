@@ -171,7 +171,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.method == :GET
     assert request.mount == []
     assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -222,7 +222,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.method == :GET
     assert request.mount == []
     assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -246,7 +246,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.method == :GET
     assert request.mount == []
     assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -274,7 +274,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.method == :GET
     assert request.mount == []
     assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
@@ -303,7 +303,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.method == :GET
     assert request.mount == []
     assert request.path == ["foo", "bar"]
-    assert request.query == %{"var" => "1"}
+    assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
     assert request.body == false
   end
