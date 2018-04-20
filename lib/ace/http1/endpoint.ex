@@ -52,7 +52,7 @@ defmodule Ace.HTTP1.Endpoint do
     end
   end
 
-  def handle_call({:send, channel, parts}, _from, state = %{channel: channel}) do
+  def handle_call({:send, channel, parts}, from, state = %{channel: channel}) do
     {outbound, state} =
       Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
         {:ok, {outbound, next_state}} = send_part(part, state)
@@ -63,6 +63,7 @@ defmodule Ace.HTTP1.Endpoint do
 
     case state.status do
       {_, :complete} ->
+        GenServer.reply(from, {:ok, channel})
         {:stop, :normal, state}
 
       {_, _incomplete} ->
