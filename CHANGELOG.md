@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.16.2](https://github.com/CrowdHailer/Ace/tree/0.16.2) - 2018-04-21
+
+### Fixed
+
+- Make sure endpoint process replies to worker when sending complete response so worker exits normally instead of crashing.
+
 ## [0.16.1](https://github.com/CrowdHailer/Ace/tree/0.16.1) - 2018-04-18
 
 ### Added
