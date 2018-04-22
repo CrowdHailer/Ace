@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.16.2](https://github.com/CrowdHailer/Ace/tree/0.16.2) - 2018-04-21
 
+### Added
+
+- Use `raxx 0.15.1` which adds a `raw_path` field to requests
+
+## [0.16.2](https://github.com/CrowdHailer/Ace/tree/0.16.2) - 2018-04-21
+
 ### Fixed
 
 - Make sure endpoint process replies to worker when sending complete response so worker exits normally instead of crashing.
