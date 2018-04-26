@@ -23,6 +23,31 @@ defmodule Ace.HTTP1.Endpoint do
   defstruct @enforce_keys
 
   @impl GenServer
+  def init(args) do
+    {:ok, args}
+  end
+
+  @impl GenServer
+  def handle_call({:send, channel, parts}, from, state = %{channel: channel}) do
+    {outbound, state} =
+      Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
+        {:ok, {outbound, next_state}} = send_part(part, state)
+        {[buffer, outbound], next_state}
+      end)
+
+    Ace.Socket.send(state.socket, outbound)
+
+    case state.status do
+      {_, :complete} ->
+        GenServer.reply(from, {:ok, channel})
+        {:stop, :normal, state}
+
+      {_, _incomplete} ->
+        {:reply, {:ok, channel}, state}
+    end
+  end
+
+  @impl GenServer
   def handle_info({t, s, packet}, state = %{socket: {t, s}}) do
     case HTTP1.Parser.parse(packet, state.receive_state) do
       {:ok, {parts, receive_state}} ->
@@ -49,25 +74,6 @@ defmodule Ace.HTTP1.Endpoint do
         {:ok, {outbound, new_state}} = send_part(Raxx.response(:uri_too_long), state)
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, new_state}
-    end
-  end
-
-  def handle_call({:send, channel, parts}, from, state = %{channel: channel}) do
-    {outbound, state} =
-      Enum.reduce(parts, {"", state}, fn part, {buffer, state} ->
-        {:ok, {outbound, next_state}} = send_part(part, state)
-        {[buffer, outbound], next_state}
-      end)
-
-    Ace.Socket.send(state.socket, outbound)
-
-    case state.status do
-      {_, :complete} ->
-        GenServer.reply(from, {:ok, channel})
-        {:stop, :normal, state}
-
-      {_, _incomplete} ->
-        {:reply, {:ok, channel}, state}
     end
   end
 

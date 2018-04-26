@@ -105,26 +105,26 @@ defmodule Ace.HTTP.Worker do
     {[response], app_state}
   end
 
-  defp normalise_reaction({parts, new_app_state}, app_state) do
+  defp normalise_reaction({parts, new_app_state}, _app_state) do
     {parts, new_app_state}
   end
 
   defp do_send({parts, new_app_state}, state) do
-    new_state = %{state | app_state: new_app_state}
     {:ok, _channel} = Ace.HTTP.Channel.send(state.channel, parts)
+    new_state = %{state | app_state: new_app_state}
 
     case List.last(parts) do
       %{body: false} ->
-        {:stop, :normal, %{state | app_state: new_app_state}}
+        {:stop, :normal, new_state}
 
       %Raxx.Tail{} ->
-        {:stop, :normal, %{state | app_state: new_app_state}}
+        {:stop, :normal, new_state}
 
       %{body: body} when is_binary(body) ->
-        {:stop, :normal, %{state | app_state: new_app_state}}
+        {:stop, :normal, new_state}
 
       _ ->
-        {:noreply, %{state | app_state: new_app_state}}
+        {:noreply, new_state}
     end
   end
 end

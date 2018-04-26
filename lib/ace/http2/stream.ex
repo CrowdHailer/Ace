@@ -217,7 +217,6 @@ defmodule Ace.HTTP2.Stream do
   end
 
   def receive_promise(original, promised, request) do
-    promised_stream_ref = {:stream, self(), promised.id, promised.monitor}
     promised_stream_ref = %Ace.HTTP.Channel{endpoint: self(), id: promised.id, socket: :h2_socket}
     forward(original, {:promise, {promised_stream_ref, request}})
     {:ok, original}

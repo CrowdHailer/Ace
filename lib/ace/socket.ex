@@ -4,7 +4,6 @@ defmodule Ace.Socket do
 
   NOTE: tls sockets use the `:ssl` module and are identified with `:ssl` atom
   """
-  @moduledoc false
 
   @typedoc """
   Wrapped tcp socket or tls socket.

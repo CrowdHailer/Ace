@@ -17,6 +17,13 @@ defmodule Ace.Mixfile do
           "README.md"
         ]
       ],
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ],
       package: package()
     ]
   end
@@ -31,8 +38,10 @@ defmodule Ace.Mixfile do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
       {:raxx, "~> 0.15.1"},
-      {:dialyxir, "~> 0.5.0", only: :dev},
-      {:ex_doc, ">= 0.0.0", only: :dev}
+      {:excoveralls, "~> 0.8", only: :test},
+      {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
+      {:credo, "~> 0.8.10", only: [:dev, :test], runtime: false},
+      {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
 
