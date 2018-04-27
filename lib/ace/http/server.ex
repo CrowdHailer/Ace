@@ -48,6 +48,10 @@ defmodule Ace.HTTP.Server do
     GenServer.call(endpoint, {:accept, listen_socket}, :infinity)
   end
 
+  def init(args) do
+    {:ok, args}
+  end
+
   def handle_call({:accept, listen_socket}, from, state) do
     case Ace.Socket.accept(listen_socket) do
       {:ok, socket} ->

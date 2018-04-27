@@ -134,55 +134,8 @@ defmodule Ace.HTTP2.Connection do
     stream = Stream.idle(stream_id, receiver, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
 
-    {:reply, {:ok, %Ace.HTTP.Channel{endpoint: self, id: stream_id, socket: :h2_socket}},
+    {:reply, {:ok, %Ace.HTTP.Channel{endpoint: self(), id: stream_id, socket: :h2_socket}},
      {buffer, state}}
-  end
-
-  defp send_promise(request, original_id, state) do
-    if state.remote_settings.enable_push do
-      {promised_stream, state} = next_stream(state)
-      headers = Ace.HTTP2.request_to_headers(request)
-      {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
-      state = %{state | encode_context: new_encode_context}
-
-      max_frame_size = state.remote_settings.max_frame_size
-
-      {initial_fragment, tail_block} =
-        case header_block do
-          <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
-            {to_send, remaining_data}
-
-          to_send ->
-            {to_send, ""}
-        end
-
-      frames =
-        case tail_block do
-          "" ->
-            [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, true)]
-
-          tail_block ->
-            [
-              Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, false)
-              | pack_continuation(tail_block, original_id, max_frame_size)
-            ]
-        end
-
-      :ok = do_send_frames(frames, state)
-      # SEND PROMISE
-      # Then handle response
-
-      {:ok, {[], state}} =
-        case Stream.receive_headers(promised_stream, request) do
-          {:ok, stream} ->
-            state = put_stream(state, stream)
-            {:ok, {[], state}}
-        end
-
-      state
-    else
-      state
-    end
   end
 
   def handle_call({:send, channel = %{id: stream_id}, items}, _from, {buffer, state})
@@ -233,6 +186,53 @@ defmodule Ace.HTTP2.Connection do
   def handle_call({:stop, reason}, from, state) do
     GenServer.reply(from, :ok)
     {:stop, reason, state}
+  end
+
+  defp send_promise(request, original_id, state) do
+    if state.remote_settings.enable_push do
+      {promised_stream, state} = next_stream(state)
+      headers = Ace.HTTP2.request_to_headers(request)
+      {:ok, {header_block, new_encode_context}} = HPack.encode(headers, state.encode_context)
+      state = %{state | encode_context: new_encode_context}
+
+      max_frame_size = state.remote_settings.max_frame_size
+
+      {initial_fragment, tail_block} =
+        case header_block do
+          <<to_send::binary-size(max_frame_size), remaining_data::binary>> ->
+            {to_send, remaining_data}
+
+          to_send ->
+            {to_send, ""}
+        end
+
+      frames =
+        case tail_block do
+          "" ->
+            [Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, true)]
+
+          tail_block ->
+            [
+              Frame.PushPromise.new(original_id, promised_stream.id, initial_fragment, false)
+              | pack_continuation(tail_block, original_id, max_frame_size)
+            ]
+        end
+
+      :ok = do_send_frames(frames, state)
+      # SEND PROMISE
+      # Then handle response
+
+      {:ok, {[], state}} =
+        case Stream.receive_headers(promised_stream, request) do
+          {:ok, stream} ->
+            state = put_stream(state, stream)
+            {:ok, {[], state}}
+        end
+
+      state
+    else
+      state
+    end
   end
 
   def send_available(connection) do
