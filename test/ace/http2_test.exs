@@ -207,14 +207,14 @@ defmodule Ace.HTTP2Test do
                    },
                    1000
 
-    assert_receive {:"$gen_call", from, {:headers, %Request{path: ["favicon"]}, _state}}, 1000
+    assert_receive {:"$gen_call", from, {:headers, %Request{path: ["favicon"]}, state}}, 1000
 
     response =
       Raxx.response(200)
       |> Raxx.set_header("content-type", "text/html")
       |> Raxx.set_body(true)
 
-    GenServer.reply(from, response)
+    GenServer.reply(from, {[response], state})
 
     assert_receive {^client_promised_stream, %Response{headers: [{"content-type", "text/html"}]}},
                    1000

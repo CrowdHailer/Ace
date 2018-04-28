@@ -1,9 +1,11 @@
 %{
+  "cookie": {:hex, :cookie, "0.1.1", "89438362ee0f0ed400e9f076d617d630f82d682e3fbcf767072a46a6e1ed5781", [:mix], [], "hexpm"},
   "dialyxir": {:hex, :dialyxir, "0.5.1", "b331b091720fd93e878137add264bac4f644e1ddae07a70bf7062c7862c4b952", [], [], "hexpm"},
   "hpack": {:hex, :hpack_erl, "0.2.3", "17670f83ff984ae6cd74b1c456edde906d27ff013740ee4d9efaa4f1bf999633", [], [], "hexpm"},
   "http_status": {:hex, :http_status, "0.2.2", "9710b536e42aaf2eedf1a5c3543b16dc459088dcfa41f80998ea2ba3715f35e6", [], [], "hexpm"},
-  "mime": {:hex, :mime, "1.1.0", "01c1d6f4083d8aa5c7b8c246ade95139620ef8effb009edde934e0ec3b28090a", [], [], "hexpm"},
+  "mime": {:hex, :mime, "1.2.0", "78adaa84832b3680de06f88f0997e3ead3b451a440d183d688085be2d709b534", [:mix], [], "hexpm"},
   "plug": {:hex, :plug, "1.4.3", "236d77ce7bf3e3a2668dc0d32a9b6f1f9b1f05361019946aae49874904be4aed", [], [{:cowboy, "~> 1.0.1 or ~> 1.1", [hex: :cowboy, repo: "hexpm", optional: true]}, {:mime, "~> 1.0", [hex: :mime, repo: "hexpm", optional: false]}], "hexpm"},
-  "raxx": {:hex, :raxx, "0.14.5", "d7187d05e41c9385b84ffb9e229d5caf1275ee1786066d23a5fbbc66171489b7", [:mix], [], "hexpm"},
-  "raxx_static": {:hex, :raxx_static, "0.5.0", "3f812dc5b03cb59ba22d187b72b03a025d065053a0e8593056be997ef7f1696b", [], [{:mime, "~> 1.1", [hex: :mime, repo: "hexpm", optional: false]}, {:raxx, "~> 0.14.2", [hex: :raxx, repo: "hexpm", optional: false]}], "hexpm"},
+  "raxx": {:hex, :raxx, "0.15.2", "7878564639d6dee50bacf99fb5df70f45818f4d2540a5d95d605071f9844e41e", [:mix], [{:cookie, "~> 0.1.0", [hex: :cookie, repo: "hexpm", optional: false]}], "hexpm"},
+  "raxx_static": {:hex, :raxx_static, "0.6.1", "8b48254fc3d1b8b1e473b7c307fbba0ae767c60482754ce823c664544c85d729", [:mix], [{:mime, "~> 1.1", [hex: :mime, repo: "hexpm", optional: false]}, {:raxx, "~> 0.15.2", [hex: :raxx, repo: "hexpm", optional: false]}], "hexpm"},
+  "uuid": {:hex, :uuid, "1.1.8", "e22fc04499de0de3ed1116b770c7737779f226ceefa0badb3592e64d5cfb4eb9", [:mix], [], "hexpm"},
 }

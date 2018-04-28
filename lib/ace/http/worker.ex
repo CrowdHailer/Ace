@@ -69,7 +69,8 @@ defmodule Ace.HTTP.Worker do
 
   @impl GenServer
   def handle_info({channel, part}, state = %{channel: channel}) do
-    handle_raxx_part(part, state)
+    Raxx.Server.handle({state.app_module, state.app_state}, part)
+    |> do_send(state)
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, state = %{channel_monitor: ref}) do
@@ -77,36 +78,8 @@ defmodule Ace.HTTP.Worker do
   end
 
   def handle_info(other, state) do
-    state.app_module.handle_info(other, state.app_state)
-    |> normalise_reaction(state.app_state)
+    Raxx.Server.handle({state.app_module, state.app_state}, other)
     |> do_send(state)
-  end
-
-  defp handle_raxx_part(head = %Raxx.Request{}, state) do
-    state.app_module.handle_head(head, state.app_state)
-    |> normalise_reaction(state.app_state)
-    |> do_send(state)
-  end
-
-  defp handle_raxx_part(data = %Raxx.Data{}, state) do
-    state.app_module.handle_data(data.data, state.app_state)
-    |> normalise_reaction(state.app_state)
-    |> do_send(state)
-  end
-
-  defp handle_raxx_part(tail = %Raxx.Tail{}, state) do
-    state.app_module.handle_tail(tail.headers, state.app_state)
-    |> normalise_reaction(state.app_state)
-    |> do_send(state)
-  end
-
-  # TODO this should just be stop state
-  defp normalise_reaction(response = %Raxx.Response{}, app_state) do
-    {[response], app_state}
-  end
-
-  defp normalise_reaction({parts, new_app_state}, _app_state) do
-    {parts, new_app_state}
   end
 
   defp do_send({parts, new_app_state}, state) do

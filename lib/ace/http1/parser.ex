@@ -41,8 +41,8 @@ defmodule Ace.HTTP1.Parser do
 
   This parser returns a list of parts that are in the input and an updated state.
   """
-  @spec parse(String.t(), state, [Raxx.Server.part()]) ::
-          {:ok, {[Raxx.Server.part()], state}} | {:error, binary}
+  @spec parse(String.t(), state, [Raxx.part()]) ::
+          {:ok, {[Raxx.part()], state}} | {:error, binary}
   def parse(binary, state, parts \\ []) do
     state = append_buffer(state, binary)
 

@@ -646,13 +646,13 @@ defmodule Ace.HTTP1.ServerTest do
     {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ok = :ssl.send(socket, http1_request)
 
-    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, _request, _state}}, 1000
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, _request, state}}, 1000
 
     response =
       Raxx.response(:ok)
       |> Raxx.set_body(true)
 
-    GenServer.reply(from, response)
+    GenServer.reply(from, {[response], state})
 
     %{channel: %{endpoint: endpoint}, channel_monitor: channel_monitor} = :sys.get_state(worker)
     endpoint_monitor = Process.monitor(endpoint)
