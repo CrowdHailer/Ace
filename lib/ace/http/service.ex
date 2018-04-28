@@ -57,6 +57,14 @@ defmodule Ace.HTTP.Service do
         unquote(__MODULE__).start_link(application, options)
       end
 
+      def child_spec([]) do
+        child_spec([%{}])
+      end
+
+      def child_spec([config]) do
+        child_spec([config, []])
+      end
+
       def child_spec([config, options]) do
         %{
           id: Keyword.get(options, :id, __MODULE__),

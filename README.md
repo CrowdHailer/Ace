@@ -81,7 +81,7 @@ defmodule MyApp.Application do
     import Supervisor.Spec, warn: false
 
     children = [
-      worker(MyApp, [%{greeting: "Hello"}]),
+      {MyApp, [%{greeting: "Hello"}]}
     ]
 
     opts = [strategy: :one_for_one, name: MyApp.Supervisor]
@@ -91,21 +91,6 @@ end
 ```
 
 Start project using `iex -S mix` and visit [http://localhost:8080](http://localhost:8080).
-
-## Features
-
-- [x] Consistent server and client interfaces
-- [x] Stream isolation; one process per stream
-- [x] Bidirectional streaming; send and receive streamed data
-- [x] Server push; to reduce latency
-- [x] Automatic flow control; at stream and connection level
-- [x] Secure data transport; TLS(SSL) support via ALPN
-- [x] Verified against [h2spec](https://github.com/summerwind/h2spec) (*143/146*)
-- [x] Simple request/response interactions; [Raxx](https://github.com/crowdhailer/raxx) interface
-- [x] HTTP upgrade mechanisms
-- [ ] HTTP/1.1 pipelining
-
-*View progress on the [roadmap](https://github.com/CrowdHailer/Ace/projects/1).*
 
 ## Testing
 

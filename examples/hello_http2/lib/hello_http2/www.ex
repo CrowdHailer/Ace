@@ -1,5 +1,5 @@
 defmodule HelloHTTP2.WWW do
-  use Raxx.Server
+  use Ace.HTTP.Service
   use Raxx.Static, "./public"
 
   @impl Raxx.Server
