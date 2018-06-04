@@ -39,7 +39,7 @@ defmodule Ace.HTTP.Channel do
   """
   # TODO raxx.part type
   @spec send(t(), [Raxx.Request.t() | Raxx.Response.t() | Raxx.Data.t() | Raxx.Tail.t()]) ::
-          {:ok, t()}
+          {:ok, t()} | {:error, :connection_closed}
   def send(channel, parts)
 
   def send(channel, []) do
