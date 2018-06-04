@@ -83,21 +83,26 @@ defmodule Ace.HTTP.Worker do
   end
 
   defp do_send({parts, new_app_state}, state) do
-    {:ok, _channel} = Ace.HTTP.Channel.send(state.channel, parts)
     new_state = %{state | app_state: new_app_state}
 
-    case List.last(parts) do
-      %{body: false} ->
-        {:stop, :normal, new_state}
+    case Ace.HTTP.Channel.send(state.channel, parts) do
+      {:ok, _channel} ->
+        case List.last(parts) do
+          %{body: false} ->
+            {:stop, :normal, new_state}
 
-      %Raxx.Tail{} ->
-        {:stop, :normal, new_state}
+          %Raxx.Tail{} ->
+            {:stop, :normal, new_state}
 
-      %{body: body} when is_binary(body) ->
-        {:stop, :normal, new_state}
+          %{body: body} when is_binary(body) ->
+            {:stop, :normal, new_state}
 
-      _ ->
-        {:noreply, new_state}
+          _ ->
+            {:noreply, new_state}
+        end
+
+      {:error, :connection_closed} ->
+        {:stop, :normal, new_state}
     end
   end
 end

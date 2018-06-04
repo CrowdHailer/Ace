@@ -39,7 +39,7 @@ defmodule Ace.HTTP.Channel do
   """
   # TODO raxx.part type
   @spec send(t(), [Raxx.Request.t() | Raxx.Response.t() | Raxx.Data.t() | Raxx.Tail.t()]) ::
-          {:ok, t()}
+          {:ok, t()} | {:error, :connection_closed}
   def send(channel, parts)
 
   def send(channel, []) do
@@ -48,5 +48,11 @@ defmodule Ace.HTTP.Channel do
 
   def send(channel = %__MODULE__{}, parts) do
     GenServer.call(channel.endpoint, {:send, channel, parts})
+  catch
+    # NOTE `GenServer.call` exits if the target process has already exited.
+    # A connection closing will also stop workers (this process).
+    # However this case can still occur due to race conditions.
+    :exit, {:noproc, _} ->
+      {:error, :connection_closed}
   end
 end
