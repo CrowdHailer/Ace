@@ -6,7 +6,7 @@ defmodule Ace.HTTP.Service do
   therefore `:cert` + `:key` or `:certfile` + `:keyfile` are required options.
 
   Starting a service will start and manage a cohort of endpoint process.
-  The number of awaiting endpoint processes is set by the acceptors option.
+  The number of awaiting endpoint processes is set by the `:acceptors` option.
 
   Each endpoint process manages communicate to a single connected client.
   Using HTTP/1.1 pipelining of HTTP/2 multiplexing one connection may be used for multiple HTTP exchanges.
@@ -98,7 +98,7 @@ defmodule Ace.HTTP.Service do
       The supported values are the same as GenServers.
 
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
-      Defaults to 50.
+      Defaults to 100.
   """
   @spec start_link({module, any}, [{atom, any}]) :: {:ok, service}
   def start_link(app = {_module, _config}, options) do
