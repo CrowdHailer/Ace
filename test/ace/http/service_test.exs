@@ -65,4 +65,22 @@ defmodule Ace.HTTP.ServiceTest do
 
     assert Process.alive?(first_governor)
   end
+
+  test "count_connections counts workers" do
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {Raxx.Forwarder, %{target: self()}},
+        port: 0,
+        cleartext: true
+      )
+
+    {:ok, port} = Ace.HTTP.Service.port(service)
+
+    {:ok, _socket1} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
+    {:ok, _socket2} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
+
+    :ok = Process.sleep(100)
+
+    assert Ace.HTTP.Service.count_connections(service) == 2
+  end
 end
