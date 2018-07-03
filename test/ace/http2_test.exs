@@ -2,7 +2,7 @@ defmodule Ace.HTTP2Test do
   use ExUnit.Case
 
   alias Raxx.{Request, Response}
-  alias Ace.{HTTP2.Client, HTTP2.Service}
+  alias Ace.HTTP2.Client
 
   setup do
     opts = [
@@ -24,7 +24,7 @@ defmodule Ace.HTTP2Test do
     request = Raxx.request(:GET, "/")
     :ok = Ace.HTTP2.send(client_stream, request)
 
-    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, received, state}}, 1000
+    assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, _received, state}}, 1000
     GenServer.reply(from, {[], state})
     monitor = Process.monitor(worker)
 
@@ -114,7 +114,7 @@ defmodule Ace.HTTP2Test do
     request = Raxx.request(:GET, "/")
     :ok = Ace.HTTP2.send(client_stream, request)
 
-    assert_receive {:"$gen_call", from, {:headers, %Request{}, state}}, 1000
+    assert_receive {:"$gen_call", from, {:headers, %Request{}, _state}}, 1000
 
     response =
       Raxx.response(:no_content)

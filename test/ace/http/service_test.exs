@@ -7,10 +7,10 @@ defmodule Ace.HTTP.ServiceTest do
 
     {:ok, port} = Ace.HTTP.Service.port(service)
 
-    {_socket, worker_sup, server_sup, governor_sup} = :sys.get_state(service)
+    {_socket, _worker_sup, server_sup, _governor_sup} = :sys.get_state(service)
     [first_child] = Supervisor.which_children(server_sup)
 
-    {:ok, client} =
+    {:ok, _client} =
       :ssl.connect(
         'localhost',
         port,
@@ -20,15 +20,15 @@ defmodule Ace.HTTP.ServiceTest do
       )
 
     Process.sleep(1000)
-    [^first_child, second_child] = Supervisor.which_children(server_sup)
+    [^first_child, _second_child] = Supervisor.which_children(server_sup)
   end
 
   test "governor will exit if server exits before accepting connection" do
     {:ok, service} = Raxx.Forwarder.start_link(%{target: self()})
 
-    {:ok, port} = Ace.HTTP.Service.port(service)
+    {:ok, _port} = Ace.HTTP.Service.port(service)
 
-    {_socket, worker_sup, server_sup, governor_sup} = :sys.get_state(service)
+    {_socket, _worker_sup, server_sup, governor_sup} = :sys.get_state(service)
     [{_name, first_governor, _type, _args}] = Supervisor.which_children(governor_sup)
     [{_name, first_server, _type, _args}] = Supervisor.which_children(server_sup)
 
@@ -44,13 +44,13 @@ defmodule Ace.HTTP.ServiceTest do
 
     {:ok, port} = Ace.HTTP.Service.port(service)
 
-    {_socket, worker_sup, server_sup, governor_sup} = :sys.get_state(service)
+    {_socket, _worker_sup, server_sup, governor_sup} = :sys.get_state(service)
     [{_name, first_governor, _type, _args}] = Supervisor.which_children(governor_sup)
     [{_name, first_server, _type, _args}] = Supervisor.which_children(server_sup)
 
-    monitor = Process.monitor(first_governor)
+    Process.monitor(first_governor)
 
-    {:ok, client} =
+    {:ok, _client} =
       :ssl.connect(
         'localhost',
         port,
