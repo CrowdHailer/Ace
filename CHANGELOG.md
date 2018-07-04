@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
-- `Ace.HTTP.Service.count_children/1` returns a number of connected clients for a given service.
+- `Ace.HTTP.Service.count_connections/1` returns a number of connected clients for a given service.
 
 ## [0.16.5](https://github.com/CrowdHailer/Ace/tree/0.16.5) - 2018-06-04
 
