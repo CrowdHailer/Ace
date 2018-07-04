@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.16.6](https://github.com/CrowdHailer/Ace/tree/0.16.6) - 2018-07-04
+
+### Added
+
+- `Ace.HTTP.Service.count_children/1` returns a number of connected clients for a given service.
+
 ## [0.16.5](https://github.com/CrowdHailer/Ace/tree/0.16.5) - 2018-06-04
 
 ### Fixed

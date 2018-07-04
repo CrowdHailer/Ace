@@ -131,8 +131,16 @@ defmodule Ace.HTTP.Service do
   It can be useful running parallel tests.
   """
   @spec port(service) :: {:ok, :inet.port_number()}
-  def port(endpoint) do
-    GenServer.call(endpoint, :port)
+  def port(service) do
+    GenServer.call(service, :port)
+  end
+
+  @doc """
+  Returns a number of connected clients for a given service.
+  """
+  @spec count_connections(service) :: non_neg_integer()
+  def count_connections(service) do
+    GenServer.call(service, :count_connections)
   end
 
   ## SERVER CALLBACKS
@@ -215,5 +223,11 @@ defmodule Ace.HTTP.Service do
   @impl GenServer
   def handle_call(:port, _from, state = {listen_socket, _, _, _}) do
     {:reply, Ace.Socket.port(listen_socket), state}
+  end
+
+  def handle_call(:count_connections, _from, state) do
+    {_listen_socket, worker_supervisor, _endpoint_supervisor, _governor_supervisor} = state
+    count = Supervisor.count_children(worker_supervisor).active
+    {:reply, count, state}
   end
 end
