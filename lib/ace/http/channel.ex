@@ -37,9 +37,7 @@ defmodule Ace.HTTP.Channel do
   @doc """
   Send a list of message parts over a HTTP channel.
   """
-  # TODO raxx.part type
-  @spec send(t(), [Raxx.Request.t() | Raxx.Response.t() | Raxx.Data.t() | Raxx.Tail.t()]) ::
-          {:ok, t()} | {:error, :connection_closed}
+  @spec send(t(), [Raxx.part()]) :: {:ok, t()} | {:error, :connection_closed}
   def send(channel, parts)
 
   def send(channel, []) do
