@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.16.6](https://github.com/CrowdHailer/Ace/tree/0.16.6) - 2018-07-04
+## [0.16.6](https://github.com/CrowdHailer/Ace/tree/0.16.6) - 2018-07-05
 
 ### Added
 
