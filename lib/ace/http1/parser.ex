@@ -128,7 +128,7 @@ defmodule Ace.HTTP1.Parser do
           Enum.reduce(
             :proplists.delete("host", clean_headers),
             build_partial_request(start_line, :proplists.get_value("host", headers)),
-            fn {k, v}, request -> Raxx.set_header(request, k, v) end
+            fn {k, v}, %{headers: headers} = request -> Map.put(request, :headers, [{k, v} | headers]) end
           )
 
         case transfer_encoding do
