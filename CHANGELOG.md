@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
-- Requests with duplicate headers cause `Elixir.RuntimeError: Headers should not be duplicated`.
+- Requests with duplicate headers no longer cause `Elixir.RuntimeError: Headers should not be duplicated`.
 
 ## [0.16.6](https://github.com/CrowdHailer/Ace/tree/0.16.6) - 2018-07-05
 
