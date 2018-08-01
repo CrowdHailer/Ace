@@ -272,7 +272,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert Enum.sort(request.headers) == [{"accept", "text/html"}, {"accept", "text/plain"}]
     assert request.body == false
   end
-  
+
   test "handles request with split start-line ", %{port: port} do
     part_1 = "GET /foo/bar?var"
 
