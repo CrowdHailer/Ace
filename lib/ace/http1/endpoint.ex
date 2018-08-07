@@ -106,52 +106,25 @@ defmodule Ace.HTTP1.Endpoint do
   defp normalise_part(request = %{scheme: nil}, :ssl), do: %{request | scheme: :https}
   defp normalise_part(part, _transport), do: part
 
-  defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
-    case content_length(response) do
-      nil ->
-        headers = [{"connection", "close"}, {"transfer-encoding", "chunked"} | response.headers]
+  defp send_part(response = %Response{}, state = %{status: {up, :response}}) do
+    case Raxx.HTTP1.serialize_response(response) do
+      {head, :chunked} ->
         new_status = {up, :chunked_body}
         new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
 
-      content_length when content_length > 0 ->
-        headers = [{"connection", "close"} | response.headers]
+        {:ok, {head, new_state}}
+
+      {head, {:bytes, content_length}} ->
         new_status = {up, {:body, content_length}}
         new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-    end
-  end
 
-  defp send_part(response = %Response{body: false}, state = %{status: {up, :response}}) do
-    case content_length(response) do
-      nil ->
-        headers = [{"connection", "close"}, {"content-length", "0"} | response.headers]
+        {:ok, {head, new_state}}
+
+      {head, {:complete, body}} ->
         new_status = {up, :complete}
         new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-    end
-  end
 
-  defp send_part(response = %Response{body: body}, state = %{status: {up, :response}})
-       when is_binary(body) do
-    case content_length(response) do
-      nil ->
-        content_length = :erlang.iolist_size(body) |> to_string
-        headers = [{"connection", "close"}, {"content-length", content_length} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, response.body)
-        {:ok, {outbound, new_state}}
-
-      _content_length ->
-        headers = [{"connection", "close"} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, response.body)
-        {:ok, {outbound, new_state}}
+        {:ok, {[head, body], new_state}}
     end
   end
 
