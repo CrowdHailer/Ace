@@ -169,12 +169,12 @@ defmodule Ace.HTTP1.Endpoint do
   end
 
   defp send_part(%Data{data: data}, state = %{status: {_up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk(data)
+    chunk = Raxx.HTTP1.serialize_chunk(data)
     {:ok, {[chunk], state}}
   end
 
   defp send_part(%Tail{headers: []}, state = %{status: {up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk("")
+    chunk = Raxx.HTTP1.serialize_chunk("")
     new_status = {up, :complete}
     new_state = %{state | status: new_status}
 

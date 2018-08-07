@@ -128,7 +128,9 @@ defmodule Ace.HTTP1.Parser do
           Enum.reduce(
             :proplists.delete("host", clean_headers),
             build_partial_request(start_line, :proplists.get_value("host", headers)),
-            fn {k, v}, %{headers: headers} = request -> Map.put(request, :headers, [{k, v} | headers]) end
+            fn {k, v}, %{headers: headers} = request ->
+              Map.put(request, :headers, [{k, v} | headers])
+            end
           )
 
         case transfer_encoding do
@@ -165,7 +167,7 @@ defmodule Ace.HTTP1.Parser do
   end
 
   defp pop_part({:body_chunked, buffer, options}) do
-    {chunk, rest} = Ace.HTTP1.pop_chunk(buffer)
+    {:ok, {chunk, rest}} = Raxx.HTTP1.parse_chunk(buffer)
 
     case chunk do
       nil ->
