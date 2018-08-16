@@ -125,6 +125,22 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:ssl_closed, ^connection}, 1000
   end
 
+  test "too long header", %{port: port} do
+    http1_request = """
+    GET / HTTP/1.1
+    cookie: bar=#{String.duplicate("a", 10_000_000)}
+
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:tcp, ^socket, response}, 1000
+
+    assert response ==
+             "HTTP/1.1 413 Payload Too Large\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
+
   test "Client too slow to deliver request head", %{port: port} do
     unfinished_head = """
     GET / HTTP/1.1
@@ -272,7 +288,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert Enum.sort(request.headers) == [{"accept", "text/html"}, {"accept", "text/plain"}]
     assert request.body == false
   end
-  
+
   test "handles request with split start-line ", %{port: port} do
     part_1 = "GET /foo/bar?var"
 
