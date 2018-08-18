@@ -61,24 +61,32 @@ defmodule Ace.HTTP1.Endpoint do
         {:noreply, %{state | receive_state: receive_state}, timeout}
 
       {:error, {:invalid_start_line, _line}} ->
-        {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
+
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, state}
 
       {:error, {:invalid_header_line, _line}} ->
-        {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
+
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, state}
 
       {:error, :start_line_too_long} ->
-        {:ok, {outbound, new_state}} = send_part(Raxx.response(:uri_too_long), state)
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:uri_too_long) |> Raxx.set_header("content-length", "0"), state)
+
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, new_state}
     end
   end
 
   def handle_info(:timeout, state) do
-    {:ok, {outbound, new_state}} = send_part(Raxx.response(:request_timeout), state)
+    {:ok, {outbound, new_state}} =
+      send_part(Raxx.response(:request_timeout) |> Raxx.set_header("content-length", "0"), state)
+
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
   end
@@ -93,7 +101,12 @@ defmodule Ace.HTTP1.Endpoint do
         {:DOWN, _ref, :process, pid, _reason},
         state = %{worker: pid, status: {_, :response}}
       ) do
-    {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
+    {:ok, {outbound, new_state}} =
+      send_part(
+        Raxx.response(:internal_server_error) |> Raxx.set_header("content-length", "0"),
+        state
+      )
+
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
   end
@@ -107,7 +120,7 @@ defmodule Ace.HTTP1.Endpoint do
   defp normalise_part(part, _transport), do: part
 
   defp send_part(response = %Response{}, state = %{status: {up, :response}}) do
-    case Raxx.HTTP1.serialize_response(response) do
+    case Raxx.HTTP1.serialize_response(response, connection: :close) do
       {head, :chunked} ->
         new_status = {up, :chunked_body}
         new_state = %{state | status: new_status}
