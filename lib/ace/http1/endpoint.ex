@@ -80,6 +80,13 @@ defmodule Ace.HTTP1.Endpoint do
 
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, new_state}
+
+      {:error, :header_line_too_long} ->
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
+
+        Ace.Socket.send(state.socket, outbound)
+        {:stop, :normal, new_state}
     end
   end
 

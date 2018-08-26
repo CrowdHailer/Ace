@@ -126,19 +126,20 @@ defmodule Ace.HTTP1.ServerTest do
   end
 
   test "too long header", %{port: port} do
-    http1_request = """
+    request = """
     GET / HTTP/1.1
-    cookie: bar=#{String.duplicate("a", 10_000_000)}
+    host: www.raxx.com
+    cookie: bar=#{String.duplicate("a", 10_000)}
 
     """
 
-    {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
-    :ok = :gen_tcp.send(socket, http1_request)
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(connection, request)
 
-    assert_receive {:tcp, ^socket, response}, 1000
+    assert_receive {:ssl, ^connection, response}, 10000
 
     assert response ==
-             "HTTP/1.1 413 Payload Too Large\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
   end
 
   test "Client too slow to deliver request head", %{port: port} do
