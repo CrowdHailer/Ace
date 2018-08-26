@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## master
 
+### Added
+
+- formatter check to travis
+- dialyzer check to travis
+
 ### Changed
 
 - Internal updates to use serialization and parsing from Raxx project
