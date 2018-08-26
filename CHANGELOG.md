@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## master
+
+### Changed
+
+- Internal updates to use serialization and parsing from Raxx project
+
 ## [0.16.7](https://github.com/CrowdHailer/Ace/tree/0.16.7) - 2018-07-15
 
 ### Fixed
