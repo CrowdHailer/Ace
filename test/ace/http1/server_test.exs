@@ -125,6 +125,23 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:ssl_closed, ^connection}, 1000
   end
 
+  test "too long header", %{port: port} do
+    request = """
+    GET / HTTP/1.1
+    host: www.raxx.com
+    cookie: bar=#{String.duplicate("a", 10_000)}
+
+    """
+
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(connection, request)
+
+    assert_receive {:ssl, ^connection, response}, 10000
+
+    assert response ==
+             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+  end
+
   test "Client too slow to deliver request head", %{port: port} do
     unfinished_head = """
     GET / HTTP/1.1
@@ -272,7 +289,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert Enum.sort(request.headers) == [{"accept", "text/html"}, {"accept", "text/plain"}]
     assert request.body == false
   end
-  
+
   test "handles request with split start-line ", %{port: port} do
     part_1 = "GET /foo/bar?var"
 
@@ -491,31 +508,6 @@ defmodule Ace.HTTP1.ServerTest do
              "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
   end
 
-  test "content-length will be added for a response with no body", %{port: port} do
-    http1_request = """
-    GET / HTTP/1.1
-    host: example.com
-
-    """
-
-    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
-    :ok = :ssl.send(socket, http1_request)
-
-    assert_receive {:"$gen_call", from, {:headers, _request, _state}}, 1000
-
-    response =
-      Raxx.response(:ok)
-      |> Raxx.set_header("x-test", "Value")
-      |> Raxx.set_body(false)
-
-    GenServer.reply(from, response)
-
-    assert_receive {:ssl, ^socket, response}, 1000
-
-    assert response ==
-             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 0\r\nx-test: Value\r\n\r\n"
-  end
-
   ## Connection test
 
   test "connection is closed at clients request for HTTP 1.1 request", %{port: port} do
@@ -535,7 +527,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert request.headers == [{"x-test", "Value"}]
     assert_receive {:ssl, ^socket, response}, 1000
-    assert response == "HTTP/1.1 204 No Content\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert response == "HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n"
 
     assert_receive {:ssl_closed, ^socket}, 1000
   end
@@ -558,7 +550,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert request.headers == [{"x-test", "Value"}]
     assert_receive {:ssl, ^socket, response}, 1000
-    assert response == "HTTP/1.1 204 No Content\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert response == "HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n"
 
     assert_receive {:ssl_closed, ^socket}, 1000
   end

@@ -41,8 +41,7 @@ defmodule Ace.HTTP1.Parser do
 
   This parser returns a list of parts that are in the input and an updated state.
   """
-  @spec parse(String.t(), state, [Raxx.part()]) ::
-          {:ok, {[Raxx.part()], state}} | {:error, binary}
+  @spec parse(String.t(), state, [Raxx.part()]) :: {:ok, {[Raxx.part()], state}} | {:error, term}
   def parse(binary, state, parts \\ []) do
     state = append_buffer(state, binary)
 
@@ -111,7 +110,7 @@ defmodule Ace.HTTP1.Parser do
   end
 
   defp pop_part(state = {:headers, buffer, start_line, headers, options}) do
-    case :erlang.decode_packet(:httph_bin, buffer, []) do
+    case :erlang.decode_packet(:httph_bin, buffer, line_length: options.max_line_length) do
       {:more, :undefined} ->
         {:ok, {nil, state}}
 
@@ -128,7 +127,9 @@ defmodule Ace.HTTP1.Parser do
           Enum.reduce(
             :proplists.delete("host", clean_headers),
             build_partial_request(start_line, :proplists.get_value("host", headers)),
-            fn {k, v}, %{headers: headers} = request -> Map.put(request, :headers, [{k, v} | headers]) end
+            fn {k, v}, %{headers: headers} = request ->
+              Map.put(request, :headers, [{k, v} | headers])
+            end
           )
 
         case transfer_encoding do
@@ -147,6 +148,9 @@ defmodule Ace.HTTP1.Parser do
 
       {:ok, {:http_error, line}, _rest} ->
         {:error, {:invalid_header_line, line}}
+
+      {:error, :invalid} ->
+        {:error, :header_line_too_long}
     end
   end
 
@@ -165,7 +169,7 @@ defmodule Ace.HTTP1.Parser do
   end
 
   defp pop_part({:body_chunked, buffer, options}) do
-    {chunk, rest} = Ace.HTTP1.pop_chunk(buffer)
+    {:ok, {chunk, rest}} = Raxx.HTTP1.parse_chunk(buffer)
 
     case chunk do
       nil ->
