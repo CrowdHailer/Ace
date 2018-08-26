@@ -64,15 +64,15 @@ defmodule Ace.HTTP1.Endpoint do
         {:ok, {outbound, new_state}} =
           send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
 
-        Ace.Socket.send(state.socket, outbound)
-        {:stop, :normal, state}
+        Ace.Socket.send(new_state.socket, outbound)
+        {:stop, :normal, new_state}
 
       {:error, {:invalid_header_line, _line}} ->
         {:ok, {outbound, new_state}} =
           send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
 
-        Ace.Socket.send(state.socket, outbound)
-        {:stop, :normal, state}
+        Ace.Socket.send(new_state.socket, outbound)
+        {:stop, :normal, new_state}
 
       {:error, :start_line_too_long} ->
         {:ok, {outbound, new_state}} =
@@ -172,16 +172,5 @@ defmodule Ace.HTTP1.Endpoint do
     new_state = %{state | status: new_status}
 
     {:ok, {[chunk], new_state}}
-  end
-
-  defp content_length(%{headers: headers}) do
-    case :proplists.get_value("content-length", headers) do
-      :undefined ->
-        nil
-
-      binary ->
-        {content_length, ""} = Integer.parse(binary)
-        content_length
-    end
   end
 end

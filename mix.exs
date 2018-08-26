@@ -9,6 +9,10 @@ defmodule Ace.Mixfile do
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      elixirc_options: [
+        # Will be done when switching to ssl handshake
+        # warnings_as_errors: true
+      ],
       description: description(),
       docs: [
         main: "readme",
