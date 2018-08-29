@@ -272,7 +272,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert Enum.sort(request.headers) == [{"accept", "text/html"}, {"accept", "text/plain"}]
     assert request.body == false
   end
-  
+
   test "handles request with split start-line ", %{port: port} do
     part_1 = "GET /foo/bar?var"
 
@@ -608,8 +608,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert 3 == state.count
   end
 
-  test "there is request backpressure" do
-    require Logger
+  test "Request backpressure kicks in if the worker doesn't handle request parts quickly enough" do
     {:ok, service} =
       Ace.HTTP.Service.start_link(
         {Raxx.Forwarder, %{target: self()}},
@@ -629,7 +628,6 @@ defmodule Ace.HTTP1.ServerTest do
 
     socket_opts = [:binary, {:send_timeout, 100}, {:send_timeout_close, false}]
     {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, socket_opts)
-    Logger.info "request socket: #{inspect socket}"
 
     :ok = :gen_tcp.send(socket, request_head)
 
@@ -637,21 +635,20 @@ defmodule Ace.HTTP1.ServerTest do
     GenServer.reply(from, {[], state})
     one_kb_message = String.duplicate("bla ", div(1024, 4))
 
-    Logger.info "filling up the buffer"
-    sent_message_count = IO.inspect fill_up_buffer(socket, one_kb_message, 10_000)
+    sent_message_count = fill_up_buffer(socket, one_kb_message, 10_000)
 
     # if all 10_000 were sent, the buffer wasn't filled up
     assert sent_message_count < 10_000
     # sending fails, but it doesn't close the socket
     refute_receive {:tcp_closed, ^socket}
 
-    IO.puts "draining the buffer"
     # drain all the messages sent so far
     processed_bytes = process_data()
     refute_receive {:"$gen_call", _from, {:data, _data, _state}}, 1000
 
+    # NOTE: a message can be partially sent using :gen_tcp
+    # SEE http://erlang.org/doc/man/inet.html#setopts-2, `{send_timeout, Integer}` option
     assert processed_bytes >= sent_message_count * 1024
-    # a message can be partially sent, can't find it in the docs right now
     assert processed_bytes <= (sent_message_count + 1) * 1024
 
     :ok = :gen_tcp.send(socket, "last bit of the request")
@@ -659,10 +656,12 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:"$gen_call", from, {:data, data, _state}}, 1000
     assert data == "last bit of the request"
 
-    response = Raxx.response(:ok)|> Raxx.set_body("server's done!")
+    response = Raxx.response(:ok) |> Raxx.set_body("server's done!")
     GenServer.reply(from, response)
 
-    assert_receive {:tcp, ^socket, "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 14\r\n\r\nserver's done!"}
+    assert_receive {:tcp, ^socket,
+                    "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 14\r\n\r\nserver's done!"}
+
     assert_receive {:tcp_closed, ^socket}
   end
 
@@ -670,8 +669,9 @@ defmodule Ace.HTTP1.ServerTest do
 
   defp fill_up_buffer(socket, message, max_count, sent_count) when max_count > sent_count do
     case :gen_tcp.send(socket, message) do
-      :ok -> 
+      :ok ->
         fill_up_buffer(socket, message, max_count, sent_count + 1)
+
       {:error, :timeout} ->
         sent_count
     end
@@ -682,13 +682,13 @@ defmodule Ace.HTTP1.ServerTest do
   end
 
   defp process_data(processed_so_far \\ 0) do
-      receive do
-        {:"$gen_call", from, {:data, data, state}} ->
-          GenServer.reply(from, {[], state})
-          process_data(processed_so_far + byte_size(data))
-      after
-        200 -> processed_so_far
-      end
+    receive do
+      {:"$gen_call", from, {:data, data, state}} ->
+        GenServer.reply(from, {[], state})
+        process_data(processed_so_far + byte_size(data))
+    after
+      200 -> processed_so_far
+    end
   end
 
   @tag :skip

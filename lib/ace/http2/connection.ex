@@ -128,6 +128,11 @@ defmodule Ace.HTTP2.Connection do
     {:noreply, {buffer, state}}
   end
 
+  def handle_info(:ack, {buffer, state}) do
+    # NOTE There's currently no backpressure mechanism for HTTP/2
+    {:noreply, {buffer, state}}
+  end
+
   @impl GenServer
   def handle_call({:new_stream, receiver}, _from, {buffer, state}) do
     {stream_id, state} = next_stream_id(state)

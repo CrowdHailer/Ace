@@ -3,6 +3,7 @@ defmodule Ace.HTTP1.Endpoint do
 
   require Logger
 
+  @max_pending_request_part_count 10
   @packet_timeout 10000
 
   alias Raxx.{Response, Data, Tail}
@@ -17,7 +18,8 @@ defmodule Ace.HTTP1.Endpoint do
     :worker,
     :monitor,
     :channel,
-    :keep_alive
+    :keep_alive,
+    :pending_ack_count
   ]
 
   defstruct @enforce_keys
@@ -56,9 +58,18 @@ defmodule Ace.HTTP1.Endpoint do
           send(state.worker, {state.channel, part})
         end)
 
-        :ok = Ace.Socket.set_active(state.socket)
-        timeout = if HTTP1.Parser.done?(receive_state), do: :infinity, else: @packet_timeout
-        {:noreply, %{state | receive_state: receive_state}, timeout}
+        pending_ack_count = state.pending_ack_count + Enum.count(parts)
+
+        timeout =
+          if pending_ack_count < @max_pending_request_part_count do
+            :ok = Ace.Socket.set_active(state.socket)
+            if HTTP1.Parser.done?(receive_state), do: :infinity, else: @packet_timeout
+          else
+            :infinity
+          end
+
+        {:noreply, %{state | receive_state: receive_state, pending_ack_count: pending_ack_count},
+         timeout}
 
       {:error, {:invalid_start_line, _line}} ->
         {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
@@ -75,6 +86,22 @@ defmodule Ace.HTTP1.Endpoint do
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, new_state}
     end
+  end
+
+  def handle_info(:ack, state = %{receive_state: receive_state}) do
+    pending_ack_count = state.pending_ack_count - 1
+
+    timeout =
+      if pending_ack_count == @max_pending_request_part_count - 1 do
+        # setting active only for @max_pending_request_part_count - 1 to make sure the socket doesn't
+        # get set to active multiple times before receiving the next packet
+        :ok = Ace.Socket.set_active(state.socket)
+        if HTTP1.Parser.done?(receive_state), do: :infinity, else: @packet_timeout
+      else
+        :infinity
+      end
+
+    {:noreply, %{state | pending_ack_count: pending_ack_count}, timeout}
   end
 
   def handle_info(:timeout, state) do

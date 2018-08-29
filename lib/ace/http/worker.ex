@@ -69,6 +69,8 @@ defmodule Ace.HTTP.Worker do
 
   @impl GenServer
   def handle_info({channel, part}, state = %{channel: channel}) do
+    Ace.HTTP.Channel.ack(channel)
+
     Raxx.Server.handle({state.app_module, state.app_state}, part)
     |> do_send(state)
   end
