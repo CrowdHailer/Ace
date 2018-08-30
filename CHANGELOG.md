@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Internal updates to use serialization and parsing from Raxx project
 
+### Fixed
+
+- Exit with status `:normal` in case where set_active call is made on closed socket.
+
 ## [0.16.7](https://github.com/CrowdHailer/Ace/tree/0.16.7) - 2018-07-15
 
 ### Fixed

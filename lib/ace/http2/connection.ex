@@ -89,8 +89,10 @@ defmodule Ace.HTTP2.Connection do
   def handle_info({:ssl, _, packet}, {buffer, state = %__MODULE__{}}) do
     case receive_packet({buffer, state}, packet) do
       {:ok, {frames, {buffer, state}}} ->
-        :ok = Ace.Socket.set_active(state.socket)
-        # DEBT returns :ok or {:error, :closed}
+        # returns :ok or {:error, :closed}
+        # If closed rely on processing tcp_closed or ssl_closed message
+        Ace.Socket.set_active(state.socket)
+
         do_send_frames(frames, state)
         {:noreply, {buffer, state}}
 
