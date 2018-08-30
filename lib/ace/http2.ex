@@ -163,7 +163,7 @@ defmodule Ace.HTTP2 do
     end
   end
 
-  defp build_request(headers, request = {scheme, authority, method, path}) do
+  defp build_request(headers, {scheme, authority, method, path}) do
     if scheme == :scheme or authority == :authority or method == :method or path == :path do
       {:error, {:protocol_error, "All pseudo-headers must be sent"}}
     else

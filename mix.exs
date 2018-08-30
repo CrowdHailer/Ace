@@ -9,6 +9,10 @@ defmodule Ace.Mixfile do
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      elixirc_options: [
+        # Will be done when switching to ssl handshake
+        # warnings_as_errors: true
+      ],
       description: description(),
       docs: [
         main: "readme",
@@ -37,7 +41,7 @@ defmodule Ace.Mixfile do
   defp deps do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
-      {:raxx, "~> 0.15.2"},
+      {:raxx, "~> 0.15.7"},
       {:excoveralls, "~> 0.8", only: :test},
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
       {:credo, "~> 0.9.2", only: [:dev, :test], runtime: false},

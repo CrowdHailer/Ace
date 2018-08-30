@@ -607,7 +607,6 @@ defmodule Ace.HTTP2.Connection do
           case HPack.decode(frame.header_block_fragment, state.decode_context) do
             {:ok, {headers, new_decode_context}} ->
               state = %{state | decode_context: new_decode_context}
-              {:ok, stream} = fetch_stream(state, frame)
 
               case Stream.receive_headers(stream, headers, frame.end_stream) do
                 {:ok, stream} ->

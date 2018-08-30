@@ -72,17 +72,30 @@ defmodule Ace.HTTP1.Endpoint do
          timeout}
 
       {:error, {:invalid_start_line, _line}} ->
-        {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
-        Ace.Socket.send(state.socket, outbound)
-        {:stop, :normal, state}
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
+
+        Ace.Socket.send(new_state.socket, outbound)
+        {:stop, :normal, new_state}
 
       {:error, {:invalid_header_line, _line}} ->
-        {:ok, {outbound, new_state}} = send_part(Raxx.response(:bad_request), state)
-        Ace.Socket.send(state.socket, outbound)
-        {:stop, :normal, state}
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
+
+        Ace.Socket.send(new_state.socket, outbound)
+        {:stop, :normal, new_state}
 
       {:error, :start_line_too_long} ->
-        {:ok, {outbound, new_state}} = send_part(Raxx.response(:uri_too_long), state)
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:uri_too_long) |> Raxx.set_header("content-length", "0"), state)
+
+        Ace.Socket.send(state.socket, outbound)
+        {:stop, :normal, new_state}
+
+      {:error, :header_line_too_long} ->
+        {:ok, {outbound, new_state}} =
+          send_part(Raxx.response(:bad_request) |> Raxx.set_header("content-length", "0"), state)
+
         Ace.Socket.send(state.socket, outbound)
         {:stop, :normal, new_state}
     end
@@ -105,7 +118,9 @@ defmodule Ace.HTTP1.Endpoint do
   end
 
   def handle_info(:timeout, state) do
-    {:ok, {outbound, new_state}} = send_part(Raxx.response(:request_timeout), state)
+    {:ok, {outbound, new_state}} =
+      send_part(Raxx.response(:request_timeout) |> Raxx.set_header("content-length", "0"), state)
+
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
   end
@@ -120,7 +135,12 @@ defmodule Ace.HTTP1.Endpoint do
         {:DOWN, _ref, :process, pid, _reason},
         state = %{worker: pid, status: {_, :response}}
       ) do
-    {:ok, {outbound, new_state}} = send_part(Raxx.response(:internal_server_error), state)
+    {:ok, {outbound, new_state}} =
+      send_part(
+        Raxx.response(:internal_server_error) |> Raxx.set_header("content-length", "0"),
+        state
+      )
+
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}
   end
@@ -133,52 +153,25 @@ defmodule Ace.HTTP1.Endpoint do
   defp normalise_part(request = %{scheme: nil}, :ssl), do: %{request | scheme: :https}
   defp normalise_part(part, _transport), do: part
 
-  defp send_part(response = %Response{body: true}, state = %{status: {up, :response}}) do
-    case content_length(response) do
-      nil ->
-        headers = [{"connection", "close"}, {"transfer-encoding", "chunked"} | response.headers]
+  defp send_part(response = %Response{}, state = %{status: {up, :response}}) do
+    case Raxx.HTTP1.serialize_response(response, connection: :close) do
+      {head, :chunked} ->
         new_status = {up, :chunked_body}
         new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
 
-      content_length when content_length > 0 ->
-        headers = [{"connection", "close"} | response.headers]
+        {:ok, {head, new_state}}
+
+      {head, {:bytes, content_length}} ->
         new_status = {up, {:body, content_length}}
         new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-    end
-  end
 
-  defp send_part(response = %Response{body: false}, state = %{status: {up, :response}}) do
-    case content_length(response) do
-      nil ->
-        headers = [{"connection", "close"}, {"content-length", "0"} | response.headers]
+        {:ok, {head, new_state}}
+
+      {head, {:complete, body}} ->
         new_status = {up, :complete}
         new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, "")
-        {:ok, {outbound, new_state}}
-    end
-  end
 
-  defp send_part(response = %Response{body: body}, state = %{status: {up, :response}})
-       when is_binary(body) do
-    case content_length(response) do
-      nil ->
-        content_length = :erlang.iolist_size(body) |> to_string
-        headers = [{"connection", "close"}, {"content-length", content_length} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, response.body)
-        {:ok, {outbound, new_state}}
-
-      _content_length ->
-        headers = [{"connection", "close"} | response.headers]
-        new_status = {up, :complete}
-        new_state = %{state | status: new_status}
-        outbound = HTTP1.serialize_response(response.status, headers, response.body)
-        {:ok, {outbound, new_state}}
+        {:ok, {[head, body], new_state}}
     end
   end
 
@@ -196,26 +189,15 @@ defmodule Ace.HTTP1.Endpoint do
   end
 
   defp send_part(%Data{data: data}, state = %{status: {_up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk(data)
+    chunk = Raxx.HTTP1.serialize_chunk(data)
     {:ok, {[chunk], state}}
   end
 
   defp send_part(%Tail{headers: []}, state = %{status: {up, :chunked_body}}) do
-    chunk = HTTP1.serialize_chunk("")
+    chunk = Raxx.HTTP1.serialize_chunk("")
     new_status = {up, :complete}
     new_state = %{state | status: new_status}
 
     {:ok, {[chunk], new_state}}
-  end
-
-  defp content_length(%{headers: headers}) do
-    case :proplists.get_value("content-length", headers) do
-      :undefined ->
-        nil
-
-      binary ->
-        {content_length, ""} = Integer.parse(binary)
-        content_length
-    end
   end
 end
