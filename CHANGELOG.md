@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - formatter check to travis
 - dialyzer check to travis
+- HTTP/1 request backpressure.
 
 ### Changed
 

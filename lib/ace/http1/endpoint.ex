@@ -3,7 +3,7 @@ defmodule Ace.HTTP1.Endpoint do
 
   require Logger
 
-  @max_pending_request_part_count 10
+  @max_pending_request_part_count 4
   @packet_timeout 10000
 
   alias Raxx.{Response, Data, Tail}
