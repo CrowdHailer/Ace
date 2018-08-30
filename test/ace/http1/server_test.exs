@@ -600,6 +600,89 @@ defmodule Ace.HTTP1.ServerTest do
     assert 3 == state.count
   end
 
+  test "Request backpressure kicks in if the worker doesn't handle request parts quickly enough" do
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {Raxx.Forwarder, %{target: self()}},
+        port: 0,
+        cleartext: true
+      )
+
+    {:ok, port} = Ace.HTTP.Service.port(service)
+
+    # oversize content-length so that we don't make assumptions about the tcp buffer size
+    request_head = """
+    POST / HTTP/1.1
+    host: example.com
+    content-length: 20000000
+
+    """
+
+    socket_opts = [:binary, {:send_timeout, 100}, {:send_timeout_close, false}]
+    {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, socket_opts)
+
+    :ok = :gen_tcp.send(socket, request_head)
+
+    assert_receive {:"$gen_call", from, {:headers, _request, state}}, 1000
+    GenServer.reply(from, {[], state})
+    one_kb_message = String.duplicate("bla ", div(1024, 4))
+
+    sent_message_count = fill_up_buffer(socket, one_kb_message, 10_000)
+
+    # if all 10_000 were sent, the buffer wasn't filled up
+    assert sent_message_count < 10_000
+    # sending fails, but it doesn't close the socket
+    refute_receive {:tcp_closed, ^socket}
+
+    # drain all the messages sent so far
+    processed_bytes = process_data()
+    refute_receive {:"$gen_call", _from, {:data, _data, _state}}, 1000
+
+    # NOTE: a message can be partially sent using :gen_tcp
+    # SEE http://erlang.org/doc/man/inet.html#setopts-2, `{send_timeout, Integer}` option
+    assert processed_bytes >= sent_message_count * 1024
+    assert processed_bytes <= (sent_message_count + 1) * 1024
+
+    :ok = :gen_tcp.send(socket, "last bit of the request")
+
+    assert_receive {:"$gen_call", from, {:data, data, _state}}, 1000
+    assert data == "last bit of the request"
+
+    response = Raxx.response(:ok) |> Raxx.set_body("server's done!")
+    GenServer.reply(from, response)
+
+    assert_receive {:tcp, ^socket,
+                    "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 14\r\n\r\nserver's done!"}
+
+    assert_receive {:tcp_closed, ^socket}
+  end
+
+  defp fill_up_buffer(socket, message, max_count, sent_count \\ 0)
+
+  defp fill_up_buffer(socket, message, max_count, sent_count) when max_count > sent_count do
+    case :gen_tcp.send(socket, message) do
+      :ok ->
+        fill_up_buffer(socket, message, max_count, sent_count + 1)
+
+      {:error, :timeout} ->
+        sent_count
+    end
+  end
+
+  defp fill_up_buffer(_socket, _message, _max_count, sent_count) do
+    sent_count
+  end
+
+  defp process_data(processed_so_far \\ 0) do
+    receive do
+      {:"$gen_call", from, {:data, data, state}} ->
+        GenServer.reply(from, {[], state})
+        process_data(processed_so_far + byte_size(data))
+    after
+      200 -> processed_so_far
+    end
+  end
+
   @tag :skip
   test "cannot receive content-length with transfer-encoding" do
   end

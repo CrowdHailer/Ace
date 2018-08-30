@@ -53,4 +53,13 @@ defmodule Ace.HTTP.Channel do
     :exit, {:noproc, _} ->
       {:error, :connection_closed}
   end
+
+  @doc """
+  Send an acknowledgement that the `Ace.HTTP.Worker` has received a request part
+  """
+  @spec ack(t()) :: :ok
+  def ack(channel = %__MODULE__{}) do
+    Kernel.send(channel.endpoint, :ack)
+    :ok
+  end
 end
