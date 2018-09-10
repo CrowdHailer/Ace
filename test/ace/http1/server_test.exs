@@ -54,7 +54,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:tcp, ^socket, response}, 1000
 
     assert response ==
-             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+             "HTTP/1.1 200 OK\r\nconnection: close\r\nx-test: Value\r\ncontent-length: 2\r\n\r\nOK"
   end
 
   test "exits normal when client closes connection", %{port: port} do
@@ -437,7 +437,6 @@ defmodule Ace.HTTP1.ServerTest do
 
     response =
       Raxx.response(:ok)
-      |> Raxx.set_header("content-length", "2")
       |> Raxx.set_header("x-test", "Value")
       |> Raxx.set_body("OK")
 
@@ -446,7 +445,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:ssl, ^socket, response}, 1000
 
     assert response ==
-             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+             "HTTP/1.1 200 OK\r\nconnection: close\r\nx-test: Value\r\ncontent-length: 2\r\n\r\nOK"
   end
 
   test "server can stream response with a predetermined size", %{port: port} do
@@ -505,7 +504,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:ssl, ^socket, response}, 1000
 
     assert response ==
-             "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 2\r\nx-test: Value\r\n\r\nOK"
+             "HTTP/1.1 200 OK\r\nconnection: close\r\nx-test: Value\r\ncontent-length: 2\r\n\r\nOK"
   end
 
   ## Connection test
