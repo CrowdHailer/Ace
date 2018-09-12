@@ -85,8 +85,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:ssl, ^connection, response}, 1000
 
-    assert response ==
-             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert "HTTP/1.1 400 Bad Request\r\n" <> _rest = response
 
     assert_receive {:ssl_closed, ^connection}, 1000
   end
@@ -97,8 +96,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:ssl, ^connection, response}, 1000
 
-    assert response ==
-             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert "HTTP/1.1 400 Bad Request\r\n" <> _rest = response
 
     assert_receive {:ssl_closed, ^connection}, 1000
   end
@@ -119,8 +117,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:ssl, ^connection, response}, 1000
 
-    assert response ==
-             "HTTP/1.1 414 URI Too Long\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert "HTTP/1.1 414 URI Too Long\r\n" <> _rest = response
 
     assert_receive {:ssl_closed, ^connection}, 1000
   end
@@ -138,8 +135,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:ssl, ^connection, response}, 10000
 
-    assert response ==
-             "HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert "HTTP/1.1 400 Bad Request\r\n" <> _rest = response
   end
 
   test "Client too slow to deliver request head", %{port: port} do
@@ -152,8 +148,7 @@ defmodule Ace.HTTP1.ServerTest do
     :ssl.send(connection, unfinished_head)
     assert_receive {:ssl, ^connection, response}, 15000
 
-    assert response ==
-             "HTTP/1.1 408 Request Timeout\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert "HTTP/1.1 408 Request Timeout\r\n" <> _rest = response
   end
 
   test "can connect with alpn preferences", %{port: port} do
@@ -212,8 +207,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:tcp, ^socket, response}, 1000
 
-    assert response ==
-             "HTTP/1.1 500 Internal Server Error\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+    assert "HTTP/1.1 500 Internal Server Error\r\n" <> _rest = response
   end
 
   ## Request tests
