@@ -102,10 +102,10 @@ defmodule Ace.HTTP1.Parser do
         pop_part({:headers, rest, start_line, [], options})
 
       {:ok, {:http_error, line}, _rest} ->
-        {:error, {:invalid_start_line, line}}
+        {:error, {:invalid_line, line}}
 
       {:error, :invalid} ->
-        {:error, :start_line_too_long}
+        {:error, {:line_length_limit_exceeded, :request_line}}
     end
   end
 
@@ -147,10 +147,10 @@ defmodule Ace.HTTP1.Parser do
         end
 
       {:ok, {:http_error, line}, _rest} ->
-        {:error, {:invalid_header_line, line}}
+        {:error, {:invalid_line, line}}
 
       {:error, :invalid} ->
-        {:error, :header_line_too_long}
+        {:error, {:line_length_limit_exceeded, :header_line}}
     end
   end
 
