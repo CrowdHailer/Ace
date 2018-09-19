@@ -52,6 +52,13 @@ defmodule Ace.HTTP.Channel do
     # However this case can still occur due to race conditions.
     :exit, {:noproc, _} ->
       {:error, :connection_closed}
+
+    # A timeout will occur when the endpoint process has become inactive.
+    # The worker assumes the connection has closed because in case of an inactive endpoint.
+    # If the endpoint process returns to normal working
+    # it will have a DOWN message from the worker and handle handle that appropriatly
+    :exit, {:timeout, _} ->
+      {:error, :connection_closed}
   end
 
   @doc """

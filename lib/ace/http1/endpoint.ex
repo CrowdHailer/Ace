@@ -37,7 +37,7 @@ defmodule Ace.HTTP1.Endpoint do
         {[buffer, outbound], next_state}
       end)
 
-    Ace.Socket.send(state.socket, outbound)
+    data_sent = Ace.Socket.send(state.socket, outbound)
 
     case state.status do
       {_, :complete} ->
@@ -45,7 +45,17 @@ defmodule Ace.HTTP1.Endpoint do
         {:stop, :normal, state}
 
       {_, _incomplete} ->
-        {:reply, {:ok, channel}, state}
+        case data_sent do
+          :ok ->
+            {:reply, {:ok, channel}, state}
+
+          # Data might not have been sent because the socket has closed,
+          # or become inactive and hit the send_timeout limit.
+          # No reply is sent to the caller, it should rely on timouts.
+          # The reason for this is the worker must already be able to handle timeouts.
+          {:error, _reason} ->
+            {:stop, :normal, state}
+        end
     end
   end
 
