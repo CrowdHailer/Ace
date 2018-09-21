@@ -35,6 +35,14 @@ defmodule Ace.HTTP.Service do
     # This setting is a security vulnerability only on multi-user machines.
     # It is NOT a vulnerability from outside the machine.
     {:reuseaddr, true},
+
+    # See the Examples section of gen_tcp docs http://erlang.org/doc/man/gen_tcp.html#examples
+    # This timeout is only to help with cleanup.
+    # Worker process that send data should have considered a connection dead after 5sec, the default Gen.call timout.
+    # If this is ever exposed as an option to users this post contains some possibly useful information.
+    # https://erlangcentral.org/wiki/Fast_TCP_sockets
+    {:send_timeout, 10_000},
+    {:send_timeout_close, true},
     {:alpn_preferred_protocols, ["h2", "http/1.1"]}
   ]
 
@@ -162,7 +170,14 @@ defmodule Ace.HTTP.Service do
       case Keyword.fetch(options, :cleartext) do
         {:ok, true} ->
           tcp_options =
-            Keyword.take(@socket_options ++ options, [:mode, :packet, :active, :reuseaddr])
+            Keyword.take(@socket_options ++ options, [
+              :mode,
+              :packet,
+              :active,
+              :reuseaddr,
+              :send_timeout,
+              :send_timeout_close
+            ])
 
           {:ok, listen_socket} = :gen_tcp.listen(port, tcp_options)
           listen_socket = {:tcp, listen_socket}
@@ -177,6 +192,8 @@ defmodule Ace.HTTP.Service do
               :packet,
               :active,
               :reuseaddr,
+              :send_timeout,
+              :send_timeout_close,
               :alpn_preferred_protocols,
               :cert,
               :key,

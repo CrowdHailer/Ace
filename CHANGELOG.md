@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.17.0](https://github.com/CrowdHailer/Ace/tree/0.17.0) - 2018-08-30
+## [0.17.1](https://github.com/CrowdHailer/Ace/tree/0.17.1) - 2018-09-21
+
+### Fixed
+
+- Issue [113](https://github.com/CrowdHailer/Ace/issues/113) by adding `send_timeout` to sockets.
+
+## [0.17.0](https://github.com/CrowdHailer/Ace/tree/0.17.0) - 2018-09-12
 
 ### Changed
 
