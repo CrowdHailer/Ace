@@ -11,6 +11,9 @@
 - [Documentation available on hexdoc](https://hexdocs.pm/ace)
 - [Discuss on slack](https://elixir-lang.slack.com/messages/C56H3TBH8/)
 
+See [Raxx.Kit](https://github.com/CrowdHailer/raxx_kit) for a project generator that helps you set up 
+a web project based on [Raxx](https://github.com/CrowdHailer/raxx)/[Ace](https://github.com/CrowdHailer/Ace).
+
 ## Get started
 
 #### Hello, World!
