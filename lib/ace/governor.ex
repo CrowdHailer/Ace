@@ -24,7 +24,6 @@ defmodule Ace.Governor do
   end
 
   def child_spec({endpoint_supervisor, listen_socket}) do
-    # DEBT is module previously checked to implement Raxx.Application or Raxx.Server
     %{
       id: __MODULE__,
       start: {__MODULE__, :start_link, [endpoint_supervisor, listen_socket]},

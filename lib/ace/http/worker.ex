@@ -36,7 +36,7 @@ defmodule Ace.HTTP.Worker do
   def child_spec(app) do
     # NOTE child spec is called only once so possibly expensive call to `Code.ensure_compiled?` is not repeated
     # `start_link` in this module could be protected by dialyzer
-    case Raxx.verify_application(app) do
+    case Raxx.Server.verify_server(app) do
       {:ok, app} ->
         %{
           id: __MODULE__,

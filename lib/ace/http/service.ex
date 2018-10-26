@@ -55,9 +55,10 @@ defmodule Ace.HTTP.Service do
 
   defmacro __using__(defaults) do
     {defaults, []} = Module.eval_quoted(__CALLER__, defaults)
+    raxx_options = Keyword.take(defaults, [:type, :maximum_body_length])
 
     quote do
-      use Raxx.Server
+      use Raxx.Server, unquote(raxx_options)
 
       def start_link(initial_state, options \\ []) do
         application = {__MODULE__, initial_state}
