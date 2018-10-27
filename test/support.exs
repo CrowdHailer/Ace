@@ -1,5 +1,5 @@
 defmodule Raxx.Kaboom do
-  use Raxx.Server, type: :simple
+  use Raxx.SimpleServer
 
   @impl Raxx.SimpleServer
   def handle_request(_request, _config) do
@@ -64,7 +64,6 @@ end
 
 defmodule Raxx.Forwarder do
   use Ace.HTTP.Service,
-    type: :streaming,
     port: 0,
     acceptors: 1,
     certfile: Support.test_certfile(),
