@@ -1,7 +1,7 @@
 defmodule Raxx.Kaboom do
-  use Raxx.Server
+  use Raxx.SimpleServer
 
-  @impl Raxx.Server
+  @impl Raxx.SimpleServer
   def handle_request(_request, _config) do
     raise "Kaboom !!!"
   end
@@ -68,6 +68,8 @@ defmodule Raxx.Forwarder do
     acceptors: 1,
     certfile: Support.test_certfile(),
     keyfile: Support.test_keyfile()
+
+  use Raxx.Server
 
   @impl Raxx.Server
   def handle_head(request, state = %{target: pid}) do

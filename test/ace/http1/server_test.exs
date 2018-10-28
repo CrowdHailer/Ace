@@ -360,7 +360,7 @@ defmodule Ace.HTTP1.ServerTest do
 
   test "request stream will end when all content has been read", %{port: port} do
     http1_request = """
-    GET /foo/bar?var=1 HTTP/1.1
+    POST /foo/bar?var=1 HTTP/1.1
     host: example.com:1234
     content-length: 14
 
@@ -387,7 +387,7 @@ defmodule Ace.HTTP1.ServerTest do
 
   test "application will be invoked as content is received", %{port: port} do
     request_head = """
-    GET /foo/bar?var=1 HTTP/1.1
+    POST /foo/bar?var=1 HTTP/1.1
     host: example.com:1234
     content-length: 14
 

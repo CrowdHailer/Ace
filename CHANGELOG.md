@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.18.0](https://github.com/CrowdHailer/Ace/tree/0.18.0) - 2018-10-28
+
+### Changed
+
+- `use Ace.HTTP.Service` no longer automatically adds a Raxx Server behaviour.
+  Modules making use of `Ace.HTTP.Service` should now explicitly add `Raxx.Server` or `Raxx.SimpleServer`.
+
 ## [0.17.1](https://github.com/CrowdHailer/Ace/tree/0.17.1) - 2018-09-21
 
 ### Fixed
