@@ -55,11 +55,8 @@ defmodule Ace.HTTP.Service do
 
   defmacro __using__(defaults) do
     {defaults, []} = Module.eval_quoted(__CALLER__, defaults)
-    raxx_options = Keyword.take(defaults, [:type, :maximum_body_length])
 
     quote do
-      use Raxx.Server, unquote(raxx_options)
-
       def start_link(initial_state, options \\ []) do
         application = {__MODULE__, initial_state}
         options = options ++ unquote(defaults)
@@ -81,6 +78,25 @@ defmodule Ace.HTTP.Service do
           type: :supervisor,
           restart: :permanent
         }
+      end
+
+      @before_compile unquote(__MODULE__)
+    end
+  end
+
+  # DEBT Remove this for 1.0 release
+  defmacro __before_compile__(_env) do
+    quote do
+      behaviours = Module.get_attribute(__MODULE__, :behaviour)
+
+      if !Enum.member?(behaviours, Raxx.Server) do
+        %{file: file, line: line} = __ENV__
+
+        :elixir_errors.warn(__ENV__.line, __ENV__.file, """
+        The service `#{inspect(__MODULE__)}` does not implement a Raxx server behaviour
+            This module should either `use Raxx.Server` or `use Raxx.SimpleServer.`
+            The behaviour Ace.HTTP.Service changed in release 0.18.0, see CHANGELOG for details.
+        """)
       end
     end
   end
@@ -110,7 +126,9 @@ defmodule Ace.HTTP.Service do
       Defaults to 100.
   """
   @spec start_link({module, any}, [{atom, any}]) :: {:ok, service}
-  def start_link(app = {_module, _config}, options) do
+  def start_link(app = {module, _config}, options) do
+    Raxx.Server.verify_implementation!(module)
+
     case Ace.HTTP2.Settings.for_server(options) do
       {:ok, _settings} ->
         service_options = Keyword.take(options, [:name])

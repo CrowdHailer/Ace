@@ -69,6 +69,8 @@ defmodule Raxx.Forwarder do
     certfile: Support.test_certfile(),
     keyfile: Support.test_keyfile()
 
+  use Raxx.Server
+
   @impl Raxx.Server
   def handle_head(request, state = %{target: pid}) do
     GenServer.call(pid, {:headers, request, state})
