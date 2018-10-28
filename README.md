@@ -20,6 +20,7 @@ a web project based on [Raxx](https://github.com/CrowdHailer/raxx)/[Ace](https:/
 ```elixir
 defmodule MyApp do
   use Ace.HTTP.Service, [port: 8080, cleartext: true]
+  use Raxx.SimpleServer
 
   @impl Raxx.SimpleServer
   def handle_request(%{method: :GET, path: []}, %{greeting: greeting}) do
