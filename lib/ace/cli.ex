@@ -30,7 +30,7 @@ defmodule Ace.Cli do
           Code.eval_string(module_code, [], file: file)
 
         config = Keyword.get(options, :config, nil)
-        port = Keyword.get(options, :port, nil)
+        port = Keyword.get(options, :port, 8080)
 
         {:ok, _pid} =
           Ace.HTTP.Service.start_link({Ace.Runnable, config}, port: port, cleartext: true)
