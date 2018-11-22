@@ -76,7 +76,7 @@ defmodule Ace.HTTP.Service do
         unquote(__MODULE__).start_link(application, options)
       end
 
-      defoverridable start_link: 2
+      defoverridable start_link: 1, start_link: 2
 
       def child_spec([]) do
         child_spec([%{}])
