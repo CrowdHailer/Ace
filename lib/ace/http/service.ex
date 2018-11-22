@@ -63,6 +63,8 @@ defmodule Ace.HTTP.Service do
         unquote(__MODULE__).start_link(application, options)
       end
 
+      defoverridable start_link: 2
+
       def child_spec([]) do
         child_spec([%{}])
       end
@@ -79,6 +81,8 @@ defmodule Ace.HTTP.Service do
           restart: :permanent
         }
       end
+
+      defoverridable child_spec: 1
 
       @before_compile unquote(__MODULE__)
     end
