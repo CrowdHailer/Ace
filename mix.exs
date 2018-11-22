@@ -44,7 +44,7 @@ defmodule Ace.Mixfile do
       {:raxx, "~> 0.17.0"},
       {:excoveralls, "~> 0.8", only: :test},
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
-      {:credo, "~> 0.9.2", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
