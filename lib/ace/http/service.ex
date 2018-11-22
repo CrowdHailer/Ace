@@ -58,6 +58,19 @@ defmodule Ace.HTTP.Service do
 
     quote do
       def start_link(initial_state, options \\ []) do
+        # DEBT Remove this for 1.0 release
+        behaviours = __MODULE__.module_info() |> get_in([:attributes, :behaviour])
+
+        if !Enum.member?(behaviours, Raxx.Server) do
+          %{file: file, line: line} = __ENV__
+
+          :elixir_errors.warn(__ENV__.line, __ENV__.file, """
+          The service `#{inspect(__MODULE__)}` does not implement a Raxx server behaviour
+              This module should either `use Raxx.Server` or `use Raxx.SimpleServer.`
+              The behaviour Ace.HTTP.Service changed in release 0.18.0, see CHANGELOG for details.
+          """)
+        end
+
         application = {__MODULE__, initial_state}
         options = options ++ unquote(defaults)
         unquote(__MODULE__).start_link(application, options)
@@ -83,25 +96,6 @@ defmodule Ace.HTTP.Service do
       end
 
       defoverridable child_spec: 1
-
-      @before_compile unquote(__MODULE__)
-    end
-  end
-
-  # DEBT Remove this for 1.0 release
-  defmacro __before_compile__(_env) do
-    quote do
-      behaviours = Module.get_attribute(__MODULE__, :behaviour)
-
-      if !Enum.member?(behaviours, Raxx.Server) do
-        %{file: file, line: line} = __ENV__
-
-        :elixir_errors.warn(__ENV__.line, __ENV__.file, """
-        The service `#{inspect(__MODULE__)}` does not implement a Raxx server behaviour
-            This module should either `use Raxx.Server` or `use Raxx.SimpleServer.`
-            The behaviour Ace.HTTP.Service changed in release 0.18.0, see CHANGELOG for details.
-        """)
-      end
     end
   end
 
