@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Next
+
+### Fixed
+
+- Fix incorrectly displayed warning from `use Raxx.SimpleServer`.
+
 ## [0.18.1](https://github.com/CrowdHailer/Ace/tree/0.18.1) - 2018-11-22
 
 ### Added
