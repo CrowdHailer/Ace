@@ -59,7 +59,11 @@ defmodule Ace.HTTP.Service do
     quote do
       def start_link(initial_state, options \\ []) do
         # DEBT Remove this for 1.0 release
-        behaviours = __MODULE__.module_info() |> get_in([:attributes, :behaviour])
+        behaviours =
+          __MODULE__.module_info()
+          |> Keyword.get(:attributes, [])
+          |> Keyword.get_values(:behaviour)
+          |> List.flatten()
 
         if !Enum.member?(behaviours, Raxx.Server) do
           %{file: file, line: line} = __ENV__

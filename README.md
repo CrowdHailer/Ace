@@ -19,7 +19,7 @@ a web project based on [Raxx](https://github.com/CrowdHailer/raxx)/[Ace](https:/
 #### Hello, World!
 ```elixir
 defmodule MyApp do
-  use Ace.HTTP.Service, [port: 8080, cleartext: true]
+  use Ace.HTTP.Service, port: 8080, cleartext: true
   use Raxx.SimpleServer
 
   @impl Raxx.SimpleServer
@@ -38,7 +38,7 @@ end
 ```elixir
 config = %{greeting: "Hello"}
 
-MyApp.start_link(config, [port: 1234])
+MyApp.start_link(config, port: 1234)
 ```
 
 *Here the default port value has been overridden at startup*
