@@ -1,6 +1,8 @@
 defmodule Ace.HTTP.ServiceTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   @tag :skip
   test "service starts a new acceptor for each new connection" do
     {:ok, service} = Raxx.Forwarder.start_link(%{target: self()})
@@ -82,5 +84,16 @@ defmodule Ace.HTTP.ServiceTest do
     :ok = Process.sleep(100)
 
     assert Ace.HTTP.Service.count_connections(service) == 2
+  end
+
+  test "MyApp should not emit missing behaviour warnings" do
+    fun = fn ->
+      config = %{greeting: "Hello"}
+      {:ok, service} = MyApp.start_link(config, [port: 0])
+
+      GenServer.stop(service)
+    end
+
+    refute capture_io(:stderr, fun) =~ ~r"does not implement a Raxx server behaviour"
   end
 end

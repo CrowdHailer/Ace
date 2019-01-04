@@ -95,3 +95,18 @@ defmodule Raxx.Forwarder do
     response
   end
 end
+
+defmodule MyApp do
+  @moduledoc """
+  A sample module in README
+  """
+  use Ace.HTTP.Service, [port: 8080, cleartext: true]
+  use Raxx.SimpleServer
+
+  @impl Raxx.SimpleServer
+  def handle_request(%{method: :GET, path: []}, %{greeting: greeting}) do
+    response(:ok)
+    |> set_header("content-type", "text/plain")
+    |> set_body("#{greeting}, World!")
+  end
+end
