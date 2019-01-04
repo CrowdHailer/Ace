@@ -100,7 +100,7 @@ defmodule MyApp do
   @moduledoc """
   A sample module in README
   """
-  use Ace.HTTP.Service, [port: 8080, cleartext: true]
+  use Ace.HTTP.Service, port: 8080, cleartext: true
   use Raxx.SimpleServer
 
   @impl Raxx.SimpleServer

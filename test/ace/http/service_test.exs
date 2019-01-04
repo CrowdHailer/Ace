@@ -89,7 +89,7 @@ defmodule Ace.HTTP.ServiceTest do
   test "MyApp should not emit missing behaviour warnings" do
     fun = fn ->
       config = %{greeting: "Hello"}
-      {:ok, service} = MyApp.start_link(config, [port: 0])
+      {:ok, service} = MyApp.start_link(config, port: 0)
 
       GenServer.stop(service)
     end
