@@ -339,7 +339,7 @@ defmodule Ace.HTTP2.Connection do
       {previous, connection}
     else
       {to_send, remaining_data} =
-        case data.data do
+        case :erlang.iolist_to_binary(data.data) do
           <<to_send::binary-size(available_window), remaining_data::binary>> ->
             {to_send, remaining_data}
 

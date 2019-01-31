@@ -73,9 +73,14 @@ defmodule Ace.HTTP2Test do
     GenServer.reply(from, {[], state})
     assert received.path == request.path
 
-    data = Raxx.data("Hello, World!")
+    data = Raxx.data("Hello, ")
     :ok = Ace.HTTP2.send(client_stream, data)
-    assert_receive {:"$gen_call", from, {:data, "Hello, World!", state}}, 1000
+    assert_receive {:"$gen_call", from, {:data, "Hello, ", state}}, 1000
+    GenServer.reply(from, {[], state})
+
+    data = Raxx.data([[], "World", "!"])
+    :ok = Ace.HTTP2.send(client_stream, data)
+    assert_receive {:"$gen_call", from, {:data, "World!", state}}, 1000
     GenServer.reply(from, {[], state})
 
     tail = Raxx.tail([{"x-foo", "bar"}])
@@ -84,7 +89,7 @@ defmodule Ace.HTTP2Test do
     GenServer.reply(from, {[], state})
   end
 
-  test "request stream ends if any body complete", %{port: port} do
+  test "request stream ends for complete body, binary", %{port: port} do
     {:ok, client} = Client.start_link({"localhost", port})
     {:ok, client_stream} = Client.stream(client)
 
@@ -92,6 +97,27 @@ defmodule Ace.HTTP2Test do
       Raxx.request(:POST, "/")
       |> Raxx.set_header("content-type", "text/plain")
       |> Raxx.set_body("This is all the content.")
+
+    :ok = Ace.HTTP2.send(client_stream, request)
+
+    assert_receive {:"$gen_call", from, {:headers, _received, state}}, 1000
+    GenServer.reply(from, {[], state})
+
+    assert_receive {:"$gen_call", from, {:data, "This is all the content.", state}}, 1000
+    GenServer.reply(from, {[], state})
+
+    assert_receive {:"$gen_call", from, {:tail, [], state}}, 1000
+    GenServer.reply(from, {[], state})
+  end
+
+  test "request stream ends for complete body, iolist", %{port: port} do
+    {:ok, client} = Client.start_link({"localhost", port})
+    {:ok, client_stream} = Client.stream(client)
+
+    request =
+      Raxx.request(:POST, "/")
+      |> Raxx.set_header("content-type", "text/plain")
+      |> Raxx.set_body([["This"], " is all the content."])
 
     :ok = Ace.HTTP2.send(client_stream, request)
 
