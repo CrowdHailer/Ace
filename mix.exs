@@ -41,7 +41,8 @@ defmodule Ace.Mixfile do
   defp deps do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
-      {:raxx, "~> 0.17.0"},
+      # {:raxx, "~> 0.17.0"},
+      {:raxx, path: "../raxx"},
       {:excoveralls, "~> 0.8", only: :test},
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :test], runtime: false},
