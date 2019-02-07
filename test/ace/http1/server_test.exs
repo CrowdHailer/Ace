@@ -178,7 +178,6 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.scheme == :https
     assert request.authority == "example.com:1234"
     assert request.method == :GET
-    assert request.mount == []
     assert request.path == ["foo", "bar"]
     assert request.raw_path == "/foo/bar"
     assert request.query == "var=1"
@@ -229,7 +228,6 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.scheme == :https
     assert request.authority == "example.com:1234"
     assert request.method == :GET
-    assert request.mount == []
     assert request.path == ["foo", "bar"]
     assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
@@ -253,7 +251,6 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.scheme == :https
     assert request.authority == "example.com:1234"
     assert request.method == :GET
-    assert request.mount == []
     assert request.path == ["foo", "bar"]
     assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
@@ -278,7 +275,6 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.scheme == :https
     assert request.authority == "example.com:1234"
     assert request.method == :GET
-    assert request.mount == []
     assert request.path == ["foo", "bar"]
     assert Enum.sort(request.headers) == [{"accept", "text/html"}, {"accept", "text/plain"}]
     assert request.body == false
@@ -305,7 +301,6 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.scheme == :https
     assert request.authority == "example.com:1234"
     assert request.method == :GET
-    assert request.mount == []
     assert request.path == ["foo", "bar"]
     assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]
@@ -334,7 +329,6 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.scheme == :https
     assert request.authority == "example.com:1234"
     assert request.method == :GET
-    assert request.mount == []
     assert request.path == ["foo", "bar"]
     assert request.query == "var=1"
     assert request.headers == [{"x-test", "Value"}]

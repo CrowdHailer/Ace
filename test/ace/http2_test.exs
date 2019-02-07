@@ -50,7 +50,6 @@ defmodule Ace.HTTP2Test do
     assert received.scheme == :https
     assert received.authority == "example.com:1234"
     assert received.method == :GET
-    assert received.mount == []
     assert received.path == ["foo", "bar"]
     assert received.raw_path == "/foo/bar"
     assert received.query == "var=1"
