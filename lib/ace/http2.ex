@@ -227,7 +227,7 @@ defmodule Ace.HTTP2 do
   defp read_headers([{"te", value} | rest], acc) do
     case value do
       "trailers" ->
-        read_headers(rest, [{"te", value}, acc])
+        read_headers(rest, [{"te", value} | acc])
 
       _ ->
         {

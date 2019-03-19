@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.18.5](https://github.com/CrowdHailer/Ace/tree/0.18.5) - 2019-03-19
+
+### Fixed
+
+- Correctly handled `te` header when parsing HTTP/2 requests.
+
 ## [0.18.4](https://github.com/CrowdHailer/Ace/tree/0.18.4) - 2019-02-07
 
 ### Added
