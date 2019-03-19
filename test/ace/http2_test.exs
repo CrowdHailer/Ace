@@ -42,6 +42,8 @@ defmodule Ace.HTTP2Test do
     request =
       Raxx.request(:GET, "https://example.com:1234/foo/bar?var=1")
       |> Raxx.set_header("content-type", "text/plain")
+      # Test special case headers
+      |> Raxx.set_header("te", "trailers")
 
     :ok = Ace.HTTP2.send(client_stream, request)
     assert_receive {:"$gen_call", from, {:headers, received, state}}, 1000
