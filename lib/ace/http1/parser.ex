@@ -229,6 +229,7 @@ defmodule Ace.HTTP1.Parser do
     # Q? how often is a host header sent with http in place
     # %{scheme: scheme} = URI.parse(host)
 
-    %{Raxx.request(method, path_string) | authority: host}
+    # NOTE add invalid scheme and authority so that parsing a path with leading `//` is handled correctly
+    %{Raxx.request(method, "raxx://root.example" <> path_string) | authority: host}
   end
 end
