@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Correctly handle paths beginning with `//`.
 - `GET` requests with a body are handled correctly.
+- Unsupported methods are handled and return a 501 status response.
 
 ## [0.18.6](https://github.com/CrowdHailer/Ace/tree/0.18.6) - 2019-04-16
 

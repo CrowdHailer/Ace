@@ -123,27 +123,35 @@ defmodule Ace.HTTP1.Parser do
         {transfer_encoding, clean_headers} = resolve_transfer_encoding(headers)
         clean_headers = :proplists.delete("connection", clean_headers)
 
-        request_head =
-          Enum.reduce(
-            :proplists.delete("host", clean_headers),
-            build_partial_request(start_line, :proplists.get_value("host", headers)),
-            fn {k, v}, %{headers: headers} = request ->
-              Map.put(request, :headers, [{k, v} | headers])
+        case build_partial_request(start_line, :proplists.get_value("host", headers)) do
+          {:ok, initial_request} ->
+            clean_headers = :proplists.delete("host", clean_headers)
+
+            request_head =
+              Enum.reduce(
+                clean_headers,
+                initial_request,
+                fn {k, v}, %{headers: headers} = request ->
+                  Map.put(request, :headers, [{k, v} | headers])
+                end
+              )
+
+            case transfer_encoding do
+              nil ->
+                case content_length(headers) do
+                  length when length in [0, nil] ->
+                    {:ok, {request_head, {:done, rest, options}}}
+
+                  length ->
+                    {:ok, {%{request_head | body: true}, {:body, rest, length, options}}}
+                end
+
+              "chunked" ->
+                {:ok, {%{request_head | body: true}, {:body_chunked, rest, options}}}
             end
-          )
 
-        case transfer_encoding do
-          nil ->
-            case content_length(headers) do
-              length when length in [0, nil] ->
-                {:ok, {request_head, {:done, rest, options}}}
-
-              length ->
-                {:ok, {%{request_head | body: true}, {:body, rest, length, options}}}
-            end
-
-          "chunked" ->
-            {:ok, {%{request_head | body: true}, {:body_chunked, rest, options}}}
+          {:error, :not_implemented} ->
+            {:error, :not_implemented}
         end
 
       {:ok, {:http_error, line}, _rest} ->
@@ -230,6 +238,16 @@ defmodule Ace.HTTP1.Parser do
     # %{scheme: scheme} = URI.parse(host)
 
     # NOTE add invalid scheme and authority so that parsing a path with leading `//` is handled correctly
-    %{Raxx.request(method, "raxx://root.example" <> path_string) | authority: host}
+    case method do
+      method when is_atom(method) ->
+        {:ok, %{Raxx.request(method, "raxx://root.example" <> path_string) | authority: host}}
+
+      # :erlang.decode_packet doesn't support patch as a known method.
+      "PATCH" ->
+        {:ok, %{Raxx.request(:PATCH, "raxx://root.example" <> path_string) | authority: host}}
+
+      _ ->
+        {:error, :not_implemented}
+    end
   end
 end

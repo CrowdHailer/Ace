@@ -250,6 +250,40 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.body == false
   end
 
+  test "PATCH method is supported", %{port: port} do
+    http1_request = """
+    PATCH / HTTP/1.1
+    host: example.com:1234
+    x-test: Value
+
+    """
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
+    GenServer.reply(from, {[], state})
+
+    assert request.method == :PATCH
+  end
+
+  test "Unsupported method returns 501", %{port: port} do
+    http1_request = """
+    WTF / HTTP/1.1
+    host: example.com:1234
+
+    """
+
+    {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(connection, http1_request)
+
+    assert_receive {:ssl, ^connection, response}, 1000
+
+    assert "HTTP/1.1 501 Not Implemented\r\n" <> _rest = response
+
+    assert_receive {:ssl_closed, ^connection}, 1000
+  end
+
   test "Header keys in request are cast to lowercase", %{port: port} do
     http1_request = """
     GET /foo/bar?var=1 HTTP/1.1
