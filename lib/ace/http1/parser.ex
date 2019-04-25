@@ -139,11 +139,11 @@ defmodule Ace.HTTP1.Parser do
                 {:ok, {request_head, {:done, rest, options}}}
 
               length ->
-                {:ok, {request_head |> Raxx.set_body(true), {:body, rest, length, options}}}
+                {:ok, {%{request_head | body: true}, {:body, rest, length, options}}}
             end
 
           "chunked" ->
-            {:ok, {request_head |> Raxx.set_body(true), {:body_chunked, rest, options}}}
+            {:ok, {%{request_head | body: true}, {:body_chunked, rest, options}}}
         end
 
       {:ok, {:http_error, line}, _rest} ->

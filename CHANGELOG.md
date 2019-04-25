@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - Correctly handle paths beginning with `//`.
+- `GET` requests with a body are handled correctly.
 
 ## [0.18.6](https://github.com/CrowdHailer/Ace/tree/0.18.6) - 2019-04-16
 

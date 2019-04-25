@@ -386,6 +386,27 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.body == false
   end
 
+  test "GET request can have a body", %{port: port} do
+    request_head = """
+    GET / HTTP/1.1
+    host: example.com:1234
+    content-length: 14
+
+    Hello, World!
+    """
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(socket, request_head)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
+    GenServer.reply(from, {[], state})
+
+    assert request.body == true
+    assert_receive {:"$gen_call", from, {:data, data, state}}, 1000
+    GenServer.reply(from, {[], state})
+    assert data == "Hello, World!\n"
+  end
+
   test "request stream will end when all content has been read", %{port: port} do
     http1_request = """
     POST /foo/bar?var=1 HTTP/1.1
