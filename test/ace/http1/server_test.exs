@@ -79,6 +79,22 @@ defmodule Ace.HTTP1.ServerTest do
 
   # Connection level errors
 
+  test "should not allow host to set scheme", %{port: port} do
+    http1_request = """
+    GET /foo/bar HTTP/1.1
+    host: http://example.com:1234
+
+    """
+
+    {:ok, socket} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :ssl.send(socket, http1_request)
+
+    assert_receive {:"$gen_call", from, {:headers, request, state}}, 1000
+    GenServer.reply(from, {[], state})
+
+    assert request.scheme == :https
+  end
+
   test "400 response for invalid start_line", %{port: port} do
     {:ok, connection} = :ssl.connect({127, 0, 0, 1}, port, [:binary])
     :ssl.send(connection, "rubbish\n")

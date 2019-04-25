@@ -132,8 +132,8 @@ defmodule Ace.HTTP1.Endpoint do
     {:stop, reason, state}
   end
 
-  defp normalise_part(request = %{scheme: nil}, :tcp), do: %{request | scheme: :http}
-  defp normalise_part(request = %{scheme: nil}, :ssl), do: %{request | scheme: :https}
+  defp normalise_part(request = %{scheme: _}, :tcp), do: %{request | scheme: :http}
+  defp normalise_part(request = %{scheme: _}, :ssl), do: %{request | scheme: :https}
   defp normalise_part(part, _transport), do: part
 
   defp send_part(response = %Response{}, state = %{status: {up, :response}}) do
