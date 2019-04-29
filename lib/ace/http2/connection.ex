@@ -100,7 +100,8 @@ defmodule Ace.HTTP2.Connection do
         Logger.warn("ERROR: #{inspect(error)}, #{inspect(debug)}")
         frame = Frame.GoAway.new(4, error, debug)
         outbound = Frame.GoAway.serialize(frame)
-        :ok = Ace.Socket.send(state.socket, outbound)
+        # NOTE doesn't matter if can't sent GoAway frame.
+        _ = Ace.Socket.send(state.socket, outbound)
         Process.sleep(1000)
 
         # Despite being an error the connection has successfully dealt with the client and does not need to crash
@@ -491,7 +492,7 @@ defmodule Ace.HTTP2.Connection do
   end
 
   def consume_frame(%Frame.GoAway{error: :no_error}, _state = %{next: :any}) do
-    {:error, {:no_error, "Client closed connection"}}
+    {:error, {:no_error, "Peer closed connection"}}
   end
 
   def consume_frame(frame = %Frame.WindowUpdate{stream_id: 0}, state = %{next: :any}) do

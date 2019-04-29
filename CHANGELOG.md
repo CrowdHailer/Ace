@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.18.8](https://github.com/CrowdHailer/Ace/tree/0.18.8) - 2019-04-29
+
+### Fixed
+
+- HTTP2 connection handles case when peer cleanly closes connection.
+
 ## [0.18.7](https://github.com/CrowdHailer/Ace/tree/0.18.7) - 2019-04-25
 
 ### Fixed
