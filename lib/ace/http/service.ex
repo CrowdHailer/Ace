@@ -126,6 +126,13 @@ defmodule Ace.HTTP.Service do
 
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 100.
+
+  Internal socket options can also be specified, most notably:
+
+    * `:alpn_preferred_protocols` - which protocols should be negotiated for the
+      https traffic. Defaults to `["h2", "http/1.1"]`
+
+  The additional options will be passed to `:gen_tcp.listen/2` and `:ssl.listen/2` as appropriate.
   """
   @spec start_link({module, any}, [{atom, any}]) :: {:ok, service}
   def start_link(app = {module, _config}, options) do
@@ -191,7 +198,7 @@ defmodule Ace.HTTP.Service do
       case Keyword.fetch(options, :cleartext) do
         {:ok, true} ->
           tcp_options =
-            Keyword.take(@socket_options ++ options, [
+            Keyword.take(options ++ @socket_options, [
               :mode,
               :packet,
               :active,
@@ -208,7 +215,7 @@ defmodule Ace.HTTP.Service do
 
         _ ->
           ssl_options =
-            Keyword.take(@socket_options ++ options, [
+            Keyword.take(options ++ @socket_options, [
               :mode,
               :packet,
               :active,
@@ -225,7 +232,13 @@ defmodule Ace.HTTP.Service do
           {:ok, listen_socket} = :ssl.listen(port, ssl_options)
           listen_socket = {:ssl, listen_socket}
           {:ok, port} = Ace.Socket.port(listen_socket)
-          Logger.info("Serving securely using HTTP/1 and HTTP/2 on port #{port}")
+
+          Logger.info(
+            "Serving securely using #{
+              inspect(Keyword.get(ssl_options, :alpn_preferred_protocols))
+            } on port #{port}"
+          )
+
           listen_socket
       end
 
