@@ -9,7 +9,9 @@ matrix:
       elixir: 1.8.1
     - otp_release: 22.0
       elixir: 1.8.2
-      env: DIALYZER_CHECK=1
+      env:
+        - DIALYZER_CHECK=1
+        - MIX_ENV=test
 env:
   - MIX_ENV=test
 before_script:
