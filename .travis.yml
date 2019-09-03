@@ -9,6 +9,7 @@ matrix:
       elixir: 1.8.1
     - otp_release: 22.0
       elixir: 1.8.2
+      env: DIALYZER_CHECK=1
 env:
   - MIX_ENV=test
 before_script:
@@ -16,7 +17,10 @@ before_script:
 script:
   - mix test
   - mix format --check-formatted
-  - mix dialyzer --halt-exit-status
+  - |
+    if [ "${DIALYZER_CHECK}" == "1" ]; then
+      mix dialyzer --halt-exit-status
+    fi
 cache:
   directories:
     - _build
