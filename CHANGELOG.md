@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Allow the users to specify socket options and opt out of HTTP/1.1 or HTTP2.
 
+### Fixed
+
+- Fix dialyzer warning about `:elixir_errors.warn` on Elixir >= 1.9.0
+
 ## [0.18.8](https://github.com/CrowdHailer/Ace/tree/0.18.8) - 2019-04-29
 
 ### Fixed
