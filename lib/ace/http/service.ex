@@ -57,6 +57,8 @@ defmodule Ace.HTTP.Service do
     {defaults, []} = Module.eval_quoted(__CALLER__, defaults)
 
     quote do
+      @spec start_link(any, [{atom, any}]) ::
+              {:ok, unquote(__MODULE__).service()} | {:error, term}
       def start_link(initial_state, options \\ []) do
         # DEBT Remove this for 1.0 release
         behaviours =
