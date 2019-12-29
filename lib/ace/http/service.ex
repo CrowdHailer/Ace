@@ -51,7 +51,7 @@ defmodule Ace.HTTP.Service do
 
   This process should be added to a supervision tree as a supervisor.
   """
-  @type service :: pid
+  @type service :: GenServer.server()
 
   defmacro __using__(defaults) do
     {defaults, []} = Module.eval_quoted(__CALLER__, defaults)
@@ -135,7 +135,7 @@ defmodule Ace.HTTP.Service do
 
   The additional options will be passed to `:gen_tcp.listen/2` and `:ssl.listen/2` as appropriate.
   """
-  @spec start_link({module, any}, [{atom, any}]) :: {:ok, service}
+  @spec start_link({module, any}, [{atom, any}]) :: {:ok, service} | {:error, term}
   def start_link(app = {module, _config}, options) do
     Raxx.Server.verify_implementation!(module)
 
