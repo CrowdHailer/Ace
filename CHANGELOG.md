@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.18.10](https://github.com/CrowdHailer/Ace/tree/0.18.10) - 2020-02-16
+
+### Added
+
+- New option `error_response` for `Ace.HTTP.Service`.
+
 ## [0.18.9](https://github.com/CrowdHailer/Ace/tree/0.18.9) - 2019-10-30
 
 ### Changed
