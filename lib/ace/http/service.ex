@@ -128,6 +128,9 @@ defmodule Ace.HTTP.Service do
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 100.
 
+    * `:error_response` - The response that Ace will send if a request handler crashes.
+      Useful for setting custom headers, e.g. for CORS.
+
   Internal socket options can also be specified, most notably:
 
     * `:alpn_preferred_protocols` - which protocols should be negotiated for the
