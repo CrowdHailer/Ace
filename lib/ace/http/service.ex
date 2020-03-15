@@ -247,29 +247,33 @@ defmodule Ace.HTTP.Service do
       end
 
     {:ok, worker_supervisor} =
-      Supervisor.start_link(
-        [{Ace.HTTP.Worker, app}],
-        strategy: :simple_one_for_one,
-        max_restarts: 5000
+      DynamicSupervisor.start_link(
+        strategy: :one_for_one,
+        max_restarts: 5000,
+        extra_arguments: [app]
       )
 
     {:ok, endpoint_supervisor} =
-      Supervisor.start_link(
-        [{Ace.HTTP.Server, {worker_supervisor, options}}],
-        strategy: :simple_one_for_one,
-        max_restarts: 5000
+      DynamicSupervisor.start_link(
+        strategy: :one_for_one,
+        max_restarts: 5000,
+        extra_arguments: [worker_supervisor, options]
       )
 
     # DEBT reduce restarts
     {:ok, governor_supervisor} =
-      Supervisor.start_link(
-        [{Ace.Governor, {endpoint_supervisor, listen_socket}}],
-        strategy: :simple_one_for_one,
-        max_restarts: 5000
+      DynamicSupervisor.start_link(
+        strategy: :one_for_one,
+        max_restarts: 5000,
+        extra_arguments: [endpoint_supervisor, listen_socket]
       )
 
     for _index <- 1..acceptors do
-      Supervisor.start_child(governor_supervisor, [])
+      {:ok, _} =
+        DynamicSupervisor.start_child(
+          governor_supervisor,
+          Ace.Governor.child_spec()
+        )
     end
 
     {:ok, {listen_socket, worker_supervisor, endpoint_supervisor, governor_supervisor}}
@@ -282,7 +286,7 @@ defmodule Ace.HTTP.Service do
 
   def handle_call(:count_connections, _from, state) do
     {_listen_socket, worker_supervisor, _endpoint_supervisor, _governor_supervisor} = state
-    count = Supervisor.count_children(worker_supervisor).active
+    count = DynamicSupervisor.count_children(worker_supervisor).active
     {:reply, count, state}
   end
 end

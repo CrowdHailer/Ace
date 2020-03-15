@@ -420,7 +420,9 @@ defmodule Ace.HTTP2.Connection do
       socket: :h2_socket
     }
 
-    {:ok, worker} = Supervisor.start_child(state.stream_supervisor, [channel])
+    {:ok, worker} =
+      DynamicSupervisor.start_child(state.stream_supervisor, Ace.HTTP.Worker.child_spec(channel))
+
     stream = Stream.reserve(stream_id, worker, state.remote_settings.initial_window_size)
     state = put_stream(state, stream)
     {stream, state}
@@ -748,7 +750,12 @@ defmodule Ace.HTTP2.Connection do
       socket: :h2_socket
     }
 
-    {:ok, worker} = Supervisor.start_child(connection.stream_supervisor, [channel])
+    {:ok, worker} =
+      DynamicSupervisor.start_child(
+        connection.stream_supervisor,
+        Ace.HTTP.Worker.child_spec(channel)
+      )
+
     stream = Stream.idle(stream_id, worker, connection.remote_settings.initial_window_size)
     {:ok, put_stream(connection, stream)}
   end

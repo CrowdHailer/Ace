@@ -23,10 +23,10 @@ defmodule Ace.Governor do
     GenServer.start_link(__MODULE__, initial_state)
   end
 
-  def child_spec({endpoint_supervisor, listen_socket}) do
+  def child_spec() do
     %{
       id: __MODULE__,
-      start: {__MODULE__, :start_link, [endpoint_supervisor, listen_socket]},
+      start: {__MODULE__, :start_link, []},
       type: :worker,
       restart: :transient,
       shutdown: 500
@@ -63,7 +63,8 @@ defmodule Ace.Governor do
   # function head ensures that only one server is being monitored at a time
   defp start_server(state = %{server: nil, monitor: nil}) do
     # Starting a server process must always succeed, before accepting on a connection it has no external influences.
-    {:ok, server} = Supervisor.start_child(state.server_supervisor, [])
+    {:ok, server} =
+      DynamicSupervisor.start_child(state.server_supervisor, Ace.HTTP.Server.child_spec())
 
     # The behaviour of a server is to always after creation, therefore linking should always succeed.
     true = Process.link(server)

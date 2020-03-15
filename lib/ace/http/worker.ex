@@ -33,10 +33,10 @@ defmodule Ace.HTTP.Worker do
   end
 
   @doc false
-  def child_spec(app) do
+  def child_spec(channel) do
     %{
       id: __MODULE__,
-      start: {__MODULE__, :start_link, [app]},
+      start: {__MODULE__, :start_link, [channel]},
       type: :worker,
       restart: :temporary,
       shutdown: 500
