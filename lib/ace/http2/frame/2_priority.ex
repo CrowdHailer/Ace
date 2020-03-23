@@ -1,11 +1,24 @@
 defmodule Ace.HTTP2.Frame.Priority do
   @moduledoc false
 
-  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+  alias Ace.HTTP2.Frame
+
+  @type t :: %__MODULE__{
+          stream_id: Frame.stream_id(),
+          stream_dependency: Frame.stream_id(),
+          weight: Frame.weight(),
+          exclusive: boolean
+        }
 
   @enforce_keys [:stream_id, :stream_dependency, :weight, :exclusive]
   defstruct @enforce_keys
 
+  @spec new(
+          Frame.stream_id(),
+          Frame.stream_id(),
+          Frame.weight(),
+          boolean
+        ) :: t()
   def new(stream_id, stream_dependency, weight, exclusive) do
     %__MODULE__{
       stream_id: stream_id,
@@ -15,6 +28,8 @@ defmodule Ace.HTTP2.Frame.Priority do
     }
   end
 
+  @spec decode({2, any(), Frame.stream_id(), binary()}) ::
+          {:ok, t()} | {:error, {:protocol_error, String.t()}}
   def decode({2, _flags, stream_id, <<exclusive::1, stream_dependency::31, weight::8>>})
       when stream_id > 0 do
     exclusive = exclusive == 1
@@ -34,6 +49,7 @@ defmodule Ace.HTTP2.Frame.Priority do
     {:error, {:protocol_error, "Priority frame invalid payload length"}}
   end
 
+  @spec serialize(t()) :: binary
   def serialize(frame) do
     exclusive = if frame.exclusive, do: 1, else: 0
 
@@ -49,7 +65,7 @@ defmodule Ace.HTTP2.Frame.Priority do
     >>
   end
 
-  defimpl Inspect, for: Ace.HTTP2.Frame.Priority do
+  defimpl Inspect, for: Frame.Priority do
     def inspect(
           %{
             stream_id: stream_id,

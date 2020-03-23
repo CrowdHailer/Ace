@@ -1,10 +1,18 @@
 defmodule Ace.HTTP2.Frame.PushPromise do
   @moduledoc false
-  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+  alias Ace.HTTP2.Frame
+
+  @type t :: %__MODULE__{
+          stream_id: Frame.stream_id(),
+          promised_stream_id: Frame.stream_id(),
+          header_block_fragment: binary,
+          end_headers: boolean
+        }
 
   @enforce_keys [:stream_id, :promised_stream_id, :header_block_fragment, :end_headers]
   defstruct @enforce_keys
 
+  @spec new(Frame.stream_id(), Frame.stream_id(), binary, boolean) :: t()
   def new(stream_id, promised_stream_id, header_block_fragment, end_headers) do
     %__MODULE__{
       stream_id: stream_id,
@@ -14,6 +22,7 @@ defmodule Ace.HTTP2.Frame.PushPromise do
     }
   end
 
+  @spec decode({5, binary, Frame.stream_id(), binary}) :: {:ok, t()}
   def decode({5, flags, stream_id, payload}) do
     <<_::4, padded::1, end_headers::1, _::2>> = flags
     end_headers = end_headers == 1
@@ -30,8 +39,9 @@ defmodule Ace.HTTP2.Frame.PushPromise do
     {:ok, new(stream_id, promised_stream_id, header_block_fragment, end_headers)}
   end
 
+  @spec serialize(t()) :: binary
   def serialize(frame) do
-    length = 4 + :erlang.iolist_size(frame.header_block_fragment)
+    length = 4 + byte_size(frame.header_block_fragment)
     # DEBT provide way to serialize with padding
     padded_flag = 0
     end_headers_flag = if frame.end_headers, do: 1, else: 0

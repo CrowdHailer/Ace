@@ -138,7 +138,12 @@ defmodule Ace.HTTP.Service do
 
   The additional options will be passed to `:gen_tcp.listen/2` and `:ssl.listen/2` as appropriate.
   """
-  @spec start_link({module, any}, [{atom, any}]) :: {:ok, service}
+  @spec start_link({module, any}, Ace.HTTP2.Settings.settings()) ::
+          {:ok, service}
+          | {:error, :initial_window_size_too_large}
+          | {:error, :initial_window_size_too_small}
+          | {:error, :max_frame_size_too_large}
+          | {:error, :max_frame_size_too_small}
   def start_link(app = {module, _config}, options) do
     Raxx.Server.verify_implementation!(module)
 

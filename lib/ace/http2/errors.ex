@@ -1,6 +1,22 @@
 defmodule Ace.HTTP2.Errors do
   @moduledoc false
 
+  @type error ::
+          :no_error
+          | :protocol_error
+          | :internal_error
+          | :flow_control_error
+          | :settings_timeout
+          | :stream_closed
+          | :frame_size_error
+          | :refused_stream
+          | :cancel
+          | :compression_error
+          | :connect_error
+          | :enhance_your_calm
+          | :inadequate_security
+          | :http_1_1_required
+
   @defined [
     {0x0, :no_error},
     {0x1, :protocol_error},
@@ -18,10 +34,12 @@ defmodule Ace.HTTP2.Errors do
     {0xD, :http_1_1_required}
   ]
 
+  @spec encode(error()) :: 0x0..0xD
   for {code, error} <- @defined do
     def encode(unquote(error)), do: unquote(code)
   end
 
+  @spec decode(0x0..0xD) :: error()
   for {code, error} <- @defined do
     def decode(unquote(code)), do: unquote(error)
   end

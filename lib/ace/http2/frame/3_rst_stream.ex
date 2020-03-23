@@ -1,17 +1,19 @@
 defmodule Ace.HTTP2.Frame.RstStream do
   @moduledoc false
 
-  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+  alias Ace.HTTP2.{Frame, Errors}
 
-  alias Ace.HTTP2.{Errors}
+  @type t :: %__MODULE__{stream_id: Frame.stream_id(), error: Errors.error()}
 
   @enforce_keys [:stream_id, :error]
   defstruct @enforce_keys
 
+  @spec new(Frame.stream_id(), Errors.error()) :: t()
   def new(stream_id, error) do
     %__MODULE__{stream_id: stream_id, error: error}
   end
 
+  @spec decode({3, any, Frame.stream_id(), binary}) :: {:ok, t()}
   def decode({3, _flags, stream_id, <<error_code::32>>}) when stream_id > 0 do
     error = Errors.decode(error_code)
     {:ok, new(stream_id, error)}
@@ -25,12 +27,13 @@ defmodule Ace.HTTP2.Frame.RstStream do
     {:error, {:protocol_error, "RstStream frame invalid payload length"}}
   end
 
+  @spec serialize(t()) :: binary
   def serialize(frame) do
     payload = <<Errors.encode(frame.error)::32>>
     <<4::24, 3::8, 0::8, 0::1, frame.stream_id::31, payload::binary>>
   end
 
-  defimpl Inspect, for: Ace.HTTP2.Frame.RstStream do
+  defimpl Inspect, for: Frame.RstStream do
     def inspect(%{stream_id: stream_id, error: error}, _opts) do
       "RST_STREAM(stream_id: #{stream_id}, error: #{error})"
     end

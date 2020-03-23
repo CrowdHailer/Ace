@@ -1,11 +1,20 @@
 defmodule Ace.HTTP2.Frame.Headers do
   @moduledoc false
-  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+
+  alias Ace.HTTP2.Frame
+
+  @type t :: %__MODULE__{
+          stream_id: Frame.stream_id(),
+          header_block_fragment: binary,
+          end_headers: boolean,
+          end_stream: boolean
+        }
 
   # TODO rename header_block_fragment -> fragment
   @enforce_keys [:stream_id, :header_block_fragment, :end_headers, :end_stream]
   defstruct @enforce_keys
 
+  @spec new(Frame.stream_id(), binary, boolean, boolean) :: t()
   def new(stream_id, header_block_fragment, end_headers, end_stream) do
     %__MODULE__{
       stream_id: stream_id,
@@ -15,6 +24,8 @@ defmodule Ace.HTTP2.Frame.Headers do
     }
   end
 
+  @spec decode({1, Frame.flags(), Frame.stream_id(), binary}) ::
+          {:ok, t()} | {:error, {:protocol_error, string}}
   def decode({1, flags, stream_id, payload}) do
     <<_::1, _::1, priority::1, _::1, padded::1, end_headers::1, _::1, end_stream::1>> = flags
 
@@ -53,6 +64,7 @@ defmodule Ace.HTTP2.Frame.Headers do
     end
   end
 
+  @spec serialize(t()) :: binary
   def serialize(frame) do
     end_stream_flag = if frame.end_stream, do: 1, else: 0
     end_headers_flag = if frame.end_headers, do: 1, else: 0

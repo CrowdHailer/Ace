@@ -15,6 +15,7 @@ defmodule Ace.HTTP2 do
 
   @known_methods ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT"]
 
+  @spec send(Ace.HTTP.Channel.t(), {:promise, Raxx.Request.t()} | Raxx.part()) :: :ok
   def send(stream, request = %{scheme: nil}) do
     send(stream, %{request | scheme: :https})
   end
@@ -44,6 +45,7 @@ defmodule Ace.HTTP2 do
 
   This headers list can be encoded via `Ace.HPack`.
   """
+  @spec request_to_headers(Raxx.Request.t()) :: Raxx.headers()
   def request_to_headers(request) do
     # TODO consider default values for required scheme and authority
     # DEBT nested queries
@@ -93,7 +95,8 @@ defmodule Ace.HTTP2 do
   #     %{request | body: !end_stream}
   #   end
   # end
-
+  @spec headers_to_request(Raxx.headers(), boolean) ::
+          {:ok, Raxx.Request.t()} | {:error, {:protocol_error, String.t()}}
   def headers_to_request(headers, end_stream) do
     case build_request(headers) do
       {:ok, request} ->
@@ -191,6 +194,7 @@ defmodule Ace.HTTP2 do
   Response pseudo-headers are; `:status`.
   Duplicate or missing pseudo-headers will return an error.
   """
+  @spec headers_to_response(Raxx.headers(), boolean) :: {:ok, Raxx.Response.t()}
   def headers_to_response([{":status", status} | headers], end_stream) do
     case read_headers(headers) do
       {:ok, headers} ->
@@ -205,6 +209,8 @@ defmodule Ace.HTTP2 do
 
   Note there are no required headers in a trailers set.
   """
+  @spec headers_to_trailers(Raxx.headers()) ::
+          %{headers: Raxx.headers(), end_stream: true} | {:error, {:protocol_error, String.t()}}
   def headers_to_trailers(headers) do
     {:ok, headers} = read_headers(headers)
     %{headers: headers, end_stream: true}
