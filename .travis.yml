@@ -43,6 +43,7 @@ script:
 cache:
   directories:
     - _build
+    - priv/plts
 before_cache:
   # should only keep the dialyzer artifacts
   - mix clean
