@@ -3,22 +3,28 @@ defmodule Ace.HTTP2.Frame.Data do
 
   alias Ace.HTTP2.Frame
 
-  @type t :: %__MODULE__{data: binary}
+  @type t :: %__MODULE__{
+          data: binary,
+          stream_id: Frame.stream_id(),
+          end_stream: boolean
+        }
 
   @enforce_keys [:data, :stream_id, :end_stream]
   defstruct @enforce_keys
 
+  @spec new(Frame.stream_id(), binary, boolean) :: t()
   def new(stream_id, data, end_stream) do
     %__MODULE__{data: data, stream_id: stream_id, end_stream: end_stream}
   end
 
-  @spec decode({0, Frame.flags(), Frame.stream_id(), binary}) :: {:ok, t}
+  @spec decode({0, Frame.flags(), Frame.stream_id(), binary}) :: {:ok, t()}
   def decode({0, flags, stream_id, payload}) do
     {data, end_stream} = read(flags, payload)
     {:ok, new(stream_id, data, end_stream)}
   end
 
   # DEBT handle padding
+  @spec serialize(t()) :: binary
   def serialize(frame) do
     length = :erlang.iolist_size(frame.data)
     end_stream_flag = if frame.end_stream, do: 1, else: 0
@@ -27,6 +33,7 @@ defmodule Ace.HTTP2.Frame.Data do
     <<length::24, 0::8, flags::binary, 0::1, frame.stream_id::31, frame.data::binary>>
   end
 
+  @spec read(binary, binary) :: {binary, boolean}
   def read(flags, payload) do
     %{padded: padded, end_stream: end_stream} = parse_flags(flags)
 
@@ -40,7 +47,7 @@ defmodule Ace.HTTP2.Frame.Data do
     {data, end_stream}
   end
 
-  def parse_flags(<<_::4, padded_flag::1, _::2, end_stream_flag::1>>) do
+  defp parse_flags(<<_::4, padded_flag::1, _::2, end_stream_flag::1>>) do
     %{
       end_stream: end_stream_flag == 1,
       padded: padded_flag == 1

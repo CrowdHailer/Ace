@@ -122,6 +122,7 @@ defmodule Ace.HTTP2.Client do
 
   Stream will start in idle state.
   """
+  @spec stream(Ace.HTTP2.Connection) :: {:ok, Ace.HTTP.Channel.t()}
   def stream(connection) do
     GenServer.call(connection, {:new_stream, self()})
   end
@@ -129,6 +130,7 @@ defmodule Ace.HTTP2.Client do
   @doc """
   Close the connection established by a client.
   """
+  @spec stop(Ace.HTTP2.Connection) :: :ok
   def stop(connection) do
     GenServer.call(connection, {:stop, :normal})
   end
@@ -136,6 +138,7 @@ defmodule Ace.HTTP2.Client do
   @doc """
   Collect all the parts streamed to a client as a single response.
   """
+  @spec collect_response(Ace.HTTP.Channel.t()) :: {:ok, Raxx.Response.t()} | :no_headers
   def collect_response(stream) do
     receive do
       {^stream, response = %Raxx.Response{body: body}} ->
@@ -154,7 +157,7 @@ defmodule Ace.HTTP2.Client do
   @doc """
   Send a complete request and wait for a complete response.
 
-  NOTE the request must have have body as a binary or `false`.
+  NOTE the request must have body as iodata or `false`.
   """
   def send_sync(connection, request) do
     if Raxx.complete?(request) do

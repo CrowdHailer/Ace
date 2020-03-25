@@ -18,6 +18,7 @@ defmodule Ace.HTTP.Server do
 
   A provisioned server will remain in an awaiting state until accept is called.
   """
+  @spec start_link(pid, Ace.HTTP2.Settings.settings()) :: :ignore | {:error, term} | {:ok, pid()}
   def start_link(worker_supervisor, settings \\ []) when is_pid(worker_supervisor) do
     state = %__MODULE__{
       worker_supervisor: worker_supervisor,

@@ -8,7 +8,7 @@ defmodule Ace.Socket do
   @typedoc """
   Wrapped tcp socket or tls socket.
   """
-  @type t :: {:tcp, :inet.socket()} | {:ssl, :"ssl.SslSocket"}
+  @type t :: {:tcp, :inet.socket()} | {:ssl, :ssl.sslsocket()}
   @typedoc """
   Wrapped listen socket.
   """
@@ -77,6 +77,7 @@ defmodule Ace.Socket do
     :ssl.setopts(socket, active: :once)
   end
 
+  @spec send(Ace.Socket.t(), iodata) :: :ok | {:error, any}
   def send({:tcp, socket}, message) do
     :gen_tcp.send(socket, message)
   end

@@ -1,16 +1,23 @@
 defmodule Ace.HTTP2.Frame.WindowUpdate do
   @moduledoc false
-  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+
+  @type increment :: 1..2_147_483_647
+  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id(), increment: increment()}
 
   @enforce_keys [:stream_id, :increment]
   defstruct @enforce_keys
 
-  @max_increment :math.pow(2, 31) - 1
+  @max_increment 2_147_483_647
 
-  def new(stream_id, increment) when increment <= @max_increment do
+  @spec new(Ace.HTTP2.Frame.stream_id(), pos_integer) :: t()
+  def new(stream_id, increment) when 1 <= increment and increment <= @max_increment do
     %__MODULE__{stream_id: stream_id, increment: increment}
   end
 
+  @spec decode({8, any, Ace.HTTP2.Frame.stream_id(), binary}) ::
+          {:ok, t()}
+          | {:error, {:flow_control_error, string}}
+          | {:error, {:protocol_error, string}}
   def decode({8, _flags, stream_id, <<0::1, increment::31>>})
       when 0 < increment and increment <= @max_increment do
     {:ok, new(stream_id, increment)}
@@ -29,7 +36,8 @@ defmodule Ace.HTTP2.Frame.WindowUpdate do
     {:error, {:frame_size_error, "window update frame payload must be 4 octets"}}
   end
 
-  def serialize(%{stream_id: stream_id, increment: increment}) do
+  @spec serialize(t()) :: binary
+  def serialize(%__MODULE__{stream_id: stream_id, increment: increment}) do
     <<4::24, 8::8, 0::8, 0::1, stream_id::31, 0::1, increment::31>>
   end
 

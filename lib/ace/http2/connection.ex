@@ -10,13 +10,26 @@ defmodule Ace.HTTP2.Connection do
 
   @preface "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
-  def preface() do
-    @preface
-  end
+  @initial_flow_control_window 65_535
 
-  # next: :preface, :handshake, :any, :continuation,
+  @type t :: %__MODULE__{
+          next: :preface | :handshake | :any | :continuation,
+          local_settings: Ace.HTTP2.Settings.settings(),
+          queued_settings: Ace.HTTP2.Settings.settings(),
+          remote_settings: Ace.HTTP2.Settings.settings(),
+          socket: nil | Ace.Socket.t(),
+          decode_context: Ace.HPack.context(),
+          encode_context: Ace.HPack.context(),
+          outbound_window: Ace.HTTP2.Settings.window_size(),
+          streams: map,
+          stream_supervisor: pid,
+          max_peer_stream_id: Ace.HTTP2.Frame.stream_id(),
+          next_local_stream_id: Ace.HTTP2.Frame.stream_id(),
+          name: String.t(),
+          pings: map
+        }
+
   defstruct next: :any,
-            peer: :server,
             local_settings: nil,
             queued_settings: [],
             remote_settings: nil,
@@ -31,7 +44,10 @@ defmodule Ace.HTTP2.Connection do
             name: nil,
             pings: %{}
 
-  # accept_push always false for server but usable in client.
+  @spec preface() :: String.t()
+  def preface() do
+    @preface
+  end
 
   @impl GenServer
   def init({:client, {host, port}, local_settings, ssl_options}) do
@@ -55,7 +71,7 @@ defmodule Ace.HTTP2.Connection do
 
         initial_state = %__MODULE__{
           socket: {:ssl, connection},
-          outbound_window: 65535,
+          outbound_window: @initial_flow_control_window,
           local_settings: default_client_settings,
           queued_settings: [local_settings],
           remote_settings: default_server_settings,

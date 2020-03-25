@@ -1,10 +1,15 @@
 defmodule Ace.HTTP2.Frame.Continuation do
   @moduledoc false
-  @type t :: %__MODULE__{stream_id: Ace.HTTP2.Frame.stream_id()}
+  @type t :: %__MODULE__{
+          stream_id: Ace.HTTP2.Frame.stream_id(),
+          header_block_fragment: binary,
+          end_headers: boolean
+        }
 
   @enforce_keys [:stream_id, :header_block_fragment, :end_headers]
   defstruct @enforce_keys
 
+  @spec new(Ace.HTTP2.Frame.stream_id(), binary, boolean) :: t()
   def new(stream_id, header_block_fragment, end_headers) do
     %__MODULE__{
       stream_id: stream_id,
@@ -13,6 +18,7 @@ defmodule Ace.HTTP2.Frame.Continuation do
     }
   end
 
+  @spec decode({9, binary, Ace.HTTP2.Frame.stream_id(), binary}) :: {:ok, t()}
   def decode({9, <<_::5, end_headers_flag::1, _::2>>, stream_id, hbf}) do
     end_headers =
       case end_headers_flag do
@@ -26,6 +32,7 @@ defmodule Ace.HTTP2.Frame.Continuation do
     {:ok, new(stream_id, hbf, end_headers)}
   end
 
+  @spec serialize(t()) :: binary
   def serialize(frame) do
     end_headers_flag = if frame.end_headers, do: 1, else: 0
 

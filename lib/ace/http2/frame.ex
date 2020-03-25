@@ -29,8 +29,9 @@ defmodule Ace.HTTP2.Frame do
   @window_update 8
   @continuation 9
 
-  @type stream_id :: 1..31
+  @type stream_id :: 0..31
   @type flags :: <<_::8>>
+  @type weight :: 1..256
 
   @type t ::
           __MODULE__.Data.t()
@@ -45,15 +46,10 @@ defmodule Ace.HTTP2.Frame do
           | __MODULE__.Continuation.t()
           | {:unknown_frame_type, integer}
 
-  @spec parse(binary(), max_length: binary) ::
-          {:ok, {t | nil, binary}}
-          | {
-              :error,
-              :bad_settings_frame
-              | {:flow_control_error, <<_::184>>}
-              | {:frame_size_error, <<_::64, _::_*8>>}
-              | {:protocol_error, <<_::64, _::_*8>>}
-            }
+  @spec parse(binary, max_length: pos_integer) ::
+          {:ok, {t(), binary}}
+          | {:ok, {nil, binary}}
+          | {:error, any}
   def parse(buffer, max_length: max_length) do
     case parse_from_buffer(buffer, max_length: max_length) do
       {:ok, {nil, unprocessed}} ->
@@ -68,8 +64,8 @@ defmodule Ace.HTTP2.Frame do
           {:error, {:unknown_frame_type, type}} ->
             {:ok, {{:unknown_frame_type, type}, unprocessed}}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
         end
 
       {:error, reason} ->
@@ -102,6 +98,8 @@ defmodule Ace.HTTP2.Frame do
     {:ok, {nil, buffer}}
   end
 
+  @spec decode({non_neg_integer, any, any, any}) ::
+          {:ok, t()} | {:error, {:unknown_frame_type, non_neg_integer}}| {:error, {:protocol_error, String.t()}}
   def decode(parsed_frame)
   def decode(frame = {@data, _, _, _}), do: __MODULE__.Data.decode(frame)
   def decode(frame = {@headers, _, _, _}), do: __MODULE__.Headers.decode(frame)
@@ -118,6 +116,7 @@ defmodule Ace.HTTP2.Frame do
   @doc """
   Transform HTTP2 frame to binary that can be transmitted over connection
   """
+  @spec serialize(t()) :: binary
   def serialize(http2_frame)
   def serialize(frame = %__MODULE__.Data{}), do: __MODULE__.Data.serialize(frame)
   def serialize(frame = %__MODULE__.Headers{}), do: __MODULE__.Headers.serialize(frame)
@@ -133,6 +132,7 @@ defmodule Ace.HTTP2.Frame do
   @doc """
   Add padding to a frames data
   """
+  @spec pad_data(binary, nil | 0..256) :: binary
   def pad_data(data, optional_pad_length)
 
   def pad_data(data, nil) do
@@ -147,6 +147,7 @@ defmodule Ace.HTTP2.Frame do
   @doc """
   Remove the padding from the payload of a frame
   """
+  @spec remove_padding(binary) :: binary
   def remove_padding(<<pad_length, rest::binary>>) do
     rest_length = :erlang.iolist_size(rest)
     data_length = rest_length - pad_length

@@ -3,6 +3,18 @@ defmodule Ace.HTTP2.Stream do
 
   @max_stream_window 2_147_483_647
 
+  @type status :: :idle | :open | :closed | :reserved
+  @type t :: %__MODULE__{
+          id: Ace.HTTP2.Frame.stream_id(),
+          status: {status(), status()},
+          worker: pid,
+          monitor: reference,
+          initial_window_size: Ace.HTTP2.Settings.window_size(),
+          incremented: non_neg_integer,
+          sent: non_neg_integer,
+          # DEBT list of what?
+          queue: list
+        }
   @enforce_keys [
     :id,
     :status,
@@ -75,6 +87,8 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec send_response(Ace.HTTP2.Stream.t(), Raxx.Response.t()) ::
+          {:ok, Ace.HTTP2.Stream.t()} | {:error, :dont_send_response_first}
   def send_response(stream, response = %{body: body}) when is_boolean(body) do
     case stream.status do
       {:idle, :idle} ->
@@ -100,7 +114,7 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
-  def send_response(stream, response = %{body: ""}) do
+  def send_response(stream, response = %{body: <<>>}) do
     send_response(stream, %{response | body: false})
   end
 
@@ -115,6 +129,7 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec send_data(Ace.HTTP2.Stream.t(), Raxx.Data.t()) :: {:ok, Ace.HTTP2.Stream.t()}
   def send_data(stream, data = %Raxx.Data{}) do
     case stream.status do
       {:open, _remote} ->
@@ -128,6 +143,7 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec send_tail(Ace.HTTP2.Stream.t(), Raxx.Tail.t()) :: {:ok, Ace.HTTP2.Stream.t()}
   def send_tail(stream, tail = %Raxx.Tail{}) do
     new_stream = process_send_end_stream(stream)
     queue = stream.queue ++ [tail]
@@ -136,6 +152,7 @@ defmodule Ace.HTTP2.Stream do
   end
 
   # Sending a reset drops the queue
+  @spec send_reset(Ace.HTTP2.Stream.t(), Ace.HTTP2.Errors.error()) :: {:ok, Ace.HTTP2.Stream.t()}
   def send_reset(stream, error) do
     new_status = {:closed, :closed}
     queue = [{:reset, error}]
@@ -151,6 +168,10 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec receive_headers(t(), Raxx.Request.t()) ::
+          {:ok, t()}
+          | {:error, {:protocol_error, String.t()}}
+          | {:error, {:stream_closed, String.t()}}
   def receive_headers(stream, request) do
     case stream.status do
       {:reserved, :closed} ->
@@ -216,12 +237,15 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec receive_promise(t(), t(), Raxx.Request.t()) :: {:ok, t()}
   def receive_promise(original, promised, request) do
     promised_stream_ref = %Ace.HTTP.Channel{endpoint: self(), id: promised.id, socket: :h2_socket}
     forward(original, {:promise, {promised_stream_ref, request}})
     {:ok, original}
   end
 
+  @spec receive_data(t(), Raxx.Data.t(), boolean) ::
+          {:ok, t()} | {:error, {:protocol_error, String.t()}}
   def receive_data(stream, data, end_stream) do
     new_status =
       case stream.status do
@@ -254,6 +278,10 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec receive_window_update(t(), Ace.HTTP2.Frame.WindowUpdate.increment()) ::
+          {:ok, t()}
+          | {:error, {:protocol_error, String.t()}}
+          | {:error, {:flow_control_error, String.t()}}
   def receive_window_update(stream, increment) do
     case stream.status do
       {:idle, :idle} ->
@@ -270,7 +298,7 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
-  def process_received_end_stream(stream) do
+  defp process_received_end_stream(stream) do
     case stream.status do
       {local, :open} ->
         new_status = {local, :closed}
@@ -281,6 +309,9 @@ defmodule Ace.HTTP2.Stream do
     end
   end
 
+  @spec receive_reset(t(), Ace.HTTP2.Errors.error()) ::
+          {:ok, t()}
+          | {:error, {:protocol_error, String.t()}}
   def receive_reset(stream, reason) do
     case stream.status do
       {:idle, :idle} ->
