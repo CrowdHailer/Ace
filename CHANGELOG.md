@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Current
 
-- Add [h2spec](https://github.com/summerwind/h2spec) test in CI
+### Added
+
+- Adds CI-only ExUnit test that downloads and runs [h2spec](https://github.com/summerwind/h2spec)
 
 ## [0.18.10](https://github.com/CrowdHailer/Ace/tree/0.18.10) - 2020-02-16
 

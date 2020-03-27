@@ -36,6 +36,7 @@ defmodule Ace.HTTP.H2SpecTest do
       )
 
     {:ok, port} = Ace.HTTP.Service.port(service)
+
     {result, exit_status} =
       System.cwd()
       |> Path.join(@h2spec_executable_destination)
@@ -48,8 +49,6 @@ defmodule Ace.HTTP.H2SpecTest do
 
     GenServer.stop(service)
     assert exit_status == 0, "h2spec failed\n#{result}"
-    IO.puts("RESULT: #{result}")
-    IO.puts("exit_status: #{inspect(exit_status)}")
   end
 
   defp maybe_fetch_h2spec() do
