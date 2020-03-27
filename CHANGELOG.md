@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Current
+
+- Add [h2spec](https://github.com/summerwind/h2spec) test in CI
+
 ## [0.18.10](https://github.com/CrowdHailer/Ace/tree/0.18.10) - 2020-02-16
 
 ### Added
@@ -158,7 +162,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
-- Use `raxx 0.15` which has does not expect query strings to be parsed.  
+- Use `raxx 0.15` which has does not expect query strings to be parsed.
 
 ## [0.15.11](https://github.com/CrowdHailer/Ace/tree/0.15.11) - 2018-03-28
 
