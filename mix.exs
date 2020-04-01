@@ -29,9 +29,6 @@ defmodule Ace.Mixfile do
         "coveralls.html": :test
       ],
       package: package(),
-      dialyzer: [
-        plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
-      ]
     ]
   end
 
