@@ -28,7 +28,7 @@ defmodule Ace.Mixfile do
         "coveralls.post": :test,
         "coveralls.html": :test
       ],
-      package: package(),
+      package: package()
     ]
   end
 
