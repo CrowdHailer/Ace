@@ -227,6 +227,7 @@ defmodule Ace.HTTP2.Connection do
         end
 
       :ok = do_send_frames(frames, state)
+
       # SEND PROMISE
       # Then handle response
 
@@ -458,7 +459,8 @@ defmodule Ace.HTTP2.Connection do
   end
 
   # TODO test this case
-  def consume_frame({:unknown_frame_type, type}, %{next: {:continuation, _stream_id, _header_block_fragment, _end_stream}
+  def consume_frame({:unknown_frame_type, type}, %{
+        next: {:continuation, _stream_id, _header_block_fragment, _end_stream}
       }) do
     Logger.debug("Dropping unknown frame type (#{type})")
     {:error, {:protocol_error, "Unknown frame interupted continuation"}}
