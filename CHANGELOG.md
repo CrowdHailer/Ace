@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Current
 
+### Added
+
+- Adds CI-only ExUnit test that downloads and runs [h2spec](https://github.com/summerwind/h2spec)
+
 ### Fixed
 
 - Correctly handles frame of unknown type
