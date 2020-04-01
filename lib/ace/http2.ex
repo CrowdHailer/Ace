@@ -86,6 +86,7 @@ defmodule Ace.HTTP2 do
   Request pseudo-headers are; `:scheme`, `:authority`, `:method` & `:path`.
   Duplicate or missing pseudo-headers will return an error.
   """
+
   # def headers_to_request(headers, end_stream) do
   #   OK.for do
   #     request <- build_request(headers)
