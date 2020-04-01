@@ -98,14 +98,11 @@ Start project using `iex -S mix` and visit [http://localhost:8080](http://localh
 
 ## Testing
 
-Run [h2spec](https://github.com/summerwind/h2spec) against the example `hello_http2` application.
+```
+mix test --include ci:true
+```
 
-1. Start the example app.
-  ```
-  cd examples/hello_http2
-  iex -S mix
-  ```
-2. Run h2spec from docker
-  ```
-  sudo docker run --net="host" summerwind/h2spec --port 8443 -t -k -S
-  ```
+Will run [h2spec](https://github.com/summerwind/h2spec) as one of the tests.
+
+If the `h2spec` is not specified in the environment variable `$H2SPEC_PATH` or on the
+`$PATH`, it will be downloaded into `test/support/h2spec/` and executed.
