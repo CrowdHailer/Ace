@@ -66,13 +66,14 @@ defmodule Ace.HTTP.Service do
           |> List.flatten()
 
         if !Enum.member?(behaviours, Raxx.Server) do
-          %{file: file, line: line} = __ENV__
-
-          :elixir_errors.warn(__ENV__.line, __ENV__.file, """
-          The service `#{inspect(__MODULE__)}` does not implement a Raxx server behaviour
-              This module should either `use Raxx.Server` or `use Raxx.SimpleServer.`
-              The behaviour Ace.HTTP.Service changed in release 0.18.0, see CHANGELOG for details.
-          """)
+          IO.warn(
+            """
+            The service `#{inspect(__MODULE__)}` does not implement a Raxx server behaviour
+                This module should either `use Raxx.Server` or `use Raxx.SimpleServer.`
+                The behaviour Ace.HTTP.Service changed in release 0.18.0, see CHANGELOG for details.
+            """,
+            Macro.Env.stacktrace(__ENV__)
+          )
         end
 
         application = {__MODULE__, initial_state}
@@ -126,6 +127,9 @@ defmodule Ace.HTTP.Service do
 
     * `:acceptors` - The number of servers simultaneously waiting for a connection.
       Defaults to 100.
+
+    * `:error_response` - The response that Ace will send if a request handler crashes.
+      Useful for setting custom headers, e.g. for CORS.
 
   Internal socket options can also be specified, most notably:
 

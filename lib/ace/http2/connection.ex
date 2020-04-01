@@ -452,15 +452,13 @@ defmodule Ace.HTTP2.Connection do
     end
   end
 
-  # TODO test this case
-  def consume_frame({:unknown_frame_type, type}, state = %{state: %{next: :any}}) do
+  def consume_frame({:unknown_frame_type, type}, state = %{next: :any}) do
     Logger.debug("Dropping unknown frame type (#{type})")
     {:ok, {[], state}}
   end
 
   # TODO test this case
-  def consume_frame({:unknown_frame_type, type}, %{
-        state: %{next: {:continuation, _stream_id, _header_block_fragment, _end_stream}}
+  def consume_frame({:unknown_frame_type, type}, %{next: {:continuation, _stream_id, _header_block_fragment, _end_stream}
       }) do
     Logger.debug("Dropping unknown frame type (#{type})")
     {:error, {:protocol_error, "Unknown frame interupted continuation"}}

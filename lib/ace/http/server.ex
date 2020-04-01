@@ -77,7 +77,8 @@ defmodule Ace.HTTP.Server do
               monitor: monitor,
               keep_alive: false,
               receive_state: Ace.HTTP1.Parser.new(max_line_length: 2048),
-              pending_ack_count: 0
+              pending_ack_count: 0,
+              error_response: Keyword.get(state.settings, :error_response)
             }
 
             GenServer.reply(from, {:ok, self()})
