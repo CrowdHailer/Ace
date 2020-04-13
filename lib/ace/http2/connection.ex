@@ -227,6 +227,7 @@ defmodule Ace.HTTP2.Connection do
         end
 
       :ok = do_send_frames(frames, state)
+
       # SEND PROMISE
       # Then handle response
 
