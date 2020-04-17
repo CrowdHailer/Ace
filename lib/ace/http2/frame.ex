@@ -64,8 +64,8 @@ defmodule Ace.HTTP2.Frame do
           {:error, {:unknown_frame_type, type}} ->
             {:ok, {{:unknown_frame_type, type}, unprocessed}}
 
-            {:error, reason} ->
-              {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
         end
 
       {:error, reason} ->
@@ -99,7 +99,9 @@ defmodule Ace.HTTP2.Frame do
   end
 
   @spec decode({non_neg_integer, any, any, any}) ::
-          {:ok, t()} | {:error, {:unknown_frame_type, non_neg_integer}}| {:error, {:protocol_error, String.t()}}
+          {:ok, t()}
+          | {:error, {:unknown_frame_type, non_neg_integer}}
+          | {:error, {:protocol_error, String.t()}}
   def decode(parsed_frame)
   def decode(frame = {@data, _, _, _}), do: __MODULE__.Data.decode(frame)
   def decode(frame = {@headers, _, _, _}), do: __MODULE__.Headers.decode(frame)
