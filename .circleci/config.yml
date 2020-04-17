@@ -67,7 +67,7 @@ jobs:
           at: /home/circleci/ace
       - run:
           name: Test Coverage
-          command: mix coveralls.html
+          command: mix coveralls.html --include ci:true
       - store_artifacts:
           path: cover/excoveralls.html
       - store_test_results:
@@ -113,7 +113,6 @@ jobs:
 
   dialyzer:
     <<: *defaults
-    resource_class: xlarge
     steps:
       - checkout
       - run: mix local.hex --force

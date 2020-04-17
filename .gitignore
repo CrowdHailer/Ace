@@ -5,4 +5,5 @@
 /doc
 erl_crash.dump
 *.ez
-/test/support/h2spec/**
+test/support/h2spec/h2spec
+test/support/h2spec/*.tar.gz

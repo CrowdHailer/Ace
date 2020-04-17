@@ -27,6 +27,7 @@ matrix:
     - otp_release: 22.3
       elixir: 1.10.2
       env:
+        - H2SPEC_CHECK=1
         - DIALYZER_CHECK=1
         - MIX_ENV=test
 env:
@@ -34,7 +35,12 @@ env:
 before_script:
   - mix local.hex --force && mix deps.get
 script:
-  - mix test
+  - |
+    if [ "${H2SPEC_CHECK}" == "1" ]; then
+      mix test --include ci:true
+    else
+      mix test
+    fi
   - mix format --check-formatted
   - |
     if [ "${DIALYZER_CHECK}" == "1" ]; then
