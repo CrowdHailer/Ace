@@ -69,6 +69,7 @@ defmodule Ace.HTTP1.ServerTest do
 
     assert_receive {:"$gen_call", from = {worker, _ref}, {:headers, _request, state}}, 1000
     GenServer.reply(from, {[], state})
+
     # Worker receives request, but client closes connection before response is sent
 
     monitor = Process.monitor(worker)
@@ -201,7 +202,7 @@ defmodule Ace.HTTP1.ServerTest do
     assert request.body == false
   end
 
-  test "renders 500 response if handler exits raises error" do
+  test "renders 500 response if handler raises error" do
     {:ok, service} =
       Ace.HTTP.Service.start_link(
         {Raxx.Kaboom, %{target: self()}},
@@ -223,6 +224,36 @@ defmodule Ace.HTTP1.ServerTest do
     assert_receive {:tcp, ^socket, response}, 1000
 
     assert "HTTP/1.1 500 Internal Server Error\r\n" <> _rest = response
+  end
+
+  test "renders custom 500 response if handler exits raises error" do
+    error_response =
+      Raxx.response(:internal_server_error)
+      |> Raxx.set_body("Something awkward happened")
+
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {Raxx.Kaboom, %{target: self()}},
+        port: 0,
+        cleartext: true,
+        error_response: error_response
+      )
+
+    {:ok, port} = Ace.HTTP.Service.port(service)
+
+    http1_request = """
+    GET /raise_error HTTP/1.1
+    host: example.com
+
+    """
+
+    {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary])
+    :ok = :gen_tcp.send(socket, http1_request)
+
+    assert_receive {:tcp, ^socket, response}, 1000
+
+    assert "HTTP/1.1 500 Internal Server Error\r\n" <> rest = response
+    assert rest =~ "Something awkward happened"
   end
 
   ## Request tests

@@ -19,7 +19,8 @@ defmodule Ace.HTTP1.Endpoint do
     :monitor,
     :channel,
     :keep_alive,
-    :pending_ack_count
+    :pending_ack_count,
+    :error_response
   ]
 
   defstruct @enforce_keys
@@ -120,9 +121,16 @@ defmodule Ace.HTTP1.Endpoint do
   # NOTE if any data already sent then canot send 500
   def handle_info(
         {:DOWN, _ref, :process, pid, _reason},
-        state = %{worker: pid, status: {_, :response}}
+        state = %{worker: pid, status: {_, :response}, error_response: error_response}
       ) do
-    {:ok, {outbound, new_state}} = send_part(Raxx.error_response(:internal_server_error), state)
+    error_response =
+      if error_response do
+        error_response
+      else
+        Raxx.error_response(:internal_server_error)
+      end
+
+    {:ok, {outbound, new_state}} = send_part(error_response, state)
 
     Ace.Socket.send(state.socket, outbound)
     {:stop, :normal, new_state}

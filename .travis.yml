@@ -1,9 +1,34 @@
 language: elixir
-elixir:
-  - 1.7.4
-  - 1.8.1
-otp_release:
-  - 21.3.8
+matrix:
+  include:
+    # - otp_release: 20.3
+    #   elixir: 1.7.4
+    - otp_release: 21.3
+      elixir: 1.7.4
+    - otp_release: 21.3
+      elixir: 1.8.1
+    - otp_release: 22.0
+      elixir: 1.8.2
+    - otp_release: 21.3
+      elixir: 1.9.4
+      env:
+        - DIALYZER_CHECK=1
+        - MIX_ENV=test
+    - otp_release: 21.3
+      elixir: 1.10.2
+      env:
+        - DIALYZER_CHECK=1
+        - MIX_ENV=test
+    - otp_release: 22.3
+      elixir: 1.9.4
+      env:
+        - DIALYZER_CHECK=1
+        - MIX_ENV=test
+    - otp_release: 22.3
+      elixir: 1.10.2
+      env:
+        - DIALYZER_CHECK=1
+        - MIX_ENV=test
 env:
   - MIX_ENV=test
 before_script:
@@ -11,7 +36,10 @@ before_script:
 script:
   - mix test
   - mix format --check-formatted
-  - mix dialyzer --halt-exit-status
+  - |
+    if [ "${DIALYZER_CHECK}" == "1" ]; then
+      mix dialyzer --halt-exit-status
+    fi
 cache:
   directories:
     - _build
