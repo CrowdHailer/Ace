@@ -4,8 +4,8 @@ defmodule Ace.Mixfile do
   def project do
     [
       app: :ace,
-      version: "0.18.10",
-      elixir: "~> 1.6",
+      version: "0.19.0",
+      elixir: "~> 1.9",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -42,8 +42,8 @@ defmodule Ace.Mixfile do
     [
       {:hpack, "~> 0.2.3", hex: :hpack_erl},
       {:raxx, "~> 0.17.0 or ~> 0.18.0 or ~> 1.0"},
-      {:excoveralls, "~> 0.8", only: :test},
-      {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.12", only: :test},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
+## [0.19.0](https://github.com/CrowdHailer/Ace/tree/0.19.0) - 2020-03-16
+
+This release requires Elixir v1.9 and later. For earlier Elixir versions, use Ace ~> 0.18.0.
+
+### Fixed
+
+- Fix depecration warnings from `:simple_one_to_one` Supervisor strategy.
+
 
 ## Current
 

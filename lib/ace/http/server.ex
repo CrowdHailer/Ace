@@ -28,10 +28,10 @@ defmodule Ace.HTTP.Server do
   end
 
   @doc false
-  def child_spec({worker_supervisor, settings}) do
+  def child_spec() do
     %{
       id: __MODULE__,
-      start: {__MODULE__, :start_link, [worker_supervisor, settings]},
+      start: {__MODULE__, :start_link, []},
       type: :worker,
       restart: :temporary,
       shutdown: 500
@@ -65,7 +65,12 @@ defmodule Ace.HTTP.Server do
               socket: socket
             }
 
-            {:ok, worker} = Supervisor.start_child(state.worker_supervisor, [channel])
+            {:ok, worker} =
+              DynamicSupervisor.start_child(
+                state.worker_supervisor,
+                Ace.HTTP.Worker.child_spec(channel)
+              )
+
             monitor = Process.monitor(worker)
 
             state = %Ace.HTTP1.Endpoint{
