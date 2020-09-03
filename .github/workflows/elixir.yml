@@ -18,6 +18,8 @@ jobs:
         exclude:
         - otp_version: '22.0'
           elixir_version: '1.7.4'
+        - otp_version: '20.3'
+          elixir_version: '1.10.3'
     steps:
     - uses: actions/checkout@v2
     - name: Set up Elixir
