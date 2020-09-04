@@ -1,27 +1,20 @@
 name: Elixir CI
-
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
 jobs:
   build:
-
     name: Build and test
     runs-on: ubuntu-latest
     strategy:
       matrix:
         elixir_version: ['1.9.4', '1.10.3']
-        otp_version: ['20.3', '21.3', '22.0']
+        otp_version: ['22.3.4.10', '23.0.3']
         exclude:
         - otp_version: '22.0'
           elixir_version: '1.7.4'
-        - otp_version: '20.3'
-          elixir_version: '1.10.3'
-        - otp_version: '20.3'
-          elixir_version: '1.9.4'       
     steps:
     - uses: actions/checkout@v2
     - name: Set up Elixir
