@@ -122,13 +122,17 @@ defmodule Ace.HTTP2.Connection do
         _ ->
           false
       end)
-
-    Logger.warn("Stopping stream #{stream.id} due to #{inspect(reason)}")
-    {:ok, new_stream} = Stream.send_reset(stream, :internal_error)
-    state = put_stream(state, new_stream)
-    {frames, state} = send_available(state)
-    :ok = do_send_frames(frames, state)
-    {:noreply, {buffer, state}}
+      
+    if reason != :normal do
+       Logger.warn("Stopping stream #{stream.id} due to #{inspect(reason)}")
+      {:ok, new_stream} = Stream.send_reset(stream, :internal_error)
+      state = put_stream(state, new_stream)
+      {frames, state} = send_available(state)
+      :ok = do_send_frames(frames, state)
+      {:noreply, {buffer, state}}    
+    else
+      {:noreply, {buffer, state}}
+    end
   end
 
   def handle_info(:ack, {buffer, state}) do
