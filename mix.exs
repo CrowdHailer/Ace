@@ -28,7 +28,10 @@ defmodule Ace.Mixfile do
         "coveralls.post": :test,
         "coveralls.html": :test
       ],
-      package: package()
+      package: package(),
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/ace.plt"}
+      ]
     ]
   end
 
