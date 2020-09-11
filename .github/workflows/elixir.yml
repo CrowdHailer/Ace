@@ -22,12 +22,19 @@ jobs:
       with:
         elixir-version: ${{ matrix.elixir_version }}
         otp-version: ${{ matrix.otp_version }}
-    - name: Restore dependencies cache
+    - name: Restore dependencies and _build cache
       uses: actions/cache@v2
       with:
-        path: deps
+        path: |
+          deps
+          _build
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
+    - name: Restore plts
+      uses: actions/cache@v2
+      with:
+        path: priv/plts
+        key: ${{ runner.os }}-dialyzer-${{ matrix.elixir_version }}-${{ matrix.otp_version }}-${{ hashFiles('**/mix.lock') }}
     - name: Install dependencies
       run: mix deps.get
     - name: Check formatting
