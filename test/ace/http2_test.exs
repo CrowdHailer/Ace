@@ -289,6 +289,24 @@ defmodule Ace.HTTP2Test do
     assert_receive {^client_stream, {:reset, :internal_error}}, 1000
   end
 
+  test "large GET response" do
+    large_greeting = String.duplicate("*", 100_000)
+    {:ok, service} =
+      Ace.HTTP.Service.start_link(
+        {MyApp, %{greeting: large_greeting}},
+        port: 0,
+        certfile: Support.test_certfile(),
+        keyfile: Support.test_keyfile()
+      )
+
+    {:ok, port} = Ace.HTTP.Service.port(service)
+
+    {:ok, client} = Client.start_link({"localhost", port}, enable_push: false)
+    {:ok, response} = Client.send_sync(client, Raxx.request(:GET, "/"))
+    assert 200 == response.status
+    assert String.starts_with?(response.body, large_greeting)
+  end
+
   @tag :skip
   test "Lost connection is forwarded to the worker", %{port: port} do
     Process.flag(:trap_exit, true)
