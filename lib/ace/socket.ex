@@ -27,9 +27,12 @@ defmodule Ace.Socket do
   def accept({:ssl, listen_socket}) do
     case :ssl.transport_accept(listen_socket) do
       {:ok, socket} ->
-        case :ssl.ssl_accept(socket) do
-          :ok ->
-            {:ok, {:ssl, socket}}
+        case :ssl.handshake(socket) do
+          {:ok, soc, _ext} ->
+            {:ok, {:ssl, soc}}
+
+          {:ok, soc} ->
+            {:ok, {:ssl, soc}}
 
           {:error, :closed} ->
             {:error, :econnaborted}
