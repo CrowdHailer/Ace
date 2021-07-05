@@ -16,10 +16,29 @@ defmodule Ace.HTTP2.Settings do
   @initial_window_size_minimum 0
   @initial_window_size_maximum 2_147_483_647
 
+  @type t :: %__MODULE__{}
+
+  @type option ::
+          {:max_frame_size, integer}
+          | {:initial_window_size, integer}
+          | {:max_concurrent_streams, integer}
+          | {:enable_push, boolean}
+
+  @type options :: [option]
+
+  @type on_init ::
+          {:ok, t}
+          | {:error, :max_frame_size_too_small}
+          | {:error, :max_frame_size_too_large}
+          | {:error, :initial_window_size_too_small}
+          | {:error, :initial_window_size_too_large}
+
+  @spec for_server(options) :: on_init
   def for_server(values \\ []) do
     for_client([{:enable_push, false} | values])
   end
 
+  @spec for_client(options) :: on_init
   def for_client(values \\ []) do
     case Keyword.get(values, :max_frame_size, @max_frame_size_default) do
       value when value < @max_frame_size_default ->
