@@ -32,7 +32,7 @@ defmodule Ace.HTTP1.Parser do
   """
   @spec new([option]) :: state
   def new(opts) do
-    max_line_length = Keyword.get(opts, :max_line_length)
+    max_line_length = Keyword.get(opts, :max_line_length, 2048)
     {:start_line, "", %{max_line_length: max_line_length}}
   end
 

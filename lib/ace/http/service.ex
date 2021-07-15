@@ -131,6 +131,8 @@ defmodule Ace.HTTP.Service do
     * `:error_response` - The response that Ace will send if a request handler crashes.
       Useful for setting custom headers, e.g. for CORS.
 
+    * `:max_line_length` - The maximum line length a request header can have.
+
   Internal socket options can also be specified, most notably:
 
     * `:alpn_preferred_protocols` - which protocols should be negotiated for the
